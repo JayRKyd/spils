@@ -1,15 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet,
-  Image, Linking, Animated,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import GradientScreen from "@/components/GradientScreen";
 import { GlassRow } from "@/components/GlassCard";
 
 interface JournalEntry {
@@ -49,31 +49,19 @@ const SEASON_ICONS: Record<string, string> = {
   Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️",
 };
 
-// ─── Glassmorphism helpers ──────────────────────────────────────────────────
+// ─── Glass Panel ─────────────────────────────────────────────────────────────
 
 function GlassPanel({ children, style }: { children: React.ReactNode; style?: object }) {
   return (
-    <BlurView intensity={30} tint="dark" style={[gp.blur, style]}>
-      <View style={[StyleSheet.absoluteFill, gp.overlay]} />
+    <View style={[gp.panel, style]}>
       {children}
-    </BlurView>
+    </View>
   );
 }
 
 const gp = StyleSheet.create({
-  blur: { borderRadius: 20, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
-  overlay: { backgroundColor: "rgba(255,255,255,0.07)" },
+  panel: { borderRadius: 20, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", overflow: "hidden" },
 });
-
-// ─── Chip ───────────────────────────────────────────────────────────────────
-
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity onPress={onPress} style={[s.chip, active && s.chipActive]}>
-      <Text style={s.chipText}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
 
 // ─── Filter Modal ────────────────────────────────────────────────────────────
 
@@ -108,7 +96,7 @@ function FilterModal({
       <View style={fm.backdrop}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
         <BlurView intensity={40} tint="dark" style={fm.sheet}>
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(60,24,10,0.82)", borderRadius: 24 }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(14,14,22,0.88)", borderRadius: 24 }]} />
           <View style={{ position: "relative" }}>
             <View style={fm.handle} />
             <View style={fm.header}>
@@ -192,21 +180,20 @@ const fm = StyleSheet.create({
   visBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.06)" },
   visBtnActive: { backgroundColor: "rgba(167,139,250,0.3)", borderColor: "#a78bfa" },
   visBtnText: { color: "rgba(255,255,255,0.65)", fontSize: 13 },
-  applyBtn: { backgroundColor: "#a78bfa", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 8 },
-  applyText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  applyBtn: { backgroundColor: "#13131a", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 8 },
+  applyText: { color: "#E5F772", fontWeight: "700", fontSize: 15 },
 });
 
 // ─── Entry Card ──────────────────────────────────────────────────────────────
 
 function EntryCard({ entry }: { entry: JournalEntry }) {
-  const date = new Date(entry.entry_date).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-  });
+  const d = new Date(entry.entry_date + "T12:00:00");
+  const date = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
   const displayName = entry.title || entry.perfumes?.name || `Entry ${date}`;
 
   return (
     <TouchableOpacity onPress={() => router.push(`/journal/${entry.id}` as any)} activeOpacity={0.75}>
-      <GlassRow style={s.card}>
+      <View style={s.card}>
         {/* Thumbnail */}
         <View style={s.thumb}>
           {entry.image_url ? (
@@ -244,7 +231,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
             </Text>
           </View>
         </View>
-      </GlassRow>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -302,20 +289,14 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
             const hasEntries = !!entryMap[key];
             const isToday = key === todayStr;
             const isSelected = key === selectedDate;
+            const filled = isSelected || isToday;
             return (
               <TouchableOpacity
                 key={key}
-                style={[cal.cell, isToday && cal.cellToday, isSelected && cal.cellSelected]}
+                style={[cal.cell, hasEntries && !filled && cal.cellHasEntry, filled && cal.cellFilled]}
                 onPress={() => setSelectedDate(isSelected ? null : key)}
               >
-                <Text style={[cal.cellText, isToday && cal.cellTextToday, isSelected && { color: "#fff", fontWeight: "700" }]}>{d}</Text>
-                {hasEntries && (
-                  <View style={cal.dot}>
-                    {entryMap[key].slice(0, 3).map((_, idx) => (
-                      <View key={idx} style={cal.dotDot} />
-                    ))}
-                  </View>
-                )}
+                <Text style={[cal.cellText, filled && cal.cellTextFilled]}>{d}</Text>
               </TouchableOpacity>
             );
           })}
@@ -342,20 +323,18 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
 const cal = StyleSheet.create({
   nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16 },
   navBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  navArrow: { color: "#a78bfa", fontSize: 28, lineHeight: 32 },
-  monthTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  weekRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 4 },
-  dayHeader: { flex: 1, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 11, fontWeight: "600" },
-  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingBottom: 12 },
-  cell: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center", borderRadius: 8 },
-  cellToday: { borderWidth: 1, borderColor: "rgba(167,139,250,0.5)" },
-  cellSelected: { backgroundColor: "#a78bfa" },
-  cellText: { color: "rgba(255,255,255,0.75)", fontSize: 13 },
-  cellTextToday: { color: "#a78bfa", fontWeight: "700" },
-  dot: { flexDirection: "row", gap: 2, marginTop: 2 },
-  dotDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "#a78bfa" },
-  dayLabel: { color: "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: "600", marginBottom: 10, marginTop: 4 },
-  noEntries: { color: "rgba(255,255,255,0.35)", textAlign: "center", paddingVertical: 20, fontSize: 14 },
+  navArrow: { color: "#13131a", fontSize: 22, fontWeight: "300" },
+  monthTitle: { color: "#13131a", fontSize: 15, fontWeight: "700", letterSpacing: 1 },
+  weekRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6 },
+  dayHeader: { flex: 1, textAlign: "center", color: "rgba(19,19,26,0.4)", fontSize: 11, fontWeight: "600" },
+  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingBottom: 14 },
+  cell: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center", borderRadius: 100 },
+  cellHasEntry: { borderWidth: 1, borderColor: "rgba(19,19,26,0.35)" },
+  cellFilled: { backgroundColor: "#13131a" },
+  cellText: { color: "rgba(19,19,26,0.75)", fontSize: 13 },
+  cellTextFilled: { color: "#E5F772", fontWeight: "700" },
+  dayLabel: { color: "rgba(19,19,26,0.55)", fontSize: 13, fontWeight: "600", marginBottom: 10, marginTop: 4 },
+  noEntries: { color: "rgba(19,19,26,0.4)", textAlign: "center", paddingVertical: 20, fontSize: 14 },
 });
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -366,7 +345,7 @@ export default function Journal() {
   const [loading, setLoading] = useState(true);
   const [filterVisible, setFilterVisible] = useState(false);
   const [filters, setFilters] = useState<Filters>({ seasons: [], minRating: 0, visibility: "all" });
-  const [view, setView] = useState<"list" | "calendar">("list");
+  const [view, setView] = useState<"list" | "calendar" | "sotd">("list");
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -385,7 +364,10 @@ export default function Journal() {
     (filters.minRating > 0 ? 1 : 0) +
     (filters.visibility !== "all" ? 1 : 0);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const filtered = entries.filter((e) => {
+    if (view === "sotd") return e.entry_date.slice(0, 10) === todayStr;
     const q = search.toLowerCase();
     if (q && !((e.title ?? "").toLowerCase().includes(q) || (e.brand ?? "").toLowerCase().includes(q) || (e.description ?? "").toLowerCase().includes(q) || (e.perfumes?.name ?? "").toLowerCase().includes(q))) return false;
     if (filters.seasons.length && !e.seasons?.some((s) => filters.seasons.includes(s))) return false;
@@ -395,143 +377,147 @@ export default function Journal() {
     return true;
   });
 
+  const toggleView = (v: "sotd" | "calendar") =>
+    setView((prev) => (prev === v ? "list" : v));
+
   return (
-    <GradientScreen gradient="journal">
-      {/* Header */}
-      <View style={s.header}>
-        <View style={s.headerTop}>
-          <Text style={s.pageTitle}>Journal</Text>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <TouchableOpacity
-              style={[s.iconBtn, activeFilterCount > 0 && s.iconBtnActive]}
-              onPress={() => setFilterVisible(true)}
-            >
-              <Text style={s.iconBtnText}>⚙</Text>
-              {activeFilterCount > 0 && (
+    <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Top nav */}
+        <View style={s.topNav}>
+          <Text style={s.logoText}>SP/LS.</Text>
+          <TouchableOpacity onPress={() => router.push("/(tabs)/profile" as any)} style={s.profileBtn}>
+            <Text style={s.profileIcon}>👤</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Header */}
+        <View style={s.header}>
+          <View style={s.headerTop}>
+            <Text style={s.pageTitle}>Journal</Text>
+            {activeFilterCount > 0 && (
+              <TouchableOpacity style={s.iconBtn} onPress={() => setFilterVisible(true)}>
+                <Text style={s.iconBtnText}>⚙</Text>
                 <View style={s.badge}><Text style={s.badgeText}>{activeFilterCount}</Text></View>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Search */}
+          <GlassPanel style={s.searchWrap}>
+            <View style={s.searchInner}>
+              <Text style={s.searchIcon}>🔍</Text>
+              <TextInput
+                style={s.searchInput}
+                placeholder="Search entries, brands, perfumes…"
+                placeholderTextColor="rgba(19,19,26,0.35)"
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch("")}>
+                  <Text style={{ color: "rgba(19,19,26,0.4)", fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
               )}
+            </View>
+          </GlassPanel>
+
+          {/* View chips */}
+          <View style={s.chipRow}>
+            <TouchableOpacity
+              style={[s.viewChip, view === "sotd" && s.viewChipActive]}
+              onPress={() => toggleView("sotd")}
+            >
+              <Text style={[s.viewChipText, view === "sotd" && s.viewChipTextActive]}>Scent of the Day</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.viewChip, view === "calendar" && s.viewChipActive]}
+              onPress={() => toggleView("calendar")}
+            >
+              <Text style={[s.viewChipText, view === "calendar" && s.viewChipTextActive]}>Calendar</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Search */}
-        <GlassPanel style={s.searchWrap}>
-          <View style={s.searchInner}>
-            <Text style={s.searchIcon}>🔍</Text>
-            <TextInput
-              style={s.searchInput}
-              placeholder="Search entries, brands, perfumes…"
-              placeholderTextColor="rgba(255,255,255,0.35)"
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch("")}>
-                <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 16 }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </GlassPanel>
+        {loading ? (
+          <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
+        ) : view === "calendar" ? (
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}>
+            <CalendarView entries={entries} onSelectEntry={(e) => router.push(`/journal/${e.id}` as any)} />
+          </ScrollView>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+            ListEmptyComponent={
+              <View style={s.emptyState}>
+                <Text style={s.emptyEmoji}>📔</Text>
+                <Text style={s.emptyTitle}>
+                  {view === "sotd" ? "No entry for today" : search || activeFilterCount ? "No matching entries" : "No journal entries yet"}
+                </Text>
+                <Text style={s.emptySubtitle}>
+                  {view === "sotd" ? "Tap + to log today's scent" : search || activeFilterCount ? "Try adjusting your filters" : "Tap + to start your fragrance journal"}
+                </Text>
+              </View>
+            }
+            renderItem={({ item }) => <EntryCard entry={item} />}
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          />
+        )}
 
-        {/* View toggle */}
-        <GlassPanel style={s.toggle}>
-          <View style={s.toggleInner}>
-            <TouchableOpacity
-              style={[s.toggleBtn, view === "list" && s.toggleBtnActive]}
-              onPress={() => setView("list")}
-            >
-              <Text style={[s.toggleText, view === "list" && s.toggleTextActive]}>≡ List</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.toggleBtn, view === "calendar" && s.toggleBtnActive]}
-              onPress={() => setView("calendar")}
-            >
-              <Text style={[s.toggleText, view === "calendar" && s.toggleTextActive]}>📅 Calendar</Text>
-            </TouchableOpacity>
-          </View>
-        </GlassPanel>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator color="#a78bfa" style={{ marginTop: 48 }} />
-      ) : view === "list" ? (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-          ListEmptyComponent={
-            <View style={s.emptyState}>
-              <Text style={s.emptyEmoji}>📔</Text>
-              <Text style={s.emptyTitle}>{search || activeFilterCount ? "No matching entries" : "No journal entries yet"}</Text>
-              <Text style={s.emptySubtitle}>{search || activeFilterCount ? "Try adjusting your filters" : "Tap + to start your fragrance journal"}</Text>
-            </View>
-          }
-          renderItem={({ item }) => <EntryCard entry={item} />}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        <FilterModal
+          visible={filterVisible}
+          filters={filters}
+          onApply={setFilters}
+          onClose={() => setFilterVisible(false)}
         />
-      ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}>
-          <CalendarView entries={entries} onSelectEntry={(e) => router.push(`/journal/${e.id}` as any)} />
-        </ScrollView>
-      )}
-
-      {/* FAB */}
-      <BlurView intensity={40} tint="dark" style={s.fab}>
-        <TouchableOpacity style={s.fabInner} onPress={() => router.push("/journal/new" as any)}>
-          <Text style={s.fabIcon}>+</Text>
-        </TouchableOpacity>
-      </BlurView>
-
-      <FilterModal
-        visible={filterVisible}
-        filters={filters}
-        onApply={setFilters}
-        onClose={() => setFilterVisible(false)}
-      />
-    </GradientScreen>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, gap: 10 },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  logoText: { color: "#13131a", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  profileIcon: { fontSize: 16 },
+  header: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, gap: 10 },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  pageTitle: { color: "#fff", fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
-  iconBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
-  iconBtnActive: { backgroundColor: "rgba(167,139,250,0.25)", borderColor: "#a78bfa" },
+  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
+  iconBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
   iconBtnText: { fontSize: 18 },
-  badge: { position: "absolute", top: -4, right: -4, backgroundColor: "#a78bfa", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
-  badgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  badge: { position: "absolute", top: -4, right: -4, backgroundColor: "#13131a", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  badgeText: { color: "#E5F772", fontSize: 10, fontWeight: "700" },
   searchWrap: { borderRadius: 16 },
   searchInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   searchIcon: { fontSize: 14 },
-  searchInput: { flex: 1, color: "#fff", fontSize: 14 },
-  toggle: { borderRadius: 14 },
-  toggleInner: { flexDirection: "row", padding: 4 },
-  toggleBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: "center" },
-  toggleBtnActive: { backgroundColor: "rgba(167,139,250,0.35)" },
-  toggleText: { color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: "600" },
-  toggleTextActive: { color: "#fff" },
-  card: { flexDirection: "row", gap: 12, paddingHorizontal: 12, paddingVertical: 12 },
-  thumb: { width: 62, height: 62, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
+  searchInput: { flex: 1, color: "#13131a", fontSize: 14 },
+  chipRow: { flexDirection: "row", gap: 10 },
+  viewChip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 24, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
+  viewChipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
+  viewChipText: { color: "rgba(19,19,26,0.55)", fontSize: 13, fontWeight: "600" },
+  viewChipTextActive: { color: "#E5F772" },
+  card: { flexDirection: "row", gap: 12, paddingHorizontal: 14, paddingVertical: 14, backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
+  thumb: { width: 62, height: 62, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.08)", overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
   thumbEmoji: { fontSize: 26 },
   cardTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 2 },
-  cardTitle: { color: "#fff", fontWeight: "700", fontSize: 14, flex: 1, marginRight: 8 },
-  cardDate: { color: "rgba(255,255,255,0.35)", fontSize: 11 },
-  cardBrand: { color: "rgba(255,255,255,0.5)", fontSize: 12, marginBottom: 2 },
-  cardDesc: { color: "rgba(255,255,255,0.45)", fontSize: 12, lineHeight: 17 },
+  cardTitle: { color: "#13131a", fontWeight: "700", fontSize: 14, flex: 1, marginRight: 8 },
+  cardDate: { color: "rgba(19,19,26,0.4)", fontSize: 11 },
+  cardBrand: { color: "rgba(19,19,26,0.55)", fontSize: 12, marginBottom: 2 },
+  cardDesc: { color: "rgba(19,19,26,0.5)", fontSize: 12, lineHeight: 17 },
   cardMeta: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 6 },
-  cardMetaText: { color: "rgba(255,255,255,0.35)", fontSize: 12 },
-  ratingPill: { backgroundColor: "rgba(167,139,250,0.2)", borderWidth: 1, borderColor: "rgba(167,139,250,0.4)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  ratingText: { color: "#a78bfa", fontSize: 11, fontWeight: "600" },
-  seasonPill: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  seasonPillText: { color: "rgba(255,255,255,0.55)", fontSize: 11 },
+  cardMetaText: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
+  ratingPill: { backgroundColor: "rgba(19,19,26,0.08)", borderWidth: 1, borderColor: "rgba(19,19,26,0.2)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  ratingText: { color: "#13131a", fontSize: 11, fontWeight: "600" },
+  seasonPill: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  seasonPillText: { color: "rgba(19,19,26,0.6)", fontSize: 11 },
   emptyState: { alignItems: "center", paddingVertical: 64 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { color: "#fff", fontSize: 17, fontWeight: "700", marginBottom: 8 },
-  emptySubtitle: { color: "rgba(255,255,255,0.4)", fontSize: 14, textAlign: "center" },
-  fab: { position: "absolute", bottom: 28, right: 20, borderRadius: 28, overflow: "hidden", borderWidth: 1, borderColor: "rgba(167,139,250,0.5)" },
-  fabInner: { width: 56, height: 56, backgroundColor: "rgba(167,139,250,0.35)", alignItems: "center", justifyContent: "center" },
-  fabIcon: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 34 },
+  emptyTitle: { color: "#13131a", fontSize: 17, fontWeight: "700", marginBottom: 8 },
+  emptySubtitle: { color: "rgba(19,19,26,0.45)", fontSize: 14, textAlign: "center" },
+  fab: { position: "absolute", bottom: 28, alignSelf: "center", left: "50%", marginLeft: -28, width: 56, height: 56, borderRadius: 28, backgroundColor: "#13131a", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  fabIcon: { color: "#E5F772", fontSize: 30, fontWeight: "300", lineHeight: 34 },
 });

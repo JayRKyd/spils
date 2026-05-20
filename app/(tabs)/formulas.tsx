@@ -4,7 +4,7 @@ import {
   Modal, ScrollView, ActivityIndicator, Alert, StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import GradientScreen from "@/components/GradientScreen";
@@ -101,7 +101,9 @@ export default function Formulas() {
   const [formulas, setFormulas] = useState<Formula[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const { openAdd } = useLocalSearchParams<{ openAdd?: string }>();
   const [createVisible, setCreateVisible] = useState(false);
+  useEffect(() => { if (openAdd) setCreateVisible(true); }, [openAdd]);
 
   const fetchFormulas = useCallback(async () => {
     setLoading(true);
@@ -151,9 +153,6 @@ export default function Formulas() {
         />
       )}
 
-      <TouchableOpacity style={s.fab} onPress={() => setCreateVisible(true)}>
-        <Text style={s.fabIcon}>+</Text>
-      </TouchableOpacity>
 
       <CreateModal
         visible={createVisible}

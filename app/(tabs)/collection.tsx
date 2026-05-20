@@ -4,7 +4,7 @@ import {
   Modal, ScrollView, ActivityIndicator, StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import GradientScreen from "@/components/GradientScreen";
@@ -144,7 +144,9 @@ export default function Collection() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [favOnly, setFavOnly] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { openAdd } = useLocalSearchParams<{ openAdd?: string }>();
   const [addVisible, setAddVisible] = useState(false);
+  useEffect(() => { if (openAdd) setAddVisible(true); }, [openAdd]);
 
   const fetchPerfumes = useCallback(async () => {
     setLoading(true);
@@ -190,9 +192,6 @@ export default function Collection() {
         />
       )}
 
-      <TouchableOpacity style={s.fab} onPress={() => setAddVisible(true)}>
-        <Text style={s.fabIcon}>+</Text>
-      </TouchableOpacity>
 
       <AddPerfumeModal visible={addVisible} userId={user?.id} onClose={() => setAddVisible(false)} onSaved={() => { setAddVisible(false); fetchPerfumes(); }} />
     </GradientScreen>

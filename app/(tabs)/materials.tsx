@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocalSearchParams } from "expo-router";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, Alert, StyleSheet,
@@ -219,6 +220,7 @@ function MaterialCard({ item, onEdit, onDelete }: {
 
 export default function Materials() {
   const { user } = useAuth();
+  const { openAdd } = useLocalSearchParams<{ openAdd?: string }>();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -226,6 +228,10 @@ export default function Materials() {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editTarget, setEditTarget] = useState<Partial<Material> | undefined>();
+
+  useEffect(() => {
+    if (openAdd) { setEditTarget(undefined); setModalVisible(true); }
+  }, [openAdd]);
 
   const fetchMaterials = useCallback(async () => {
     setLoading(true);
@@ -339,16 +345,6 @@ export default function Materials() {
           )}
         />
       )}
-
-      {/* FAB */}
-      <BlurView intensity={40} tint="dark" style={s.fab}>
-        <TouchableOpacity
-          style={s.fabInner}
-          onPress={() => { setEditTarget(undefined); setModalVisible(true); }}
-        >
-          <Text style={s.fabIcon}>+</Text>
-        </TouchableOpacity>
-      </BlurView>
 
       <MaterialModal
         visible={modalVisible}
