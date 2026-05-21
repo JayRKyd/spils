@@ -340,7 +340,7 @@ export default function JournalNew() {
       is_wishlisted: isWishlisted,
     }]);
     setSaving(false);
-    if (error) { Alert.alert("Error", "Failed to save. Please try again."); return; }
+    if (error) { console.error("Journal save error:", error.message); Alert.alert("Error", "Failed to save. Please try again."); return; }
     router.back();
   };
 
