@@ -2,8 +2,9 @@ import { useState, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, StyleSheet, Alert, Image,
-  KeyboardAvoidingView, Platform, PanResponder, Modal, Share,
+  KeyboardAvoidingView, Platform, PanResponder, Modal, Share, Linking,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
@@ -67,13 +68,9 @@ function SliderRow({ label, value, onChange }: { label: string; value: number; o
   const pct = value / 10;
 
   return (
-    <View style={{ marginBottom: 20 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-        <Text style={s.fieldLabel}>{label}</Text>
-        <Text style={s.sliderVal}>{value}/10</Text>
-      </View>
-      <View ref={containerRef} onLayout={measure} style={s.sliderContainer} {...panResponder.panHandlers}>
-        <View style={s.sliderTrackBg} />
+    <View style={{ marginBottom: 14 }}>
+      <Text style={[s.fieldLabel, { marginBottom: 6 }]}>{label}</Text>
+      <View ref={containerRef} onLayout={measure} style={s.sliderTrack} {...panResponder.panHandlers}>
         <View style={[s.sliderFill, { width: `${pct * 100}%` as any }]} />
         <View style={[s.sliderThumb, { left: `${pct * 100}%` as any }]} />
       </View>
@@ -157,6 +154,7 @@ export default function JournalNew() {
   const [aiActionLoading, setAiActionLoading] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
+  const [moreView, setMoreView] = useState<"main" | "delete" | "share">("main");
   const [isWishlisted, setIsWishlisted] = useState(false);
 
   // ─── Image Picker ──────────────────────────────────────────────────────────
@@ -263,6 +261,36 @@ export default function JournalNew() {
   };
 
   // ─── More Sheet ────────────────────────────────────────────────────────────
+
+  const closeMore = () => { setMoreVisible(false); setMoreView("main"); };
+
+  const shareText = `${title || "Untitled"}${brand ? ` by ${brand}` : ""} — logged in Spils`;
+
+  const handleOSShare = async () => {
+    closeMore();
+    await Share.share({ message: shareText });
+  };
+
+  const handleEmailShare = () => {
+    closeMore();
+    Linking.openURL(`mailto:?subject=${encodeURIComponent(title || "Spils Entry")}&body=${encodeURIComponent(shareText)}`);
+  };
+
+  const handleSMSShare = () => {
+    closeMore();
+    Linking.openURL(`sms:?body=${encodeURIComponent(shareText)}`);
+  };
+
+  const handleCopyLink = async () => {
+    await Clipboard.setStringAsync(shareText);
+    closeMore();
+    Alert.alert("Copied!", "Entry text copied to clipboard.");
+  };
+
+  const handleDiscard = () => {
+    closeMore();
+    router.back();
+  };
 
   const handleAddToCollection = async () => {
     setMoreVisible(false);
@@ -527,37 +555,80 @@ export default function JournalNew() {
         </KeyboardAvoidingView>
 
         {/* More Bottom Sheet */}
-        <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={() => setMoreVisible(false)}>
+        <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={closeMore}>
           <View style={ms.backdrop}>
-            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setMoreVisible(false)} />
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeMore} />
             <View style={ms.sheet}>
               <View style={ms.handle} />
 
-              <TouchableOpacity style={ms.btn} onPress={handleAddToCollection}>
-                <Text style={ms.btnText}>+Collection</Text>
-              </TouchableOpacity>
+              {moreView === "main" && (
+                <>
+                  <TouchableOpacity style={ms.btn} onPress={handleAddToCollection}>
+                    <Text style={ms.btnText}>+Collection</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity style={[ms.btn, isWishlisted && ms.btnWishlisted]} onPress={handleAddToWishlist}>
-                <Text style={ms.btnText}>{isWishlisted ? "✓ Wishlisted" : "Add to Wishlist"}</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity style={[ms.btn, isWishlisted && ms.btnWishlisted]} onPress={handleAddToWishlist}>
+                    <Text style={ms.btnText}>{isWishlisted ? "✓ Wishlisted" : "Add to Wishlist"}</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity style={[ms.btn, ms.btnDark]} onPress={handleClearAll}>
-                <Text style={[ms.btnText, ms.btnTextLight]}>Clear All</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity style={[ms.btn, ms.btnDark]} onPress={handleClearAll}>
+                    <Text style={[ms.btnText, ms.btnTextLight]}>Clear All</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[ms.btn, ms.btnBlue]}
-                onPress={() => {
-                  setMoreVisible(false);
-                  Share.share({ message: `${title || "Untitled"}${brand ? ` by ${brand}` : ""} — logged in Spils` });
-                }}
-              >
-                <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity style={[ms.btn, ms.btnDelete]} onPress={() => setMoreView("delete")}>
+                    <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity style={[ms.btn, ms.btnBeige]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
-                <Text style={ms.btnText}>Print</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={() => setMoreView("share")}>
+                    <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={[ms.btn, ms.btnBeige]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
+                    <Text style={ms.btnText}>Print</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {moreView === "delete" && (
+                <>
+                  <View style={[ms.btn, ms.btnDelete]}>
+                    <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
+                  </View>
+                  <Text style={ms.confirmText}>Are you sure?</Text>
+                  <View style={ms.confirmRow}>
+                    <TouchableOpacity style={[ms.btn, { flex: 1 }]} onPress={handleDiscard}>
+                      <Text style={ms.btnText}>Yes</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[ms.btn, { flex: 1 }]} onPress={() => setMoreView("main")}>
+                      <Text style={ms.btnText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {moreView === "share" && (
+                <>
+                  <View style={[ms.btn, ms.btnBlue]}>
+                    <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
+                  </View>
+
+                  <TouchableOpacity style={ms.btn} onPress={handleOSShare}>
+                    <Text style={ms.btnText}>Share</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={ms.btn} onPress={handleEmailShare}>
+                    <Text style={ms.btnText}>Email</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={ms.btn} onPress={handleSMSShare}>
+                    <Text style={ms.btnText}>Text (SMS)</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={ms.btn} onPress={handleCopyLink}>
+                    <Text style={ms.btnText}>Copy Link</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </Modal>
@@ -644,13 +715,11 @@ const s = StyleSheet.create({
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
   tagText: { color: "#13131a", fontSize: 13 },
 
-  sliderContainer: { height: 44, justifyContent: "center", position: "relative" },
-  sliderTrackBg: { position: "absolute", left: 0, right: 0, height: 8, borderRadius: 4, backgroundColor: "rgba(0,0,0,0.14)" },
-  sliderFill: { position: "absolute", left: 0, height: 8, borderRadius: 4, backgroundColor: "#13131a" },
-  sliderThumb: { position: "absolute", width: 28, height: 28, borderRadius: 14, backgroundColor: "#13131a", top: "50%", transform: [{ translateY: -14 }, { translateX: -14 }] },
-  sliderVal: { color: "rgba(19,19,26,0.45)", fontSize: 12 },
+  sliderTrack: { height: 52, borderRadius: 26, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.55)" },
+  sliderThumb: { position: "absolute", width: 46, height: 46, borderRadius: 23, backgroundColor: "#fff", top: 3, transform: [{ translateX: -38 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 
-  colorWheelWrap: { height: 240, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
+  colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
 
   aiHint: { color: "rgba(19,19,26,0.5)", fontSize: 13, marginBottom: 14 },
@@ -663,8 +732,8 @@ const s = StyleSheet.create({
   moreBtnText: { color: "#13131a", fontSize: 14 },
   fabBtn: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)", alignItems: "center", justifyContent: "center" },
   fabBtnText: { color: "rgba(19,19,26,0.5)", fontSize: 26, fontWeight: "300", lineHeight: 30 },
-  saveBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
-  saveBtnText: { color: "#E5F772", fontSize: 15, fontWeight: "700" },
+  saveBtn: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
+  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 });
 
 const ms = StyleSheet.create({
@@ -676,6 +745,9 @@ const ms = StyleSheet.create({
   btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
   btnBeige: { backgroundColor: "#EDE5D8", borderColor: "#EDE5D8" },
   btnWishlisted: { backgroundColor: "#E5F772", borderColor: "#E5F772" },
+  btnDelete: { backgroundColor: "#FF2D55", borderColor: "#FF2D55" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },
   btnTextLight: { color: "#fff" },
+  confirmText: { color: "#13131a", fontSize: 17, fontWeight: "600", textAlign: "center", marginVertical: 16 },
+  confirmRow: { flexDirection: "row", gap: 12 },
 });

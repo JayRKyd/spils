@@ -236,6 +236,52 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
   );
 }
 
+// ─── Archive Card ────────────────────────────────────────────────────────────
+
+function ArchiveCard({ entry }: { entry: JournalEntry }) {
+  const d = new Date(entry.entry_date + "T12:00:00");
+  const date = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
+  const displayName = entry.title || entry.perfumes?.name || `Entry ${date}`;
+
+  return (
+    <TouchableOpacity onPress={() => router.push(`/journal/${entry.id}` as any)} activeOpacity={0.75}>
+      <View style={arc.card}>
+        {/* Thumbnail */}
+        <View style={arc.thumb}>
+          {entry.image_url ? (
+            <Image source={{ uri: entry.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <Text style={arc.thumbEmoji}>📔</Text>
+          )}
+        </View>
+
+        {/* Content */}
+        <View style={{ flex: 1 }}>
+          <View style={arc.topRow}>
+            <Text style={arc.title} numberOfLines={1}>{displayName}</Text>
+            <Text style={arc.date}>{date}</Text>
+          </View>
+          {entry.brand ? <Text style={arc.brand} numberOfLines={1}>{entry.brand}</Text> : null}
+          {entry.description ? (
+            <Text style={arc.desc} numberOfLines={2}>{entry.description}</Text>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const arc = StyleSheet.create({
+  card: { flexDirection: "row", gap: 12, paddingHorizontal: 14, paddingVertical: 14, backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
+  thumb: { width: 62, height: 62, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.08)", overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
+  thumbEmoji: { fontSize: 26 },
+  topRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 2 },
+  title: { color: "#13131a", fontWeight: "700", fontSize: 14, flex: 1, marginRight: 8 },
+  date: { color: "rgba(19,19,26,0.4)", fontSize: 11 },
+  brand: { color: "rgba(19,19,26,0.5)", fontSize: 12, marginBottom: 3 },
+  desc: { color: "rgba(19,19,26,0.5)", fontSize: 12, lineHeight: 17 },
+});
+
 // ─── Calendar View ───────────────────────────────────────────────────────────
 
 function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onSelectEntry: (e: JournalEntry) => void }) {
@@ -345,7 +391,7 @@ export default function Journal() {
   const [loading, setLoading] = useState(true);
   const [filterVisible, setFilterVisible] = useState(false);
   const [filters, setFilters] = useState<Filters>({ seasons: [], minRating: 0, visibility: "all" });
-  const [view, setView] = useState<"list" | "calendar" | "sotd">("list");
+  const [view, setView] = useState<"list" | "calendar" | "sotd" | "archive">("list");
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -377,7 +423,7 @@ export default function Journal() {
     return true;
   });
 
-  const toggleView = (v: "sotd" | "calendar") =>
+  const toggleView = (v: "sotd" | "calendar" | "archive") =>
     setView((prev) => (prev === v ? "list" : v));
 
   return (
@@ -436,6 +482,12 @@ export default function Journal() {
             >
               <Text style={[s.viewChipText, view === "calendar" && s.viewChipTextActive]}>Calendar</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.viewChip, view === "archive" && s.viewChipActive]}
+              onPress={() => toggleView("archive")}
+            >
+              <Text style={[s.viewChipText, view === "archive" && s.viewChipTextActive]}>Archive</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -445,6 +497,21 @@ export default function Journal() {
           <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}>
             <CalendarView entries={entries} onSelectEntry={(e) => router.push(`/journal/${e.id}` as any)} />
           </ScrollView>
+        ) : view === "archive" ? (
+          <FlatList
+            data={entries}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+            ListEmptyComponent={
+              <View style={s.emptyState}>
+                <Text style={s.emptyEmoji}>📔</Text>
+                <Text style={s.emptyTitle}>No entries in archive</Text>
+                <Text style={s.emptySubtitle}>Tap + to start your fragrance journal</Text>
+              </View>
+            }
+            renderItem={({ item }) => <ArchiveCard entry={item} />}
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          />
         ) : (
           <FlatList
             data={filtered}

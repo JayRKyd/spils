@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import {
+  View, Text, TextInput, TouchableOpacity, ActivityIndicator,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import GradientScreen from "@/components/GradientScreen";
-import GlassCard from "@/components/GlassCard";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -23,123 +26,132 @@ export default function Signup() {
 
   if (success) {
     return (
-      <GradientScreen gradient="default">
-        <View style={styles.container}>
-          <GlassCard intensity={22} padding={32}>
-            <Text style={styles.logo}>Check your email</Text>
-            <Text style={[styles.subtitle, { marginBottom: 24 }]}>
-              We sent a confirmation link to {email}
-            </Text>
-            <TouchableOpacity onPress={() => router.replace("/(auth)/login")}>
-              <Text style={styles.linkAccent}>Back to Sign In</Text>
-            </TouchableOpacity>
-          </GlassCard>
+      <SafeAreaView style={s.screen}>
+        <View style={s.inner}>
+          <Text style={s.logo}>SP/LS.</Text>
+          <Text style={s.successTitle}>Check your email</Text>
+          <Text style={s.successSub}>We sent a confirmation link to {email}</Text>
+          <TouchableOpacity style={s.primaryBtn} onPress={() => router.replace("/(auth)/login")}>
+            <Text style={s.primaryBtnText}>Back to Sign In</Text>
+          </TouchableOpacity>
         </View>
-      </GradientScreen>
+      </SafeAreaView>
     );
   }
 
   return (
-    <GradientScreen gradient="default">
-      <View style={styles.container}>
-        <Text style={styles.logo}>Create Account</Text>
-        <Text style={styles.subtitle}>Join Spils</Text>
+    <SafeAreaView style={s.screen}>
+      <KeyboardAvoidingView style={s.inner} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <Text style={s.logo}>SP/LS.</Text>
 
-        <GlassCard intensity={22} padding={24} style={styles.card}>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+        <TextInput
+          style={s.input}
+          placeholder="Email Address"
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
 
+        <View style={s.passwordWrap}>
           <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="rgba(255,255,255,0.4)"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <TextInput
-            style={[styles.input, { marginBottom: 24 }]}
+            style={s.passwordInput}
             placeholder="Password"
-            placeholderTextColor="rgba(255,255,255,0.4)"
+            placeholderTextColor="rgba(255,255,255,0.35)"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            secureTextEntry={!showPassword}
           />
-
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleSignup} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Create Account</Text>
-            )}
+          <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={s.eyeBtn}>
+            <Text style={s.eyeIcon}>{showPassword ? "🙈" : "👁"}</Text>
           </TouchableOpacity>
+        </View>
 
-          <TouchableOpacity style={styles.linkBtn} onPress={() => router.back()}>
-            <Text style={styles.linkText}>
-              Already have an account?{" "}
-              <Text style={styles.linkAccent}>Sign in</Text>
-            </Text>
+        {error ? <Text style={s.error}>{error}</Text> : null}
+
+        <TouchableOpacity style={[s.primaryBtn, loading && { opacity: 0.7 }]} onPress={handleSignup} disabled={loading}>
+          {loading ? <ActivityIndicator color="#13131a" /> : <Text style={s.primaryBtnText}>Sign Up</Text>}
+        </TouchableOpacity>
+
+        <View style={s.divider}>
+          <View style={s.dividerLine} />
+          <Text style={s.dividerText}>Or</Text>
+          <View style={s.dividerLine} />
+        </View>
+
+        <View style={s.socialRow}>
+          <TouchableOpacity style={s.socialBtn} onPress={() => Alert.alert("Google", "Google sign-in coming soon.")}>
+            <Text style={s.socialG}>G</Text>
           </TouchableOpacity>
-        </GlassCard>
-      </View>
-    </GradientScreen>
+          <TouchableOpacity style={s.socialBtn} onPress={() => Alert.alert("Apple", "Apple sign-in coming soon.")}>
+            <Text style={s.socialIcon}></Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.socialBtn, s.socialFB]} onPress={() => Alert.alert("Facebook", "Facebook sign-in coming soon.")}>
+            <Text style={[s.socialIcon, { color: "#fff" }]}>f</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={s.footer} onPress={() => router.back()}>
+          <Text style={s.footerText}>
+            Already have an account?{"  "}
+            <Text style={s.footerLink}>Sign In</Text>
+          </Text>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  logo: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#ffffff",
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.5)",
-    marginBottom: 28,
-  },
-  card: {},
-  error: {
-    color: "#f87171",
-    marginBottom: 12,
-    fontSize: 13,
-  },
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#13131a" },
+  inner: { flex: 1, justifyContent: "center", paddingHorizontal: 28 },
+
+  logo: { color: "#E5F772", fontSize: 34, fontWeight: "800", letterSpacing: 1, marginBottom: 40 },
+
+  successTitle: { color: "#fff", fontSize: 24, fontWeight: "700", marginBottom: 10 },
+  successSub: { color: "rgba(255,255,255,0.5)", fontSize: 15, marginBottom: 32 },
+
   input: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: "#ffffff",
-    fontSize: 15,
-    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: 14, paddingHorizontal: 18, paddingVertical: 16,
+    color: "#fff", fontSize: 15, marginBottom: 12,
   },
+  passwordWrap: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: 14, marginBottom: 12, paddingRight: 14,
+  },
+  passwordInput: { flex: 1, paddingHorizontal: 18, paddingVertical: 16, color: "#fff", fontSize: 15 },
+  eyeBtn: { padding: 4 },
+  eyeIcon: { fontSize: 16 },
+
+  error: { color: "#f87171", fontSize: 13, marginBottom: 10 },
+
   primaryBtn: {
-    backgroundColor: "#a78bfa",
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: "center",
-    marginBottom: 16,
+    backgroundColor: "#E5F772", borderRadius: 50,
+    paddingVertical: 17, alignItems: "center", marginTop: 8, marginBottom: 4,
   },
-  primaryBtnText: {
-    color: "#ffffff",
-    fontWeight: "600",
-    fontSize: 15,
+  primaryBtnText: { color: "#13131a", fontWeight: "700", fontSize: 16 },
+
+  divider: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 22 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
+  dividerText: { color: "rgba(255,255,255,0.4)", fontSize: 13 },
+
+  socialRow: { flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 36 },
+  socialBtn: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: "#fff",
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
-  linkBtn: {
-    alignItems: "center",
-  },
-  linkText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 14,
-  },
-  linkAccent: {
-    color: "#a78bfa",
-  },
+  socialFB: { backgroundColor: "#1877F2" },
+  socialG: { fontSize: 20, fontWeight: "700", color: "#4285F4" },
+  socialIcon: { fontSize: 20, fontWeight: "700", color: "#13131a" },
+
+  footer: { alignItems: "center" },
+  footerText: { color: "rgba(255,255,255,0.45)", fontSize: 13 },
+  footerLink: { color: "#E5F772", fontWeight: "600" },
 });
