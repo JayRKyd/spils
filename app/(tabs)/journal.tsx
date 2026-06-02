@@ -427,7 +427,7 @@ export default function Journal() {
     const { data } = await (supabase as any)
       .from("scent_of_day")
       .select("*")
-      .order("entry_date", { ascending: false });
+      .order("created_at", { ascending: false });
     setSotdEntries(data ?? []);
     setSotdLoading(false);
   }, []);
