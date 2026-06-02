@@ -10,6 +10,7 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 import { GlassRow } from "@/components/GlassCard";
 
 interface JournalEntry {
@@ -42,6 +43,12 @@ interface JournalEntry {
   music_source: string | null;
   music_title: string | null;
   perfumes?: { name: string } | null;
+}
+
+interface ScentOfDayEntry {
+  id: string;
+  perfume_name: string;
+  entry_date: string;
 }
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
@@ -390,6 +397,7 @@ const cal = StyleSheet.create({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function Journal() {
+  const { user } = useAuth();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -398,19 +406,31 @@ export default function Journal() {
   const [view, setView] = useState<"landing" | "list" | "calendar" | "sotd">("landing");
   const [sotdInput, setSotdInput] = useState("");
   const [sotdSaving, setSotdSaving] = useState(false);
+  const [sotdEntries, setSotdEntries] = useState<ScentOfDayEntry[]>([]);
+  const [sotdLoading, setSotdLoading] = useState(false);
 
   const handleSotdSave = async () => {
     if (!sotdInput.trim()) return;
     setSotdSaving(true);
-    await (supabase as any).from("journal_entries").insert([{
-      title: sotdInput.trim(),
+    await (supabase as any).from("scent_of_day").insert([{
+      user_id: user?.id,
+      perfume_name: sotdInput.trim(),
       entry_date: new Date().toISOString().slice(0, 10),
-      is_public: false,
     }]);
     setSotdInput("");
     setSotdSaving(false);
-    fetchEntries();
+    fetchSotdEntries();
   };
+
+  const fetchSotdEntries = useCallback(async () => {
+    setSotdLoading(true);
+    const { data } = await (supabase as any)
+      .from("scent_of_day")
+      .select("*")
+      .order("entry_date", { ascending: false });
+    setSotdEntries(data ?? []);
+    setSotdLoading(false);
+  }, []);
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -422,7 +442,7 @@ export default function Journal() {
     setLoading(false);
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchEntries(); }, [fetchEntries]));
+  useFocusEffect(useCallback(() => { fetchEntries(); fetchSotdEntries(); }, [fetchEntries, fetchSotdEntries]));
 
   const activeFilterCount =
     filters.seasons.length +
@@ -530,21 +550,18 @@ export default function Journal() {
 
             {/* Entry history — minimal rows */}
             <FlatList
-              data={entries}
+              data={sotdEntries}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: 100, gap: 8 }}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => {
                 const d = new Date(item.entry_date + "T12:00:00");
                 const date = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
-                const name = item.title || item.perfumes?.name || `Entry ${date}`;
                 return (
-                  <TouchableOpacity onPress={() => router.push(`/journal/${item.id}` as any)} activeOpacity={0.75}>
-                    <View style={s.sotdRow}>
-                      <Text style={s.sotdRowName} numberOfLines={1}>{name}</Text>
-                      <Text style={s.sotdRowDate}>{date}</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <View style={s.sotdRow}>
+                    <Text style={s.sotdRowName} numberOfLines={1}>{item.perfume_name}</Text>
+                    <Text style={s.sotdRowDate}>{date}</Text>
+                  </View>
                 );
               }}
             />
