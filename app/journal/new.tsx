@@ -166,7 +166,7 @@ export default function JournalNew() {
         onPress: async () => {
           const perm = await ImagePicker.requestCameraPermissionsAsync();
           if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.55, base64: true });
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
           if (!result.canceled && result.assets[0]) {
             setBottleImage(result.assets[0].uri);
             if (result.assets[0].base64) runVisionAI(`data:image/jpeg;base64,${result.assets[0].base64}`);
@@ -178,7 +178,7 @@ export default function JournalNew() {
         onPress: async () => {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.55, base64: true });
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
           if (!result.canceled && result.assets[0]) {
             setBottleImage(result.assets[0].uri);
             if (result.assets[0].base64) runVisionAI(`data:image/jpeg;base64,${result.assets[0].base64}`);
@@ -398,14 +398,24 @@ export default function JournalNew() {
 
               {/* Bottle photo */}
               <TouchableOpacity style={s.photoUpload} onPress={pickPhoto} activeOpacity={0.85}>
-                {bottleImage && <Image source={{ uri: bottleImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="cover" />}
+                {bottleImage && <Image source={{ uri: bottleImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />}
                 {aiLoading && (
                   <View style={s.loadingOverlay}>
                     <ActivityIndicator color="#13131a" size="large" />
                     <Text style={s.loadingText}>{aiStatus}</Text>
                   </View>
                 )}
-                {!bottleImage && !aiLoading && <Text style={s.uploadLabel}>Upload Photo</Text>}
+                {!bottleImage && !aiLoading && (
+                  <>
+                    {/* Corner brackets */}
+                    <View style={[s.corner, s.cornerTL]} />
+                    <View style={[s.corner, s.cornerTR]} />
+                    <View style={[s.corner, s.cornerBL]} />
+                    <View style={[s.corner, s.cornerBR]} />
+                    <Text style={s.uploadIcon}>📷</Text>
+                    <Text style={s.uploadLabel}>Tap to capture or upload</Text>
+                  </>
+                )}
                 {bottleImage && !aiLoading && aiStatus && (
                   <View style={s.aiStatusBar}><Text style={s.aiStatusText}>{aiStatus}</Text></View>
                 )}
@@ -691,8 +701,14 @@ const s = StyleSheet.create({
   profileIcon: { fontSize: 16 },
   pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, marginBottom: 16 },
 
-  photoUpload: { width: "100%", height: 240, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" },
+  photoUpload: { width: "100%", height: 380, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" },
+  uploadIcon: { fontSize: 32, marginBottom: 10, opacity: 0.4 },
   uploadLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
+  corner: { position: "absolute", width: 22, height: 22, borderColor: "rgba(19,19,26,0.3)", borderWidth: 0 },
+  cornerTL: { top: 16, left: 16, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 4 },
+  cornerTR: { top: 16, right: 16, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 4 },
+  cornerBL: { bottom: 16, left: 16, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 4 },
+  cornerBR: { bottom: 16, right: 16, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 4 },
   loadingOverlay: { ...StyleSheet.absoluteFillObject as any, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "rgba(237,255,141,0.6)" },
   loadingText: { color: "rgba(19,19,26,0.6)", fontSize: 12 },
   aiStatusBar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(167,139,250,0.3)", paddingVertical: 6, paddingHorizontal: 12 },

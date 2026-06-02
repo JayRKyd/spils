@@ -313,21 +313,19 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
   const selectedEntries = selectedDate ? (entryMap[selectedDate] ?? []) : [];
 
   return (
-    <View>
-      {/* Month nav */}
+    <View style={{ flex: 1 }}>
+      {/* Calendar — fixed, does not scroll */}
       <GlassPanel style={{ marginBottom: 12 }}>
         <View style={cal.nav}>
           <TouchableOpacity onPress={prevMonth} style={cal.navBtn}><Text style={cal.navArrow}>‹</Text></TouchableOpacity>
           <Text style={cal.monthTitle}>{monthName}</Text>
           <TouchableOpacity onPress={nextMonth} style={cal.navBtn}><Text style={cal.navArrow}>›</Text></TouchableOpacity>
         </View>
-        {/* Day headers */}
         <View style={cal.weekRow}>
           {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
             <Text key={d} style={cal.dayHeader}>{d}</Text>
           ))}
         </View>
-        {/* Grid */}
         <View style={cal.grid}>
           {days.map((d, i) => {
             if (!d) return <View key={`e-${i}`} style={cal.cell} />;
@@ -349,17 +347,23 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
         </View>
       </GlassPanel>
 
-      {/* Selected day entries */}
+      {/* Selected day entries — independently scrollable */}
       {selectedDate && (
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={cal.dayLabel}>
             {new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </Text>
-          {selectedEntries.length === 0 ? (
-            <Text style={cal.noEntries}>No entries this day</Text>
-          ) : (
-            selectedEntries.map((e) => <EntryCard key={e.id} entry={e} />)
-          )}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            {selectedEntries.length === 0 ? (
+              <Text style={cal.noEntries}>No entries this day</Text>
+            ) : (
+              selectedEntries.map((e) => (
+                <View key={e.id} style={{ marginBottom: 10 }}>
+                  <EntryCard entry={e} />
+                </View>
+              ))
+            )}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -391,7 +395,7 @@ export default function Journal() {
   const [loading, setLoading] = useState(true);
   const [filterVisible, setFilterVisible] = useState(false);
   const [filters, setFilters] = useState<Filters>({ seasons: [], minRating: 0, visibility: "all" });
-  const [view, setView] = useState<"list" | "calendar" | "sotd" | "archive">("list");
+  const [view, setView] = useState<"landing" | "list" | "calendar" | "sotd">("landing");
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -423,8 +427,8 @@ export default function Journal() {
     return true;
   });
 
-  const toggleView = (v: "sotd" | "calendar" | "archive") =>
-    setView((prev) => (prev === v ? "list" : v));
+  const toggleView = (v: "sotd" | "calendar") =>
+    setView((prev) => (prev === v ? "landing" : v));
 
   return (
     <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
@@ -474,44 +478,31 @@ export default function Journal() {
               style={[s.viewChip, view === "sotd" && s.viewChipActive]}
               onPress={() => toggleView("sotd")}
             >
-              <Text style={[s.viewChipText, view === "sotd" && s.viewChipTextActive]}>Scent of the Day</Text>
+              <Text style={[s.viewChipText, view === "sotd" && s.viewChipTextActive]} numberOfLines={1}>Scent of the Day</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.viewChip, view === "calendar" && s.viewChipActive]}
               onPress={() => toggleView("calendar")}
             >
-              <Text style={[s.viewChipText, view === "calendar" && s.viewChipTextActive]}>Calendar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.viewChip, view === "archive" && s.viewChipActive]}
-              onPress={() => toggleView("archive")}
-            >
-              <Text style={[s.viewChipText, view === "archive" && s.viewChipTextActive]}>Archive</Text>
+              <Text style={[s.viewChipText, view === "calendar" && s.viewChipTextActive]} numberOfLines={1}>Calendar</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {loading ? (
           <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
+        ) : view === "landing" ? (
+          <View style={s.heroWrap}>
+            <Image
+              source={require("../../assets/magnific__create-a-modern-fashion-editorial-with-this-refere__42180.png")}
+              style={s.heroImage}
+              resizeMode="cover"
+            />
+          </View>
         ) : view === "calendar" ? (
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}>
+          <View style={{ flex: 1, paddingHorizontal: 16 }}>
             <CalendarView entries={entries} onSelectEntry={(e) => router.push(`/journal/${e.id}` as any)} />
-          </ScrollView>
-        ) : view === "archive" ? (
-          <FlatList
-            data={entries}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-            ListEmptyComponent={
-              <View style={s.emptyState}>
-                <Text style={s.emptyEmoji}>📔</Text>
-                <Text style={s.emptyTitle}>No entries in archive</Text>
-                <Text style={s.emptySubtitle}>Tap + to start your fragrance journal</Text>
-              </View>
-            }
-            renderItem={({ item }) => <ArchiveCard entry={item} />}
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          />
+          </View>
         ) : (
           <FlatList
             data={filtered}
@@ -562,10 +553,10 @@ const s = StyleSheet.create({
   searchInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   searchIcon: { fontSize: 14 },
   searchInput: { flex: 1, color: "#13131a", fontSize: 14 },
-  chipRow: { flexDirection: "row", gap: 10 },
-  viewChip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 24, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
+  chipRow: { flexDirection: "row", gap: 10, alignSelf: "stretch" },
+  viewChip: { flex: 1, height: 40, borderRadius: 24, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)", alignItems: "center", justifyContent: "center" },
   viewChipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  viewChipText: { color: "rgba(19,19,26,0.55)", fontSize: 13, fontWeight: "600" },
+  viewChipText: { color: "rgba(19,19,26,0.55)", fontSize: 13, fontWeight: "600", textAlign: "center" },
   viewChipTextActive: { color: "#E5F772" },
   card: { flexDirection: "row", gap: 12, paddingHorizontal: 14, paddingVertical: 14, backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
   thumb: { width: 62, height: 62, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.08)", overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
@@ -581,6 +572,8 @@ const s = StyleSheet.create({
   ratingText: { color: "#13131a", fontSize: 11, fontWeight: "600" },
   seasonPill: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   seasonPillText: { color: "rgba(19,19,26,0.6)", fontSize: 11 },
+  heroWrap: { flex: 1, marginHorizontal: 16, marginBottom: 100, borderRadius: 24, overflow: "hidden" },
+  heroImage: { width: "100%", height: "100%" },
   emptyState: { alignItems: "center", paddingVertical: 64 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { color: "#13131a", fontSize: 17, fontWeight: "700", marginBottom: 8 },
