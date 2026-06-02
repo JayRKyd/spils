@@ -396,6 +396,21 @@ export default function Journal() {
   const [filterVisible, setFilterVisible] = useState(false);
   const [filters, setFilters] = useState<Filters>({ seasons: [], minRating: 0, visibility: "all" });
   const [view, setView] = useState<"landing" | "list" | "calendar" | "sotd">("landing");
+  const [sotdInput, setSotdInput] = useState("");
+  const [sotdSaving, setSotdSaving] = useState(false);
+
+  const handleSotdSave = async () => {
+    if (!sotdInput.trim()) return;
+    setSotdSaving(true);
+    await (supabase as any).from("journal_entries").insert([{
+      title: sotdInput.trim(),
+      entry_date: new Date().toISOString().slice(0, 10),
+      is_public: false,
+    }]);
+    setSotdInput("");
+    setSotdSaving(false);
+    fetchEntries();
+  };
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -414,18 +429,6 @@ export default function Journal() {
     (filters.minRating > 0 ? 1 : 0) +
     (filters.visibility !== "all" ? 1 : 0);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  const filtered = entries.filter((e) => {
-    if (view === "sotd") return e.entry_date.slice(0, 10) === todayStr;
-    const q = search.toLowerCase();
-    if (q && !((e.title ?? "").toLowerCase().includes(q) || (e.brand ?? "").toLowerCase().includes(q) || (e.description ?? "").toLowerCase().includes(q) || (e.perfumes?.name ?? "").toLowerCase().includes(q))) return false;
-    if (filters.seasons.length && !e.seasons?.some((s) => filters.seasons.includes(s))) return false;
-    if (filters.minRating > 0 && (e.rating_10 == null || e.rating_10 < filters.minRating)) return false;
-    if (filters.visibility === "public" && !e.is_public) return false;
-    if (filters.visibility === "private" && e.is_public) return false;
-    return true;
-  });
 
   const toggleView = (v: "sotd" | "calendar") =>
     setView((prev) => (prev === v ? "landing" : v));
@@ -503,20 +506,67 @@ export default function Journal() {
           <View style={{ flex: 1, paddingHorizontal: 16 }}>
             <CalendarView entries={entries} onSelectEntry={(e) => router.push(`/journal/${e.id}` as any)} />
           </View>
+        ) : view === "sotd" ? (
+          <View style={{ flex: 1, paddingHorizontal: 16 }}>
+            {/* Quick log input */}
+            <View style={s.sotdInputRow}>
+              <TextInput
+                style={s.sotdInput}
+                placeholder="Perfume No. 5"
+                placeholderTextColor="rgba(19,19,26,0.35)"
+                value={sotdInput}
+                onChangeText={setSotdInput}
+                returnKeyType="done"
+                onSubmitEditing={handleSotdSave}
+              />
+              <TouchableOpacity
+                style={[s.sotdSaveBtn, (!sotdInput.trim() || sotdSaving) && { opacity: 0.4 }]}
+                onPress={handleSotdSave}
+                disabled={!sotdInput.trim() || sotdSaving}
+              >
+                {sotdSaving ? <ActivityIndicator size="small" color="#13131a" /> : <Text style={s.sotdSaveBtnText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+
+            {/* Entry history — minimal rows */}
+            <FlatList
+              data={entries}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: 100, gap: 8 }}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                const d = new Date(item.entry_date + "T12:00:00");
+                const date = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
+                const name = item.title || item.perfumes?.name || `Entry ${date}`;
+                return (
+                  <TouchableOpacity onPress={() => router.push(`/journal/${item.id}` as any)} activeOpacity={0.75}>
+                    <View style={s.sotdRow}>
+                      <Text style={s.sotdRowName} numberOfLines={1}>{name}</Text>
+                      <Text style={s.sotdRowDate}>{date}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
         ) : (
           <FlatList
-            data={filtered}
+            data={entries.filter((e) => {
+              const q = search.toLowerCase();
+              if (q && !((e.title ?? "").toLowerCase().includes(q) || (e.brand ?? "").toLowerCase().includes(q) || (e.description ?? "").toLowerCase().includes(q) || (e.perfumes?.name ?? "").toLowerCase().includes(q))) return false;
+              if (filters.seasons.length && !e.seasons?.some((season) => filters.seasons.includes(season))) return false;
+              if (filters.minRating > 0 && (e.rating_10 == null || e.rating_10 < filters.minRating)) return false;
+              if (filters.visibility === "public" && !e.is_public) return false;
+              if (filters.visibility === "private" && e.is_public) return false;
+              return true;
+            })}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
             ListEmptyComponent={
               <View style={s.emptyState}>
                 <Text style={s.emptyEmoji}>📔</Text>
-                <Text style={s.emptyTitle}>
-                  {view === "sotd" ? "No entry for today" : search || activeFilterCount ? "No matching entries" : "No journal entries yet"}
-                </Text>
-                <Text style={s.emptySubtitle}>
-                  {view === "sotd" ? "Tap + to log today's scent" : search || activeFilterCount ? "Try adjusting your filters" : "Tap + to start your fragrance journal"}
-                </Text>
+                <Text style={s.emptyTitle}>{search || activeFilterCount ? "No matching entries" : "No journal entries yet"}</Text>
+                <Text style={s.emptySubtitle}>{search || activeFilterCount ? "Try adjusting your filters" : "Tap + to start your fragrance journal"}</Text>
               </View>
             }
             renderItem={({ item }) => <EntryCard entry={item} />}
@@ -572,6 +622,13 @@ const s = StyleSheet.create({
   ratingText: { color: "#13131a", fontSize: 11, fontWeight: "600" },
   seasonPill: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   seasonPillText: { color: "rgba(19,19,26,0.6)", fontSize: 11 },
+  sotdInputRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 50, paddingLeft: 18, paddingRight: 6, paddingVertical: 6, marginBottom: 12 },
+  sotdInput: { flex: 1, color: "#13131a", fontSize: 14, paddingVertical: 6 },
+  sotdSaveBtn: { backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8 },
+  sotdSaveBtnText: { color: "#13131a", fontSize: 13, fontWeight: "600" },
+  sotdRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(0,0,0,0.04)", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  sotdRowName: { color: "#13131a", fontWeight: "600", fontSize: 14, flex: 1, marginRight: 12 },
+  sotdRowDate: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
   heroWrap: { flex: 1, marginHorizontal: 16, marginBottom: 100, borderRadius: 24, overflow: "hidden" },
   heroImage: { width: "100%", height: "100%" },
   emptyState: { alignItems: "center", paddingVertical: 64 },
