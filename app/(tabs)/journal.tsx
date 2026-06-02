@@ -408,6 +408,9 @@ export default function Journal() {
   const [sotdSaving, setSotdSaving] = useState(false);
   const [sotdEntries, setSotdEntries] = useState<ScentOfDayEntry[]>([]);
   const [sotdLoading, setSotdLoading] = useState(false);
+  const [sotdSelected, setSotdSelected] = useState<ScentOfDayEntry | null>(null);
+  const [sotdEditValue, setSotdEditValue] = useState("");
+  const [sotdActionSaving, setSotdActionSaving] = useState(false);
 
   const handleSotdSave = async () => {
     if (!sotdInput.trim()) return;
@@ -431,6 +434,24 @@ export default function Journal() {
     setSotdEntries(data ?? []);
     setSotdLoading(false);
   }, []);
+
+  const handleSotdEdit = async () => {
+    if (!sotdSelected || !sotdEditValue.trim()) return;
+    setSotdActionSaving(true);
+    await (supabase as any).from("scent_of_day").update({ perfume_name: sotdEditValue.trim() }).eq("id", sotdSelected.id);
+    setSotdActionSaving(false);
+    setSotdSelected(null);
+    fetchSotdEntries();
+  };
+
+  const handleSotdDelete = async () => {
+    if (!sotdSelected) return;
+    setSotdActionSaving(true);
+    await (supabase as any).from("scent_of_day").delete().eq("id", sotdSelected.id);
+    setSotdActionSaving(false);
+    setSotdSelected(null);
+    fetchSotdEntries();
+  };
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -558,10 +579,16 @@ export default function Journal() {
                 const d = new Date(item.entry_date + "T12:00:00");
                 const date = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
                 return (
-                  <View style={s.sotdRow}>
-                    <Text style={s.sotdRowName} numberOfLines={1}>{item.perfume_name}</Text>
-                    <Text style={s.sotdRowDate}>{date}</Text>
-                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    onLongPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); }}
+                    delayLongPress={400}
+                  >
+                    <View style={s.sotdRow}>
+                      <Text style={s.sotdRowName} numberOfLines={1}>{item.perfume_name}</Text>
+                      <Text style={s.sotdRowDate}>{date}</Text>
+                    </View>
+                  </TouchableOpacity>
                 );
               }}
             />
@@ -597,6 +624,47 @@ export default function Journal() {
           onApply={setFilters}
           onClose={() => setFilterVisible(false)}
         />
+
+        {/* SOTD edit / delete modal */}
+        <Modal visible={!!sotdSelected} transparent animationType="slide" onRequestClose={() => setSotdSelected(null)}>
+          <View style={fm.backdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSotdSelected(null)} />
+            <BlurView intensity={40} tint="dark" style={fm.sheet}>
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(14,14,22,0.88)", borderRadius: 24 }]} />
+              <View style={{ position: "relative" }}>
+                <View style={fm.handle} />
+                <View style={fm.header}>
+                  <Text style={fm.title}>Edit Entry</Text>
+                  <TouchableOpacity onPress={() => setSotdSelected(null)}>
+                    <Text style={fm.clear}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={s.sotdEditInput}
+                  value={sotdEditValue}
+                  onChangeText={setSotdEditValue}
+                  placeholder="Perfume name"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={[s.sotdModalBtn, { backgroundColor: "#E5F772", marginBottom: 10 }, (!sotdEditValue.trim() || sotdActionSaving) && { opacity: 0.4 }]}
+                  onPress={handleSotdEdit}
+                  disabled={!sotdEditValue.trim() || sotdActionSaving}
+                >
+                  {sotdActionSaving ? <ActivityIndicator size="small" color="#13131a" /> : <Text style={[s.sotdModalBtnText, { color: "#13131a" }]}>Save changes</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.sotdModalBtn, { backgroundColor: "rgba(255,60,60,0.18)", borderWidth: 1, borderColor: "rgba(255,60,60,0.35)" }, sotdActionSaving && { opacity: 0.4 }]}
+                  onPress={handleSotdDelete}
+                  disabled={sotdActionSaving}
+                >
+                  <Text style={[s.sotdModalBtnText, { color: "#ff6b6b" }]}>Delete entry</Text>
+                </TouchableOpacity>
+              </View>
+            </BlurView>
+          </View>
+        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -646,6 +714,9 @@ const s = StyleSheet.create({
   sotdRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(0,0,0,0.04)", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
   sotdRowName: { color: "#13131a", fontWeight: "600", fontSize: 14, flex: 1, marginRight: 12 },
   sotdRowDate: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
+  sotdEditInput: { color: "#fff", fontSize: 15, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 20, marginBottom: 16 },
+  sotdModalBtn: { marginHorizontal: 20, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
+  sotdModalBtnText: { fontSize: 14, fontWeight: "700" },
   heroWrap: { flex: 1, marginHorizontal: 16, marginBottom: 100, borderRadius: 24, overflow: "hidden" },
   heroImage: { width: "100%", height: "100%" },
   emptyState: { alignItems: "center", paddingVertical: 64 },
