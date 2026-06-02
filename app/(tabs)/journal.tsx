@@ -645,7 +645,6 @@ export default function Journal() {
                   onChangeText={setSotdEditValue}
                   placeholder="Perfume name"
                   placeholderTextColor="rgba(255,255,255,0.3)"
-                  autoFocus
                 />
                 <TouchableOpacity
                   style={[s.sotdModalBtn, { backgroundColor: "#E5F772", marginBottom: 10 }, (!sotdEditValue.trim() || sotdActionSaving) && { opacity: 0.4 }]}
