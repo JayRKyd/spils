@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet,
-  Image,
+  Image, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -627,6 +627,7 @@ export default function Journal() {
 
         {/* SOTD edit / delete modal */}
         <Modal visible={!!sotdSelected} transparent animationType="slide" onRequestClose={() => setSotdSelected(null)}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View style={fm.backdrop}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSotdSelected(null)} />
             <BlurView intensity={40} tint="dark" style={fm.sheet}>
@@ -663,6 +664,7 @@ export default function Journal() {
               </View>
             </BlurView>
           </View>
+          </KeyboardAvoidingView>
         </Modal>
       </SafeAreaView>
     </LinearGradient>
