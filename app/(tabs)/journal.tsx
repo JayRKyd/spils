@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet,
-  Image, KeyboardAvoidingView, Platform,
+  Image, KeyboardAvoidingView, Platform, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -589,16 +589,27 @@ export default function Journal() {
                 const d = new Date(item.entry_date + "T12:00:00");
                 const date = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
                 return (
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    onLongPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); }}
-                    delayLongPress={400}
-                  >
-                    <View style={s.sotdRow}>
-                      <Text style={s.sotdRowName} numberOfLines={1}>{item.perfume_name}</Text>
+                  <View style={s.sotdRow}>
+                    <Text style={s.sotdRowName} numberOfLines={1}>{item.perfume_name}</Text>
+                    <View style={s.sotdActions}>
+                      <TouchableOpacity onPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); }}>
+                        <Text style={s.sotdActionBtn}>EDIT</Text>
+                      </TouchableOpacity>
+                      <Text style={s.sotdActionSep}>|</Text>
+                      <TouchableOpacity onPress={() => {
+                        Alert.alert("Delete", "Remove this SOTD entry?", [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Delete", style: "destructive", onPress: async () => {
+                            await (supabase as any).from("scent_of_day").delete().eq("id", item.id);
+                            fetchSotdEntries();
+                          }},
+                        ]);
+                      }}>
+                        <Text style={s.sotdActionBtn}>DELETE</Text>
+                      </TouchableOpacity>
                       <Text style={s.sotdRowDate}>{date}</Text>
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 );
               }}
             />
@@ -723,8 +734,11 @@ const s = StyleSheet.create({
   sotdSaveBtn: { backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8 },
   sotdSaveBtnText: { color: "#13131a", fontSize: 13, fontWeight: "600" },
   sotdRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(0,0,0,0.04)", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  sotdRowName: { color: "#13131a", fontWeight: "600", fontSize: 14, flex: 1, marginRight: 12 },
-  sotdRowDate: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
+  sotdRowName: { color: "#13131a", fontWeight: "600", fontSize: 14, flex: 1, marginRight: 8 },
+  sotdRowDate: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginLeft: 8 },
+  sotdActions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  sotdActionBtn: { color: "#7c3aed", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+  sotdActionSep: { color: "rgba(19,19,26,0.3)", fontSize: 11 },
   sotdEditInput: { color: "#fff", fontSize: 15, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 20, marginBottom: 16 },
   sotdModalBtn: { marginHorizontal: 20, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   sotdModalBtnText: { fontSize: 14, fontWeight: "700" },
