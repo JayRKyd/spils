@@ -765,9 +765,9 @@ const s = StyleSheet.create({
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
   tagText: { color: "#13131a", fontSize: 13 },
 
-  sliderTrack: { height: 46, borderRadius: 23, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
-  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 23, backgroundColor: "rgba(255,255,255,0.55)" },
-  sliderThumb: { position: "absolute", width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", top: 4, transform: [{ translateX: -31 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },
+  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 
   colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
