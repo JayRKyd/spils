@@ -501,7 +501,7 @@ export default function JournalDetail() {
           {/* Inspiration photo box inside the card */}
           <TouchableOpacity style={d.inspirationInCard} onPress={pickInspirationPhoto} activeOpacity={0.8}>
             {entry.inspiration_image_url ? (
-              <Image source={{ uri: entry.inspiration_image_url }} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} resizeMode="contain" />
+              <Image source={{ uri: entry.inspiration_image_url }} style={{ width: "100%", height: "100%", borderRadius: 14 }} resizeMode="contain" />
             ) : null}
             {inspirationSaving ? (
               <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.6)", borderRadius: 14 }]}>
@@ -639,7 +639,7 @@ const d = StyleSheet.create({
 
   descText: { color: "rgba(19,19,26,0.75)", fontSize: 14, lineHeight: 22, paddingBottom: 14 },
 
-  inspirationInCard: { height: 300, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.5)", borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", alignItems: "center", justifyContent: "center", marginVertical: 12 },
+  inspirationInCard: { height: 420, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.5)", borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", alignItems: "center", justifyContent: "center", marginVertical: 12, overflow: "hidden" },
 
   editPill: { alignSelf: "center", backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 48, paddingVertical: 14, marginTop: 8, marginBottom: 24 },
   editPillText: { color: "#fff", fontSize: 15, fontWeight: "600" },
