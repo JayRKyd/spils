@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ interface JournalEntry {
   music_url: string | null;
   music_source: string | null;
   music_title: string | null;
+  inspiration_image_url: string | null;
   perfumes?: { name: string } | null;
 }
 
@@ -66,6 +68,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [notesBase, setNotesBase] = useState<string[]>([]);
   const [accords, setAccords] = useState<string[]>([]);
   const [musicUrl, setMusicUrl] = useState("");
+  const [dryDown, setDryDown] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -85,6 +88,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setNotesBase(entry.notes_base ?? []);
     setAccords(entry.accords ?? []);
     setMusicUrl(entry.music_url ?? "");
+    setDryDown(entry.dry_down ?? "");
   }, [visible, entry]);
 
   const handleSave = async () => {
@@ -105,6 +109,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       notes_base: notesBase.length ? notesBase : null,
       accords: accords.length ? accords : null,
       music_url: musicUrl.trim() || null,
+      dry_down: dryDown.trim() || null,
     }).eq("id", entry.id);
     setSaving(false);
     onSaved();
@@ -134,6 +139,8 @@ function EditModal({ visible, entry, onClose, onSaved }: {
           <Text style={em.label}>Date</Text><F placeholder="YYYY-MM-DD" value={entryDate} onChangeText={setEntryDate} />
           <Text style={em.label}>Notes</Text>
           <F placeholder="Your thoughts…" value={description} onChangeText={setDescription} multiline style={{ height: 90, textAlignVertical: "top" }} />
+          <Text style={em.label}>Dry Down</Text>
+          <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} />
           <Text style={em.label}>Music URL</Text><F placeholder="Spotify / YouTube link…" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" />
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -237,6 +244,41 @@ export default function JournalDetail() {
     }
   };
 
+  const [inspirationSaving, setInspirationSaving] = useState(false);
+
+  const pickInspirationPhoto = () => {
+    Alert.alert("Inspiration Photo", "Choose an option", [
+      {
+        text: "Take Photo",
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
+        },
+      },
+      {
+        text: "Choose from Library",
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const saveInspirationPhoto = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (!entry) return;
+    setInspirationSaving(true);
+    const imageData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+    await (supabase as any).from("journal_entries").update({ inspiration_image_url: imageData }).eq("id", entry.id);
+    setInspirationSaving(false);
+    fetchEntry();
+  };
+
   const handleShare = async () => {
     if (!entry) return;
     try {
@@ -272,17 +314,9 @@ export default function JournalDetail() {
           </TouchableOpacity>
           <Text style={d.logoText}>SP/LS.</Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <TouchableOpacity style={d.iconBtn} onPress={() => setEditVisible(true)}>
-            <Text style={d.iconBtnText}>✎</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[d.iconBtn, { borderColor: "rgba(220,50,50,0.3)" }]} onPress={handleDelete}>
-            <Text style={d.iconBtnText}>🗑</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-            <Text style={d.profileIcon}>👤</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
+          <Text style={d.profileIcon}>👤</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -342,9 +376,22 @@ export default function JournalDetail() {
           {entry.dry_down ? <Row label="Dry Down" value={entry.dry_down} /> : null}
 
           {/* Inspiration photo box inside the card */}
-          <View style={d.inspirationInCard}>
-            <Text style={d.photoPlaceholder}>Upload Inspiration Photo</Text>
-          </View>
+          <TouchableOpacity style={d.inspirationInCard} onPress={pickInspirationPhoto} activeOpacity={0.8}>
+            {entry.inspiration_image_url ? (
+              <Image source={{ uri: entry.inspiration_image_url }} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} resizeMode="cover" />
+            ) : null}
+            {inspirationSaving ? (
+              <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.6)", borderRadius: 14 }]}>
+                <ActivityIndicator color="#13131a" />
+              </View>
+            ) : !entry.inspiration_image_url ? (
+              <Text style={d.photoPlaceholder}>Tap to upload inspiration photo</Text>
+            ) : (
+              <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
           {/* Colors row */}
           <View style={d.row}>
@@ -414,8 +461,11 @@ export default function JournalDetail() {
             <TouchableOpacity style={ms.btn} onPress={handleShare}>
               <Text style={ms.btnText}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={handleAddToCollection}>
-              <Text style={[ms.btnText, ms.btnTextLight]}>+Collection</Text>
+            <TouchableOpacity style={ms.btn} onPress={handleAddToCollection}>
+              <Text style={ms.btnText}>+Collection</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={ms.btn} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
+              <Text style={ms.btnText}>Print</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[ms.btn, ms.btnDanger]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
               <Text style={[ms.btnText, { color: "#dc2626" }]}>Delete</Text>

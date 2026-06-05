@@ -140,6 +140,7 @@ export default function JournalNew() {
   const [sillageVal, setSillageVal] = useState(5);
   const [longevityVal, setLongevityVal] = useState(5);
   const [dryDownVal, setDryDownVal] = useState(5);
+  const [dryDownText, setDryDownText] = useState("");
 
   const [colors, setColors] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
@@ -329,7 +330,7 @@ export default function JournalNew() {
     setFamilies([]); setPendingFamily("");
     setNotesTop([]); setNotesHeart([]); setNotesBase([]);
     setTopInput(""); setMidInput(""); setBaseInput("");
-    setProjectionVal(5); setSillageVal(5); setLongevityVal(5); setDryDownVal(5);
+    setProjectionVal(5); setSillageVal(5); setLongevityVal(5); setDryDownVal(5); setDryDownText("");
     setColors([]); setSelectedColor("#a78bfa"); setMusicUrl("");
     setBottleImage(null); setBottleBase64(null); setInspirationImage(null);
     setAiResult(null); setAiStatus(null);
@@ -360,7 +361,7 @@ export default function JournalNew() {
       projection: String(projectionVal),
       sillage: String(sillageVal),
       longevity: String(longevityVal),
-      dry_down: String(dryDownVal),
+      dry_down: dryDownText.trim() || null,
       colors: colors.length ? colors : null,
       music_url: musicUrl.trim() || null,
       music_source: musicUrl.trim() ? detectSource(musicUrl.trim()) : null,
@@ -475,7 +476,17 @@ export default function JournalNew() {
               <SliderRow label="Projection" value={projectionVal} onChange={setProjectionVal} />
               <SliderRow label="Sillage" value={sillageVal} onChange={setSillageVal} />
               <SliderRow label="Longevity" value={longevityVal} onChange={setLongevityVal} />
-              <SliderRow label="Dry Down" value={dryDownVal} onChange={setDryDownVal} />
+              <View style={{ marginBottom: 14 }}>
+                <Text style={[s.fieldLabel, { marginBottom: 6 }]}>Dry Down</Text>
+                <TextInput
+                  style={s.field}
+                  placeholder="Describe the dry down..."
+                  placeholderTextColor="rgba(19,19,26,0.4)"
+                  value={dryDownText}
+                  onChangeText={setDryDownText}
+                  multiline
+                />
+              </View>
 
               {/* Inspiration Photo */}
               <SH text="Inspiration" />

@@ -299,6 +299,7 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDay = new Date(year, month, 1).getDay();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
 
   const entryMap: Record<string, JournalEntry[]> = {};
   entries.forEach((e) => {
@@ -307,54 +308,78 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
     entryMap[key].push(e);
   });
 
-  const monthName = new Date(year, month).toLocaleString("en-US", { month: "long", year: "numeric" });
-  const todayStr = now.toISOString().slice(0, 10);
+  const monthName = new Date(year, month).toLocaleString("en-US", { month: "long" }).toUpperCase();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   const prevMonth = () => { if (month === 0) { setMonth(11); setYear((y) => y - 1); } else setMonth((m) => m - 1); };
   const nextMonth = () => { if (month === 11) { setMonth(0); setYear((y) => y + 1); } else setMonth((m) => m + 1); };
 
-  const days: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) days.push(null);
-  for (let d = 1; d <= daysInMonth; d++) days.push(d);
+  type Cell = { day: number; current: boolean; key: string };
+  const cells: Cell[] = [];
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = daysInPrevMonth - i;
+    const pm = month === 0 ? 11 : month - 1;
+    const py = month === 0 ? year - 1 : year;
+    cells.push({ day: d, current: false, key: `${py}-${String(pm + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}` });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, current: true, key: `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}` });
+  }
+  const remaining = cells.length % 7 === 0 ? 0 : 7 - (cells.length % 7);
+  for (let d = 1; d <= remaining; d++) {
+    const nm = month === 11 ? 0 : month + 1;
+    const ny = month === 11 ? year + 1 : year;
+    cells.push({ day: d, current: false, key: `${ny}-${String(nm + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}` });
+  }
 
   const selectedEntries = selectedDate ? (entryMap[selectedDate] ?? []) : [];
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Calendar — fixed, does not scroll */}
-      <GlassPanel style={{ marginBottom: 12 }}>
+      <View style={cal.panel}>
+        {/* Month nav */}
         <View style={cal.nav}>
           <TouchableOpacity onPress={prevMonth} style={cal.navBtn}><Text style={cal.navArrow}>‹</Text></TouchableOpacity>
           <Text style={cal.monthTitle}>{monthName}</Text>
           <TouchableOpacity onPress={nextMonth} style={cal.navBtn}><Text style={cal.navArrow}>›</Text></TouchableOpacity>
         </View>
+
+        {/* Day headers */}
         <View style={cal.weekRow}>
-          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <Text key={d} style={cal.dayHeader}>{d}</Text>
           ))}
         </View>
+
+        {/* Grid */}
         <View style={cal.grid}>
-          {days.map((d, i) => {
-            if (!d) return <View key={`e-${i}`} style={cal.cell} />;
-            const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-            const hasEntries = !!entryMap[key];
-            const isToday = key === todayStr;
-            const isSelected = key === selectedDate;
-            const filled = isSelected || isToday;
+          {cells.map((cell, i) => {
+            const isToday = cell.key === todayStr && cell.current;
+            const isSelected = cell.key === selectedDate;
+            const hasEntries = !!entryMap[cell.key] && cell.current;
             return (
               <TouchableOpacity
-                key={key}
-                style={[cal.cell, hasEntries && !filled && cal.cellHasEntry, filled && cal.cellFilled]}
-                onPress={() => setSelectedDate(isSelected ? null : key)}
+                key={i}
+                style={[cal.cell, isSelected && cal.cellSelected, isToday && !isSelected && cal.cellToday]}
+                onPress={() => { if (cell.current) setSelectedDate(isSelected ? null : cell.key); }}
+                activeOpacity={cell.current ? 0.7 : 1}
               >
-                <Text style={[cal.cellText, filled && cal.cellTextFilled]}>{d}</Text>
+                <Text style={[
+                  cal.cellText,
+                  !cell.current && cal.cellTextDim,
+                  isSelected && cal.cellTextSelected,
+                  isToday && !isSelected && cal.cellTextToday,
+                ]}>
+                  {cell.day}
+                </Text>
+                {hasEntries && !isSelected && <View style={cal.dot} />}
               </TouchableOpacity>
             );
           })}
         </View>
-      </GlassPanel>
+      </View>
 
-      {/* Selected day entries — independently scrollable */}
+      {/* Selected day entries */}
       {selectedDate && (
         <View style={{ flex: 1 }}>
           <Text style={cal.dayLabel}>
@@ -378,18 +403,22 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
 }
 
 const cal = StyleSheet.create({
-  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16 },
-  navBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  navArrow: { color: "#13131a", fontSize: 22, fontWeight: "300" },
-  monthTitle: { color: "#13131a", fontSize: 15, fontWeight: "700", letterSpacing: 1 },
+  panel: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", marginBottom: 14, paddingBottom: 10 },
+  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16 },
+  navBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  navArrow: { color: "rgba(19,19,26,0.5)", fontSize: 20 },
+  monthTitle: { color: "#13131a", fontSize: 13, fontWeight: "700", letterSpacing: 2 },
   weekRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6 },
-  dayHeader: { flex: 1, textAlign: "center", color: "rgba(19,19,26,0.4)", fontSize: 11, fontWeight: "600" },
-  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingBottom: 14 },
-  cell: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center", borderRadius: 100 },
-  cellHasEntry: { borderWidth: 1, borderColor: "rgba(19,19,26,0.35)" },
-  cellFilled: { backgroundColor: "#13131a" },
-  cellText: { color: "rgba(19,19,26,0.75)", fontSize: 13 },
-  cellTextFilled: { color: "#E5F772", fontWeight: "700" },
+  dayHeader: { flex: 1, textAlign: "center", color: "rgba(19,19,26,0.45)", fontSize: 10, fontWeight: "600" },
+  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 4, paddingBottom: 4 },
+  cell: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center" },
+  cellToday: { borderWidth: 1.5, borderColor: "#13131a", borderRadius: 100 },
+  cellSelected: { backgroundColor: "#13131a", borderRadius: 100 },
+  cellText: { color: "#13131a", fontSize: 13 },
+  cellTextDim: { color: "rgba(19,19,26,0.2)" },
+  cellTextToday: { fontWeight: "700" },
+  cellTextSelected: { color: "#E5F772", fontWeight: "700" },
+  dot: { position: "absolute", bottom: 5, width: 3, height: 3, borderRadius: 2, backgroundColor: "#13131a" },
   dayLabel: { color: "rgba(19,19,26,0.55)", fontSize: 13, fontWeight: "600", marginBottom: 10, marginTop: 4 },
   noEntries: { color: "rgba(19,19,26,0.4)", textAlign: "center", paddingVertical: 20, fontSize: 14 },
 });
@@ -418,7 +447,7 @@ export default function Journal() {
     await (supabase as any).from("scent_of_day").insert([{
       user_id: user?.id,
       perfume_name: sotdInput.trim(),
-      entry_date: new Date().toISOString().slice(0, 10),
+      entry_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })(),
     }]);
     setSotdInput("");
     setSotdSaving(false);
@@ -496,25 +525,6 @@ export default function Journal() {
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Search */}
-          <GlassPanel style={s.searchWrap}>
-            <View style={s.searchInner}>
-              <Text style={s.searchIcon}>🔍</Text>
-              <TextInput
-                style={s.searchInput}
-                placeholder="Search entries, brands, perfumes…"
-                placeholderTextColor="rgba(19,19,26,0.35)"
-                value={search}
-                onChangeText={setSearch}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch("")}>
-                  <Text style={{ color: "rgba(19,19,26,0.4)", fontSize: 16 }}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </GlassPanel>
 
           {/* View chips */}
           <View style={s.chipRow}>
