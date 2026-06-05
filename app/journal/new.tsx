@@ -683,18 +683,15 @@ export default function JournalNew() {
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSeasonPickerVisible(false)} />
             <View style={ms.sheet}>
               <View style={ms.handle} />
-              {["🌸 Spring", "☀️ Summer", "🍂 Fall", "❄️ Winter"].map((s_) => {
-                const val = s_.split(" ")[1];
-                return (
-                  <TouchableOpacity
-                    key={val}
-                    style={[ms.btn, seasons === val && ms.btnDark]}
-                    onPress={() => { setSeasons(val); setSeasonPickerVisible(false); }}
-                  >
-                    <Text style={[ms.btnText, seasons === val && ms.btnTextLight]}>{s_}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {["Spring", "Summer", "Fall", "Winter"].map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  style={[ms.btn, seasons === val && ms.btnDark]}
+                  onPress={() => { setSeasons(val); setSeasonPickerVisible(false); }}
+                >
+                  <Text style={[ms.btnText, seasons === val && ms.btnTextLight]}>{val}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </Modal>
