@@ -489,7 +489,8 @@ export default function Journal() {
     const { data } = await (supabase as any)
       .from("journal_entries")
       .select("*, perfumes:perfume_id (name)")
-      .order("entry_date", { ascending: false });
+      .order("entry_date", { ascending: false })
+      .order("created_at", { ascending: false });
     setEntries(data ?? []);
     setLoading(false);
   }, []);
