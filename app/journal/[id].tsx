@@ -50,6 +50,35 @@ const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️",
 
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
 
+function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove }: {
+  tags: string[]; inputVal: string; placeholder: string;
+  onChangeInput: (v: string) => void; onAdd: (v: string) => void; onRemove: (i: number) => void;
+}) {
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <TextInput
+        style={em.input}
+        placeholder={placeholder}
+        placeholderTextColor="rgba(19,19,26,0.4)"
+        value={inputVal}
+        onChangeText={onChangeInput}
+        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); onChangeInput(""); } }}
+        returnKeyType="done"
+        blurOnSubmit={false}
+      />
+      {tags.length > 0 && (
+        <View style={em.tagRow}>
+          {tags.map((t, i) => (
+            <TouchableOpacity key={i} style={em.tag} onPress={() => onRemove(i)}>
+              <Text style={em.tagText}>{t} ×</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function EditModal({ visible, entry, onClose, onSaved }: {
   visible: boolean; entry: JournalEntry; onClose: () => void; onSaved: () => void;
 }) {
@@ -69,6 +98,13 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [accords, setAccords] = useState<string[]>([]);
   const [musicUrl, setMusicUrl] = useState("");
   const [dryDown, setDryDown] = useState("");
+  const [projection, setProjection] = useState("");
+  const [sillage, setSillage] = useState("");
+  const [longevity, setLongevity] = useState("");
+  const [topInput, setTopInput] = useState("");
+  const [heartInput, setHeartInput] = useState("");
+  const [baseInput, setBaseInput] = useState("");
+  const [accordInput, setAccordInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -89,6 +125,10 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setAccords(entry.accords ?? []);
     setMusicUrl(entry.music_url ?? "");
     setDryDown(entry.dry_down ?? "");
+    setProjection(entry.projection ?? "");
+    setSillage(entry.sillage ?? "");
+    setLongevity(entry.longevity ?? "");
+    setTopInput(""); setHeartInput(""); setBaseInput(""); setAccordInput("");
   }, [visible, entry]);
 
   const handleSave = async () => {
@@ -110,53 +150,134 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       accords: accords.length ? accords : null,
       music_url: musicUrl.trim() || null,
       dry_down: dryDown.trim() || null,
+      projection: projection.trim() || null,
+      sillage: sillage.trim() || null,
+      longevity: longevity.trim() || null,
     }).eq("id", entry.id);
     setSaving(false);
     onSaved();
   };
 
+  const toggleSeason = (s: string) =>
+    setSeasons((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
+
   const F = (props: React.ComponentProps<typeof TextInput>) => (
-    <TextInput style={em.input} placeholderTextColor="rgba(255,255,255,0.3)" {...props} />
+    <TextInput style={em.input} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />
   );
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={em.screen}>
-        <View style={em.header}>
-          <TouchableOpacity onPress={onClose}><Text style={em.cancel}>Cancel</Text></TouchableOpacity>
-          <Text style={em.headerTitle}>Edit Entry</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#a78bfa" size="small" /> : <Text style={em.saveBtn}>Save</Text>}
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
-          <Text style={em.label}>Title</Text><F placeholder="Perfume name…" value={title} onChangeText={setTitle} />
-          <Text style={em.label}>Brand</Text><F placeholder="Brand…" value={brand} onChangeText={setBrand} />
-          <Text style={em.label}>Perfumer</Text><F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
-          <Text style={em.label}>Gender</Text><F placeholder="Unisex, Feminine…" value={gender} onChangeText={setGender} />
-          <Text style={em.label}>Price</Text><F placeholder="190.00" value={priceText} onChangeText={setPriceText} />
-          <Text style={em.label}>Rating (0–10)</Text><F placeholder="8.5" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
-          <Text style={em.label}>Date</Text><F placeholder="YYYY-MM-DD" value={entryDate} onChangeText={setEntryDate} />
-          <Text style={em.label}>Notes</Text>
-          <F placeholder="Your thoughts…" value={description} onChangeText={setDescription} multiline style={{ height: 90, textAlignVertical: "top" }} />
-          <Text style={em.label}>Dry Down</Text>
-          <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} />
-          <Text style={em.label}>Music URL</Text><F placeholder="Spotify / YouTube link…" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" />
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      </View>
+      <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={em.header}>
+            <TouchableOpacity onPress={onClose}><Text style={em.cancel}>Cancel</Text></TouchableOpacity>
+            <Text style={em.headerTitle}>Edit Entry</Text>
+            <TouchableOpacity onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.saveBtn}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+            <Text style={em.label}>Title</Text>
+            <F placeholder="Perfume name…" value={title} onChangeText={setTitle} />
+
+            <Text style={em.label}>Brand</Text>
+            <F placeholder="Brand…" value={brand} onChangeText={setBrand} />
+
+            <Text style={em.label}>Perfumer</Text>
+            <F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
+
+            <Text style={em.label}>Gender</Text>
+            <F placeholder="Unisex, Feminine…" value={gender} onChangeText={setGender} />
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Price</Text>
+                <F placeholder="190.00" value={priceText} onChangeText={setPriceText} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Rating (0–10)</Text>
+                <F placeholder="8.5" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+              </View>
+            </View>
+
+            <Text style={em.label}>Date</Text>
+            <F placeholder="YYYY-MM-DD" value={entryDate} onChangeText={setEntryDate} />
+
+            <Text style={em.label}>Season(s)</Text>
+            <View style={em.chipRow}>
+              {SEASONS.map((s) => (
+                <TouchableOpacity key={s} style={[em.chip, seasons.includes(s) && em.chipActive]} onPress={() => toggleSeason(s)}>
+                  <Text style={[em.chipText, seasons.includes(s) && em.chipTextActive]}>{SEASON_ICONS[s]} {s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={em.label}>Fragrance Family</Text>
+            <TagInput tags={accords} inputVal={accordInput} placeholder="Add accord…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
+
+            <Text style={em.label}>Top Notes</Text>
+            <TagInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+
+            <Text style={em.label}>Middle Notes</Text>
+            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+
+            <Text style={em.label}>Base Notes</Text>
+            <TagInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Projection</Text>
+                <F placeholder="1–10" value={projection} onChangeText={setProjection} keyboardType="decimal-pad" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Sillage</Text>
+                <F placeholder="1–10" value={sillage} onChangeText={setSillage} keyboardType="decimal-pad" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Longevity</Text>
+                <F placeholder="1–10" value={longevity} onChangeText={setLongevity} keyboardType="decimal-pad" />
+              </View>
+            </View>
+
+            <Text style={em.label}>Dry Down</Text>
+            <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} />
+
+            <Text style={em.label}>Music URL</Text>
+            <F placeholder="Spotify / YouTube link…" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" />
+
+            <Text style={em.label}>Notes</Text>
+            <F placeholder="Your thoughts…" value={description} onChangeText={setDescription} multiline style={{ height: 120, textAlignVertical: "top" }} />
+
+            <TouchableOpacity style={em.publicRow} onPress={() => setIsPublic((v) => !v)}>
+              <Text style={em.publicLabel}>{isPublic ? "🌐 Public" : "🔒 Private"}</Text>
+              <Text style={em.publicSub}>Tap to toggle visibility</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
     </Modal>
   );
 }
 
 const em = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0e0e16" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
-  headerTitle: { color: "#fff", fontSize: 17, fontWeight: "700" },
-  cancel: { color: "rgba(255,255,255,0.5)", fontSize: 16 },
-  saveBtn: { color: "#a78bfa", fontSize: 16, fontWeight: "700" },
-  label: { color: "rgba(255,255,255,0.5)", fontSize: 12, marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.6 },
-  input: { backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: "#fff", fontSize: 14 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
+  headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
+  cancel: { color: "rgba(19,19,26,0.5)", fontSize: 16 },
+  saveBtn: { color: "#13131a", fontSize: 16, fontWeight: "700" },
+  label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
+  input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
+  chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
+  chipText: { color: "rgba(19,19,26,0.6)", fontSize: 13 },
+  chipTextActive: { color: "#E5F772" },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  tagText: { color: "#13131a", fontSize: 13 },
+  publicRow: { marginTop: 20, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  publicLabel: { color: "#13131a", fontSize: 15, fontWeight: "600" },
+  publicSub: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginTop: 2 },
 });
 
 // ─── Detail Row ───────────────────────────────────────────────────────────────
