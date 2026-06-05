@@ -48,7 +48,33 @@ interface JournalEntry {
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 
-// ─── Edit Modal ───────────────────────────────────────────────────────────────
+// ─── Edit Modal Styles (hoisted so TagInput + F can reference em) ────────────
+
+const em = StyleSheet.create({
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
+  headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
+  cancel: { color: "rgba(19,19,26,0.5)", fontSize: 16 },
+  saveBtn: { color: "#13131a", fontSize: 16, fontWeight: "700" },
+  label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
+  input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
+  chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
+  chipText: { color: "rgba(19,19,26,0.6)", fontSize: 13 },
+  chipTextActive: { color: "#E5F772" },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  tagText: { color: "#13131a", fontSize: 13 },
+  publicRow: { marginTop: 20, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  publicLabel: { color: "#13131a", fontSize: 15, fontWeight: "600" },
+  publicSub: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginTop: 2 },
+});
+
+// ─── Edit Modal Components ────────────────────────────────────────────────────
+
+function F(props: React.ComponentProps<typeof TextInput>) {
+  return <TextInput style={em.input} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />;
+}
 
 function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove }: {
   tags: string[]; inputVal: string; placeholder: string;
@@ -161,10 +187,6 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const toggleSeason = (s: string) =>
     setSeasons((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
 
-  const F = (props: React.ComponentProps<typeof TextInput>) => (
-    <TextInput style={em.input} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />
-  );
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
@@ -259,26 +281,6 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     </Modal>
   );
 }
-
-const em = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
-  headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
-  cancel: { color: "rgba(19,19,26,0.5)", fontSize: 16 },
-  saveBtn: { color: "#13131a", fontSize: 16, fontWeight: "700" },
-  label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
-  input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
-  chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  chipText: { color: "rgba(19,19,26,0.6)", fontSize: 13 },
-  chipTextActive: { color: "#E5F772" },
-  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
-  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  tagText: { color: "#13131a", fontSize: 13 },
-  publicRow: { marginTop: 20, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  publicLabel: { color: "#13131a", fontSize: 15, fontWeight: "600" },
-  publicSub: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginTop: 2 },
-});
 
 // ─── Detail Row ───────────────────────────────────────────────────────────────
 
