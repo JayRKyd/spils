@@ -360,18 +360,20 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
             return (
               <TouchableOpacity
                 key={i}
-                style={[cal.cell, isSelected && cal.cellSelected, isToday && !isSelected && cal.cellToday]}
+                style={cal.cell}
                 onPress={() => { if (cell.current) setSelectedDate(isSelected ? null : cell.key); }}
                 activeOpacity={cell.current ? 0.7 : 1}
               >
-                <Text style={[
-                  cal.cellText,
-                  !cell.current && cal.cellTextDim,
-                  isSelected && cal.cellTextSelected,
-                  isToday && !isSelected && cal.cellTextToday,
-                ]}>
-                  {cell.day}
-                </Text>
+                <View style={[cal.dayCircle, isSelected && cal.cellSelected, isToday && !isSelected && cal.cellToday]}>
+                  <Text style={[
+                    cal.cellText,
+                    !cell.current && cal.cellTextDim,
+                    isSelected && cal.cellTextSelected,
+                    isToday && !isSelected && cal.cellTextToday,
+                  ]}>
+                    {cell.day}
+                  </Text>
+                </View>
                 {hasEntries && !isSelected && <View style={cal.dot} />}
               </TouchableOpacity>
             );
@@ -412,8 +414,9 @@ const cal = StyleSheet.create({
   dayHeader: { flex: 1, textAlign: "center", color: "rgba(19,19,26,0.45)", fontSize: 10, fontWeight: "600" },
   grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 4, paddingBottom: 4 },
   cell: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center" },
-  cellToday: { borderWidth: 1.5, borderColor: "#13131a", borderRadius: 100 },
-  cellSelected: { backgroundColor: "#13131a", borderRadius: 100 },
+  dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  cellToday: { borderWidth: 1.5, borderColor: "#13131a" },
+  cellSelected: { backgroundColor: "#13131a" },
   cellText: { color: "#13131a", fontSize: 13 },
   cellTextDim: { color: "rgba(19,19,26,0.2)" },
   cellTextToday: { fontWeight: "700" },
