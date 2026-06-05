@@ -413,7 +413,7 @@ const cal = StyleSheet.create({
   weekRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6 },
   dayHeader: { flex: 1, textAlign: "center", color: "rgba(19,19,26,0.45)", fontSize: 10, fontWeight: "600" },
   grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 4, paddingBottom: 0 },
-  cell: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center" },
+  cell: { width: "14.285%", height: 44, alignItems: "center", justifyContent: "center" },
   dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   cellToday: { borderWidth: 1.5, borderColor: "#13131a" },
   cellSelected: { backgroundColor: "#13131a" },
