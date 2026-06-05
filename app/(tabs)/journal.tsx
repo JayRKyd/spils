@@ -405,14 +405,14 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
 }
 
 const cal = StyleSheet.create({
-  panel: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", marginBottom: 14, paddingBottom: 10 },
+  panel: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", marginBottom: 14, paddingBottom: 0 },
   nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16 },
   navBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   navArrow: { color: "rgba(19,19,26,0.5)", fontSize: 20 },
   monthTitle: { color: "#13131a", fontSize: 13, fontWeight: "700", letterSpacing: 2 },
   weekRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6 },
   dayHeader: { flex: 1, textAlign: "center", color: "rgba(19,19,26,0.45)", fontSize: 10, fontWeight: "600" },
-  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 4, paddingBottom: 4 },
+  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 4, paddingBottom: 0 },
   cell: { width: "14.285%", aspectRatio: 1, alignItems: "center", justifyContent: "center" },
   dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   cellToday: { borderWidth: 1.5, borderColor: "#13131a" },
