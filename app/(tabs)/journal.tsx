@@ -374,7 +374,6 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
                     {cell.day}
                   </Text>
                 </View>
-                {hasEntries && !isSelected && <View style={cal.dot} />}
               </TouchableOpacity>
             );
           })}
