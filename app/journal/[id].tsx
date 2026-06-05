@@ -313,15 +313,15 @@ export default function JournalDetail() {
   const [editVisible, setEditVisible] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
 
-  const fetchEntry = useCallback(async () => {
-    setLoading(true);
+  const fetchEntry = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const { data } = await (supabase as any)
       .from("journal_entries")
       .select("*, perfumes:perfume_id (name)")
       .eq("id", id)
       .single();
     setEntry(data);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   }, [id]);
 
   useEffect(() => { fetchEntry(); }, [fetchEntry]);
@@ -397,7 +397,7 @@ export default function JournalDetail() {
     const imageData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
     await (supabase as any).from("journal_entries").update({ inspiration_image_url: imageData }).eq("id", entry.id);
     setInspirationSaving(false);
-    fetchEntry();
+    fetchEntry(false);
   };
 
   const handleShare = async () => {
@@ -570,7 +570,7 @@ export default function JournalDetail() {
           visible={editVisible}
           entry={entry}
           onClose={() => setEditVisible(false)}
-          onSaved={() => { setEditVisible(false); fetchEntry(); }}
+          onSaved={() => { setEditVisible(false); fetchEntry(false); }}
         />
       )}
       {/* More Sheet */}
