@@ -233,9 +233,6 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
                 <Text style={s.seasonPillText}>{SEASON_ICONS[season]} {season}</Text>
               </View>
             ))}
-            <Text style={[s.cardMetaText, { marginLeft: "auto" }]}>
-              {entry.is_public ? "🌐" : "🔒"}
-            </Text>
           </View>
         </View>
       </View>
