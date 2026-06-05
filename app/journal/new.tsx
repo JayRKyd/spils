@@ -494,8 +494,8 @@ export default function JournalNew() {
 
               {/* Inspiration Photo */}
               <SH text="Inspiration" />
-              <TouchableOpacity style={[s.photoUpload, { height: 180 }]} onPress={pickInspirationPhoto} activeOpacity={0.85}>
-                {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="cover" />}
+              <TouchableOpacity style={s.photoUpload} onPress={pickInspirationPhoto} activeOpacity={0.85}>
+                {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />}
                 {!inspirationImage && <Text style={s.uploadLabel}>Upload Inspiration Photo</Text>}
                 {inspirationImage && (
                   <View style={s.aiStatusBar}><Text style={s.aiStatusText}>Tap to change</Text></View>
