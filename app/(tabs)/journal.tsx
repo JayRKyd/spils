@@ -563,7 +563,7 @@ export default function Journal() {
             <View style={s.sotdInputRow}>
               <TextInput
                 style={s.sotdInput}
-                placeholder="Perfume No. 5"
+                placeholder="Your SOTD..."
                 placeholderTextColor="rgba(19,19,26,0.35)"
                 value={sotdInput}
                 onChangeText={setSotdInput}
