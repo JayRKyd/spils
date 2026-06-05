@@ -72,8 +72,8 @@ const em = StyleSheet.create({
 
 // ─── Edit Modal Components ────────────────────────────────────────────────────
 
-function F(props: React.ComponentProps<typeof TextInput>) {
-  return <TextInput style={em.input} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />;
+function F({ style, ...props }: React.ComponentProps<typeof TextInput>) {
+  return <TextInput style={[em.input, style]} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />;
 }
 
 function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove }: {
