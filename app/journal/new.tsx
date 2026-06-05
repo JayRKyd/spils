@@ -128,6 +128,7 @@ export default function JournalNew() {
   const [pendingFamily, setPendingFamily] = useState("");
   const [familyPickerVisible, setFamilyPickerVisible] = useState(false);
   const [genderPickerVisible, setGenderPickerVisible] = useState(false);
+  const [seasonPickerVisible, setSeasonPickerVisible] = useState(false);
 
   const [notesTop, setNotesTop] = useState<string[]>([]);
   const [notesHeart, setNotesHeart] = useState<string[]>([]);
@@ -433,7 +434,10 @@ export default function JournalNew() {
                   <Text style={gender ? s.chooserFilled : s.chooserEmpty}>{gender || "Gender"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
-                <TextInput style={[s.field, { flex: 1 }]} placeholder="Season" placeholderTextColor="rgba(19,19,26,0.4)" value={seasons} onChangeText={setSeasons} />
+                <TouchableOpacity style={[s.field, { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]} onPress={() => setSeasonPickerVisible(true)}>
+                  <Text style={seasons ? s.chooserFilled : s.chooserEmpty}>{seasons || "Season"}</Text>
+                  <Text style={s.chevron}>▾</Text>
+                </TouchableOpacity>
               </View>
               <View style={s.row}>
                 <TextInput style={[s.field, { flex: 1 }]} placeholder="Price" placeholderTextColor="rgba(19,19,26,0.4)" value={priceText} onChangeText={setPriceText} />
@@ -669,6 +673,28 @@ export default function JournalNew() {
                   <Text style={[ms.btnText, gender === g && ms.btnTextLight]}>{g}</Text>
                 </TouchableOpacity>
               ))}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Season Picker */}
+        <Modal visible={seasonPickerVisible} transparent animationType="slide" onRequestClose={() => setSeasonPickerVisible(false)}>
+          <View style={ms.backdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSeasonPickerVisible(false)} />
+            <View style={ms.sheet}>
+              <View style={ms.handle} />
+              {["🌸 Spring", "☀️ Summer", "🍂 Fall", "❄️ Winter"].map((s_) => {
+                const val = s_.split(" ")[1];
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    style={[ms.btn, seasons === val && ms.btnDark]}
+                    onPress={() => { setSeasons(val); setSeasonPickerVisible(false); }}
+                  >
+                    <Text style={[ms.btnText, seasons === val && ms.btnTextLight]}>{s_}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </Modal>
