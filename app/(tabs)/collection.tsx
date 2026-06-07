@@ -16,6 +16,11 @@ type Perfume = {
   status?: string | null; category?: string | null; is_favorite?: boolean | null;
   concentration?: string | null; size_ml?: number | null; rating?: number | null;
   image_url?: string | null; created_at?: string | null;
+  nose?: string | null;
+  accords?: string[] | null;
+  top_notes?: string[] | null;
+  heart_notes?: string[] | null;
+  base_notes?: string[] | null;
 };
 
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
@@ -81,7 +86,7 @@ export default function Collection() {
 
   const fetchPerfumes = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from("perfumes").select("id,name,brand,year,status,category,is_favorite,concentration,size_ml,rating,image_url,created_at");
+    let query = supabase.from("perfumes").select("id,name,brand,year,status,category,is_favorite,concentration,size_ml,rating,image_url,created_at,nose,accords,top_notes,heart_notes,base_notes");
     if (sortOrder === "A-Z") query = query.order("name", { ascending: true });
     else if (sortOrder === "Z-A") query = query.order("name", { ascending: false });
     else query = query.order("created_at", { ascending: false });
@@ -95,10 +100,19 @@ export default function Collection() {
 
   useFocusEffect(useCallback(() => { fetchPerfumes(); }, [fetchPerfumes]));
 
-  const filtered = items.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.brand?.toLowerCase().includes(search.toLowerCase()) ?? false)
-  );
+  const filtered = items.filter((p) => {
+    const q = search.toLowerCase();
+    if (!q) return true;
+    return (
+      p.name.toLowerCase().includes(q) ||
+      (p.brand?.toLowerCase().includes(q) ?? false) ||
+      (p.nose?.toLowerCase().includes(q) ?? false) ||
+      (p.accords?.some((a) => a.toLowerCase().includes(q)) ?? false) ||
+      (p.top_notes?.some((n) => n.toLowerCase().includes(q)) ?? false) ||
+      (p.heart_notes?.some((n) => n.toLowerCase().includes(q)) ?? false) ||
+      (p.base_notes?.some((n) => n.toLowerCase().includes(q)) ?? false)
+    );
+  });
 
   const toggleFavorite = async (item: Perfume) => {
     await supabase.from("perfumes").update({ is_favorite: !item.is_favorite }).eq("id", item.id);
