@@ -271,7 +271,7 @@ export default function CollectionNew() {
       user_id: user?.id,
       name: title.trim(),
       brand: brand.trim() || null,
-      perfumer: perfumer.trim() || null,
+      nose: perfumer.trim() || null,
       gender: gender.trim() || null,
       price: priceText ? parseFloat(priceText) : null,
       size_ml: sizeText ? parseFloat(sizeText) : null,
@@ -295,7 +295,7 @@ export default function CollectionNew() {
       is_favorite: tags.includes("Favorites"),
     }]);
     setSaving(false);
-    if (error) { Alert.alert("Error", "Failed to save. Please try again."); return; }
+    if (error) { console.error("Collection save error:", error.message); Alert.alert("Error", "Failed to save. Please try again."); return; }
     router.back();
   };
 
@@ -369,10 +369,6 @@ export default function CollectionNew() {
                 <TextInput style={[s.field, { flex: 1 }]} placeholder="Price" placeholderTextColor="rgba(19,19,26,0.4)" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
               </View>
               <TextInput style={s.field} placeholder="Rating (0-10)" placeholderTextColor="rgba(19,19,26,0.4)" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
-              <TouchableOpacity style={[s.field, s.chooser]} onPress={() => setStatusPickerVisible(true)}>
-                <Text style={s.chooserFilled}>{status}</Text>
-                <Text style={s.chevron}>▾</Text>
-              </TouchableOpacity>
 
               {/* Fragrance Family */}
               <SH text="Fragrance Family" />

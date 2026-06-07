@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image,
   Modal, ScrollView, ActivityIndicator, StyleSheet, useWindowDimensions,
@@ -92,7 +93,7 @@ export default function Collection() {
     setLoading(false);
   }, [activeFilter, categoryFilter, sortOrder]);
 
-  useEffect(() => { fetchPerfumes(); }, [fetchPerfumes]);
+  useFocusEffect(useCallback(() => { fetchPerfumes(); }, [fetchPerfumes]));
 
   const filtered = items.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -153,7 +154,7 @@ export default function Collection() {
             <TouchableOpacity
               key={key}
               style={[s.chip, activeFilter === key && s.chipActive]}
-              onPress={() => setActiveFilter((prev) => prev === key ? "all" : key)}
+              onPress={() => { setActiveFilter((prev) => prev === key ? "all" : key); setCategoryFilter("All"); }}
             >
               <Text style={[s.chipText, activeFilter === key && s.chipTextActive]}>{label}</Text>
             </TouchableOpacity>
@@ -193,7 +194,7 @@ export default function Collection() {
                 <TouchableOpacity
                   key={cat}
                   style={[s.pickerBtn, categoryFilter === cat && s.pickerBtnActive]}
-                  onPress={() => { setCategoryFilter(cat); setCategoryPickerVisible(false); }}
+                  onPress={() => { setCategoryFilter(cat); setActiveFilter("all"); setCategoryPickerVisible(false); }}
                 >
                   <Text style={[s.pickerBtnText, categoryFilter === cat && s.pickerBtnTextActive]}>{cat}</Text>
                 </TouchableOpacity>
