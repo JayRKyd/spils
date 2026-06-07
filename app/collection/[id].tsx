@@ -116,6 +116,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
   const [brand, setBrand] = useState("");
   const [perfumer, setPerfumer] = useState("");
   const [gender, setGender] = useState("");
+  const [sizeText, setSizeText] = useState("");
   const [priceText, setPriceText] = useState("");
   const [rating, setRating] = useState("");
   const [seasons, setSeasons] = useState<string[]>([]);
@@ -144,6 +145,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
     setBrand(perfume.brand ?? "");
     setPerfumer(perfume.perfumer ?? "");
     setGender(perfume.gender ?? "");
+    setSizeText(perfume.size_ml != null ? String(perfume.size_ml) : "");
     setPriceText(perfume.price != null ? String(perfume.price) : "");
     setRating(perfume.rating != null ? String(perfume.rating) : "");
     setSeasons(perfume.season ?? []);
@@ -173,6 +175,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       brand: brand.trim() || null,
       perfumer: perfumer.trim() || null,
       gender: gender.trim() || null,
+      size_ml: sizeText ? parseFloat(sizeText) : null,
       price: priceText ? parseFloat(priceText) : null,
       rating: rating ? parseFloat(rating) : null,
       season: seasons.length ? seasons : null,
@@ -220,6 +223,10 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <F placeholder="Unisex, Feminine…" value={gender} onChangeText={setGender} />
 
             <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Size (ml)</Text>
+                <F placeholder="50" value={sizeText} onChangeText={setSizeText} keyboardType="decimal-pad" />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={em.label}>Price</Text>
                 <F placeholder="190.00" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
@@ -454,37 +461,31 @@ export default function CollectionDetail() {
 
         {/* ONE big card — all info */}
         <View style={d.card}>
-          {perfume.brand ? <Row label="Brand" value={perfume.brand} /> : null}
-          {perfume.perfumer ? <Row label="Perfumer" value={perfume.perfumer} /> : null}
-          {perfume.gender ? <Row label="Gender" value={perfume.gender} /> : null}
-          {perfume.season?.length ? <Row label="Season(s)" value={perfume.season.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ")} /> : null}
+          <Row label="Brand" value={perfume.brand ?? "—"} />
+          <Row label="Perfumer" value={perfume.perfumer ?? "—"} />
+          <Row label="Gender" value={perfume.gender ?? "—"} />
+          <Row label="Season(s)" value={perfume.season?.length ? perfume.season.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ") : "—"} />
           <Row label="Concentration" value={perfume.concentration ?? "—"} />
           <Row label="Category" value={perfume.category ?? "—"} />
-          {perfume.price != null ? <Row label="Price" value={`$${perfume.price}`} /> : null}
-          {perfume.rating != null ? <Row label="Rating" value={String(perfume.rating)} /> : null}
+          <Row label="Size" value={perfume.size_ml != null ? `${perfume.size_ml} ml` : "—"} />
+          <Row label="Price" value={perfume.price != null ? `$${perfume.price}` : "—"} />
+          <Row label="Rating" value={perfume.rating != null ? String(perfume.rating) : "—"} />
 
-          {/* Accords as right-aligned text under rating */}
-          {perfume.accords?.length ? (
-            <View style={[d.row, { paddingTop: 0 }]}>
-              <Text style={d.rowLabel} />
-              <Text style={[d.rowValue, { flex: 2 }]}>{perfume.accords.join(", ")}</Text>
-            </View>
-          ) : null}
-
-          {(perfume.top_notes?.length || perfume.heart_notes?.length || perfume.base_notes?.length) ? (
-            <View style={d.divider} />
-          ) : null}
-
-          {perfume.top_notes?.length ? <Row label="Top Notes" value={perfume.top_notes.join(", ")} /> : null}
-          {perfume.heart_notes?.length ? <Row label="Middle Notes" value={perfume.heart_notes.join(", ")} /> : null}
-          {perfume.base_notes?.length ? <Row label="Base Notes" value={perfume.base_notes.join(", ")} /> : null}
+          {/* Accords */}
+          <Row label="Fragrance Family" value={perfume.accords?.length ? perfume.accords.join(", ") : "—"} />
 
           <View style={d.divider} />
 
-          {perfume.projection ? <Row label="Projection" value={perfume.projection} /> : null}
-          {perfume.sillage ? <Row label="Sillage" value={perfume.sillage} /> : null}
-          {perfume.longevity ? <Row label="Longevity" value={perfume.longevity} /> : null}
-          {perfume.dry_down ? <Row label="Dry Down" value={perfume.dry_down} /> : null}
+          <Row label="Top Notes" value={perfume.top_notes?.length ? perfume.top_notes.join(", ") : "—"} />
+          <Row label="Middle Notes" value={perfume.heart_notes?.length ? perfume.heart_notes.join(", ") : "—"} />
+          <Row label="Base Notes" value={perfume.base_notes?.length ? perfume.base_notes.join(", ") : "—"} />
+
+          <View style={d.divider} />
+
+          <Row label="Projection" value={perfume.projection ?? "—"} />
+          <Row label="Sillage" value={perfume.sillage ?? "—"} />
+          <Row label="Longevity" value={perfume.longevity ?? "—"} />
+          <Row label="Dry Down" value={perfume.dry_down ?? "—"} />
 
           {/* Inspiration photo */}
           <TouchableOpacity style={d.inspirationInCard} onPress={pickInspirationPhoto} activeOpacity={0.8}>
