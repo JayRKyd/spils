@@ -1,19 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Alert, Image, Modal, StyleSheet,
+  ActivityIndicator, Alert, Modal, StyleSheet, Image, Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
-import GradientScreen from "@/components/GradientScreen";
-import { GlassRow } from "@/components/GlassCard";
+import { useAuth } from "@/context/AuthContext";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Perfume = {
   id: number;
   name: string;
   brand?: string | null;
-  house?: string | null;
+  perfumer?: string | null;
+  gender?: string | null;
+  season?: string[] | null;
   year?: number | null;
   status?: string | null;
   category?: string | null;
@@ -21,82 +26,169 @@ type Perfume = {
   concentration?: string | null;
   size_ml?: number | null;
   rating?: number | null;
+  price?: number | null;
   image_url?: string | null;
+  inspiration_image_url?: string | null;
   notes?: string | null;
+  music?: string | null;
   top_notes?: string[] | null;
   heart_notes?: string[] | null;
   base_notes?: string[] | null;
   accords?: string[] | null;
+  projection?: string | null;
   longevity?: string | null;
   sillage?: string | null;
+  dry_down?: string | null;
+  colors?: string[] | null;
   retailer?: string | null;
-  price?: number | null;
 };
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
+const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
 const CONCENTRATION_OPTIONS = ["Parfum/Extrait", "EDP", "EDT", "Cologne", "Oil"];
 const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity onPress={onPress} style={[s.chip, active && s.chipActive]}>
-      <Text style={s.chipText}>{label}</Text>
-    </TouchableOpacity>
-  );
+const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
+
+// ─── Edit Modal Styles (hoisted so F + TagInput can reference em) ─────────────
+
+const em = StyleSheet.create({
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
+  headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
+  cancel: { color: "rgba(19,19,26,0.5)", fontSize: 16 },
+  saveBtn: { color: "#13131a", fontSize: 16, fontWeight: "700" },
+  label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
+  input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
+  chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
+  chipText: { color: "rgba(19,19,26,0.6)", fontSize: 13 },
+  chipTextActive: { color: "#E5F772" },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  tagText: { color: "#13131a", fontSize: 13 },
+});
+
+// ─── Edit Modal Components (module-level to avoid remount on re-render) ────────
+
+function F({ style, ...props }: React.ComponentProps<typeof TextInput>) {
+  return <TextInput style={[em.input, style]} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />;
 }
 
-function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
-  if (!value && value !== 0) return null;
+function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove }: {
+  tags: string[]; inputVal: string; placeholder: string;
+  onChangeInput: (v: string) => void; onAdd: (v: string) => void; onRemove: (i: number) => void;
+}) {
   return (
-    <View style={{ marginBottom: 12 }}>
-      <Text style={s.rowLabel}>{label}</Text>
-      <Text style={{ color: "#fff", fontSize: 15 }}>{String(value)}</Text>
+    <View style={{ marginBottom: 4 }}>
+      <TextInput
+        style={em.input}
+        placeholder={placeholder}
+        placeholderTextColor="rgba(19,19,26,0.4)"
+        value={inputVal}
+        onChangeText={onChangeInput}
+        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); onChangeInput(""); } }}
+        returnKeyType="done"
+        blurOnSubmit={false}
+      />
+      {tags.length > 0 && (
+        <View style={em.tagRow}>
+          {tags.map((t, i) => (
+            <TouchableOpacity key={i} style={em.tag} onPress={() => onRemove(i)}>
+              <Text style={em.tagText}>{t} ×</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
-function TagRow({ label, tags }: { label: string; tags?: string[] | null }) {
-  if (!tags?.length) return null;
-  return (
-    <View style={{ marginBottom: 12 }}>
-      <Text style={s.rowLabel}>{label}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-        {tags.map((t) => (
-          <View key={t} style={s.tag}><Text style={s.tagText}>{t}</Text></View>
-        ))}
-      </View>
-    </View>
-  );
-}
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
 
 function EditModal({ visible, perfume, onClose, onSaved }: {
   visible: boolean; perfume: Perfume; onClose: () => void; onSaved: () => void;
 }) {
-  const [form, setForm] = useState<Partial<Perfume>>({});
+  const [name, setName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [perfumer, setPerfumer] = useState("");
+  const [gender, setGender] = useState("");
+  const [priceText, setPriceText] = useState("");
+  const [rating, setRating] = useState("");
+  const [seasons, setSeasons] = useState<string[]>([]);
+  const [concentration, setConcentration] = useState("");
+  const [category, setCategory] = useState("");
+  const [status, setStatus] = useState("");
+  const [notesTop, setNotesTop] = useState<string[]>([]);
+  const [notesHeart, setNotesHeart] = useState<string[]>([]);
+  const [notesBase, setNotesBase] = useState<string[]>([]);
+  const [accords, setAccords] = useState<string[]>([]);
+  const [projection, setProjection] = useState("");
+  const [sillage, setSillage] = useState("");
+  const [longevity, setLongevity] = useState("");
+  const [dryDown, setDryDown] = useState("");
+  const [music, setMusic] = useState("");
+  const [notes, setNotes] = useState("");
+  const [topInput, setTopInput] = useState("");
+  const [heartInput, setHeartInput] = useState("");
+  const [baseInput, setBaseInput] = useState("");
+  const [accordInput, setAccordInput] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (visible) setForm({ ...perfume }); }, [visible, perfume]);
+  useEffect(() => {
+    if (!visible) return;
+    setName(perfume.name ?? "");
+    setBrand(perfume.brand ?? "");
+    setPerfumer(perfume.perfumer ?? "");
+    setGender(perfume.gender ?? "");
+    setPriceText(perfume.price != null ? String(perfume.price) : "");
+    setRating(perfume.rating != null ? String(perfume.rating) : "");
+    setSeasons(perfume.season ?? []);
+    setConcentration(perfume.concentration ?? "");
+    setCategory(perfume.category ?? "");
+    setStatus(perfume.status ?? "");
+    setNotesTop(perfume.top_notes ?? []);
+    setNotesHeart(perfume.heart_notes ?? []);
+    setNotesBase(perfume.base_notes ?? []);
+    setAccords(perfume.accords ?? []);
+    setProjection(perfume.projection ?? "");
+    setSillage(perfume.sillage ?? "");
+    setLongevity(perfume.longevity ?? "");
+    setDryDown(perfume.dry_down ?? "");
+    setMusic(perfume.music ?? "");
+    setNotes(perfume.notes ?? "");
+    setTopInput(""); setHeartInput(""); setBaseInput(""); setAccordInput("");
+  }, [visible, perfume]);
 
-  const set = (key: keyof Perfume, val: any) => setForm((p) => ({ ...p, [key]: val }));
+  const toggleSeason = (s: string) =>
+    setSeasons((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
 
   const handleSave = async () => {
     setSaving(true);
     await supabase.from("perfumes").update({
-      name: (form.name ?? "").trim(),
-      brand: form.brand?.trim() || null,
-      house: form.house?.trim() || null,
-      concentration: form.concentration || null,
-      size_ml: form.size_ml ?? null,
-      year: form.year ?? null,
-      category: form.category || null,
-      notes: form.notes?.trim() || null,
-      rating: form.rating ?? null,
-      is_favorite: form.is_favorite ?? false,
-      status: form.status || null,
-      longevity: form.longevity?.trim() || null,
-      sillage: form.sillage?.trim() || null,
-      retailer: form.retailer?.trim() || null,
-      price: form.price ?? null,
+      name: name.trim() || perfume.name,
+      brand: brand.trim() || null,
+      perfumer: perfumer.trim() || null,
+      gender: gender.trim() || null,
+      price: priceText ? parseFloat(priceText) : null,
+      rating: rating ? parseFloat(rating) : null,
+      season: seasons.length ? seasons : null,
+      concentration: concentration || null,
+      category: category || null,
+      status: status || null,
+      top_notes: notesTop.length ? notesTop : null,
+      heart_notes: notesHeart.length ? notesHeart : null,
+      base_notes: notesBase.length ? notesBase : null,
+      accords: accords.length ? accords : null,
+      projection: projection.trim() || null,
+      sillage: sillage.trim() || null,
+      longevity: longevity.trim() || null,
+      dry_down: dryDown.trim() || null,
+      music: music.trim() || null,
+      notes: notes.trim() || null,
     }).eq("id", perfume.id);
     setSaving(false);
     onSaved();
@@ -104,223 +196,437 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={s.modal}>
-        <View style={s.modalHeader}>
-          <Text style={s.modalTitle}>Edit Perfume</Text>
-          <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
-        </View>
-        <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
-          {([
-            { label: "Name *", key: "name" as keyof Perfume, placeholder: "Perfume name" },
-            { label: "Brand", key: "brand" as keyof Perfume, placeholder: "Brand" },
-            { label: "House", key: "house" as keyof Perfume, placeholder: "House" },
-            { label: "Retailer", key: "retailer" as keyof Perfume, placeholder: "Where bought" },
-            { label: "Notes", key: "notes" as keyof Perfume, placeholder: "Fragrance notes...", multiline: true },
-            { label: "Longevity", key: "longevity" as keyof Perfume, placeholder: "e.g. 8 hours" },
-            { label: "Sillage", key: "sillage" as keyof Perfume, placeholder: "e.g. moderate" },
-          ] as any[]).map(({ label, key, placeholder, multiline }) => (
-            <View key={key}>
-              <Text style={s.fieldLabel}>{label}</Text>
-              <TextInput
-                style={[s.input, multiline && { height: 80, textAlignVertical: "top" }]}
-                placeholder={placeholder} placeholderTextColor="rgba(255,255,255,0.35)"
-                value={String((form as Record<string, any>)[key] ?? "")} onChangeText={(v) => set(key, v)}
-                multiline={multiline} numberOfLines={multiline ? 3 : 1}
-              />
-            </View>
-          ))}
-
-          <View style={{ flexDirection: "row", gap: 12, marginBottom: 14 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Year</Text>
-              <TextInput style={s.input} placeholder="2023" placeholderTextColor="rgba(255,255,255,0.35)" value={String(form.year ?? "")} onChangeText={(v) => set("year", v ? parseInt(v) : null)} keyboardType="number-pad" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Size (ml)</Text>
-              <TextInput style={s.input} placeholder="100" placeholderTextColor="rgba(255,255,255,0.35)" value={String(form.size_ml ?? "")} onChangeText={(v) => set("size_ml", v ? parseFloat(v) : null)} keyboardType="decimal-pad" />
-            </View>
+      <LinearGradient colors={TEAL} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={em.header}>
+            <TouchableOpacity onPress={onClose}><Text style={em.cancel}>Cancel</Text></TouchableOpacity>
+            <Text style={em.headerTitle}>Edit Entry</Text>
+            <TouchableOpacity onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.saveBtn}>Save</Text>}
+            </TouchableOpacity>
           </View>
 
-          <View style={{ flexDirection: "row", gap: 12, marginBottom: 14 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Rating (0-10)</Text>
-              <TextInput style={s.input} placeholder="8.5" placeholderTextColor="rgba(255,255,255,0.35)" value={String(form.rating ?? "")} onChangeText={(v) => set("rating", v ? parseFloat(v) : null)} keyboardType="decimal-pad" />
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+            <Text style={em.label}>Name</Text>
+            <F placeholder="Perfume name…" value={name} onChangeText={setName} />
+
+            <Text style={em.label}>Brand</Text>
+            <F placeholder="Brand…" value={brand} onChangeText={setBrand} />
+
+            <Text style={em.label}>Perfumer</Text>
+            <F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
+
+            <Text style={em.label}>Gender</Text>
+            <F placeholder="Unisex, Feminine…" value={gender} onChangeText={setGender} />
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Price</Text>
+                <F placeholder="190.00" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Rating (0–10)</Text>
+                <F placeholder="8.5" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Price</Text>
-              <TextInput style={s.input} placeholder="150" placeholderTextColor="rgba(255,255,255,0.35)" value={String(form.price ?? "")} onChangeText={(v) => set("price", v ? parseFloat(v) : null)} keyboardType="decimal-pad" />
+
+            <Text style={em.label}>Season(s)</Text>
+            <View style={em.chipRow}>
+              {SEASONS.map((s) => (
+                <TouchableOpacity key={s} style={[em.chip, seasons.includes(s) && em.chipActive]} onPress={() => toggleSeason(s)}>
+                  <Text style={[em.chipText, seasons.includes(s) && em.chipTextActive]}>{SEASON_ICONS[s]} {s}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          </View>
 
-          <Text style={s.fieldLabel}>Concentration</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 14 }}>
-            {CONCENTRATION_OPTIONS.map((opt) => (
-              <Chip key={opt} label={opt} active={form.concentration === opt} onPress={() => set("concentration", form.concentration === opt ? null : opt)} />
-            ))}
-          </View>
+            <Text style={em.label}>Concentration</Text>
+            <View style={em.chipRow}>
+              {CONCENTRATION_OPTIONS.map((opt) => (
+                <TouchableOpacity key={opt} style={[em.chip, concentration === opt && em.chipActive]} onPress={() => setConcentration(concentration === opt ? "" : opt)}>
+                  <Text style={[em.chipText, concentration === opt && em.chipTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-          <Text style={s.fieldLabel}>Category</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 14 }}>
-            {CATEGORY_OPTIONS.map((opt) => (
-              <Chip key={opt} label={opt} active={form.category === opt} onPress={() => set("category", form.category === opt ? null : opt)} />
-            ))}
-          </View>
+            <Text style={em.label}>Category</Text>
+            <View style={em.chipRow}>
+              {CATEGORY_OPTIONS.map((opt) => (
+                <TouchableOpacity key={opt} style={[em.chip, category === opt && em.chipActive]} onPress={() => setCategory(category === opt ? "" : opt)}>
+                  <Text style={[em.chipText, category === opt && em.chipTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-          <Text style={s.fieldLabel}>Status</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 14 }}>
-            {STATUS_OPTIONS.map((opt) => (
-              <Chip key={opt} label={opt} active={form.status === opt} onPress={() => set("status", opt)} />
-            ))}
-          </View>
+            <Text style={em.label}>Status</Text>
+            <View style={em.chipRow}>
+              {STATUS_OPTIONS.map((opt) => (
+                <TouchableOpacity key={opt} style={[em.chip, status === opt && em.chipActive]} onPress={() => setStatus(opt)}>
+                  <Text style={[em.chipText, status === opt && em.chipTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-          <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 24 }} onPress={() => set("is_favorite", !form.is_favorite)}>
-            <Text style={{ fontSize: 22 }}>{form.is_favorite ? "❤️" : "🤍"}</Text>
-            <Text style={{ color: "#fff", fontSize: 15 }}>Favorite</Text>
-          </TouchableOpacity>
+            <Text style={em.label}>Fragrance Family</Text>
+            <TagInput tags={accords} inputVal={accordInput} placeholder="Add accord…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
 
-          <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Save Changes</Text>}
-          </TouchableOpacity>
-          <View style={{ height: 40 }} />
-        </ScrollView>
-      </SafeAreaView>
+            <Text style={em.label}>Top Notes</Text>
+            <TagInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+
+            <Text style={em.label}>Middle Notes</Text>
+            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+
+            <Text style={em.label}>Base Notes</Text>
+            <TagInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Projection</Text>
+                <F placeholder="1–10" value={projection} onChangeText={setProjection} keyboardType="decimal-pad" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Sillage</Text>
+                <F placeholder="1–10" value={sillage} onChangeText={setSillage} keyboardType="decimal-pad" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={em.label}>Longevity</Text>
+                <F placeholder="1–10" value={longevity} onChangeText={setLongevity} keyboardType="decimal-pad" />
+              </View>
+            </View>
+
+            <Text style={em.label}>Dry Down</Text>
+            <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} />
+
+            <Text style={em.label}>Music</Text>
+            <F placeholder="Hallelujah by Jeff Buckley…" value={music} onChangeText={setMusic} />
+
+            <Text style={em.label}>Notes</Text>
+            <F placeholder="Your thoughts…" value={notes} onChangeText={setNotes} multiline style={{ height: 120, textAlignVertical: "top" }} />
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
     </Modal>
   );
 }
 
+// ─── Detail Row ───────────────────────────────────────────────────────────────
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={d.row}>
+      <Text style={d.rowLabel}>{label}</Text>
+      <Text style={d.rowValue} numberOfLines={3}>{value}</Text>
+    </View>
+  );
+}
+
+// ─── More Sheet Styles ────────────────────────────────────────────────────────
+
+const ms = StyleSheet.create({
+  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
+  sheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 10 },
+  handle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
+  btn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
+  btnDanger: { borderColor: "rgba(220,50,50,0.25)" },
+  btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
+});
+
+// ─── Detail Screen ────────────────────────────────────────────────────────────
+
 export default function CollectionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
   const [perfume, setPerfume] = useState<Perfume | null>(null);
   const [loading, setLoading] = useState(true);
   const [editVisible, setEditVisible] = useState(false);
+  const [moreVisible, setMoreVisible] = useState(false);
+  const [inspirationSaving, setInspirationSaving] = useState(false);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
+  const fetchPerfume = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const { data } = await supabase.from("perfumes").select("*").eq("id", id).single();
     setPerfume(data as Perfume);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   }, [id]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetchPerfume(); }, [fetchPerfume]);
 
   const handleDelete = () => {
     Alert.alert("Delete Perfume", `Remove "${perfume?.name}"? This cannot be undone.`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete", style: "destructive",
-        onPress: async () => {
-          await supabase.from("perfumes").delete().eq("id", id);
-          router.back();
-        },
+        onPress: async () => { await supabase.from("perfumes").delete().eq("id", id); router.back(); },
       },
     ]);
   };
 
-  if (loading) return (
-    <GradientScreen gradient="collection">
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color="#a78bfa" />
-      </View>
-    </GradientScreen>
+  const handleShare = async () => {
+    if (!perfume) return;
+    try {
+      await Share.share({ message: `${perfume.name}${perfume.brand ? ` — ${perfume.brand}` : ""}${perfume.notes ? `\n${perfume.notes}` : ""}`.trim() });
+    } catch {}
+  };
+
+  const pickInspirationPhoto = () => {
+    Alert.alert("Inspiration Photo", "Choose an option", [
+      {
+        text: "Take Photo",
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
+        },
+      },
+      {
+        text: "Choose from Library",
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const saveInspirationPhoto = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (!perfume) return;
+    setInspirationSaving(true);
+    const imageData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+    await supabase.from("perfumes").update({ inspiration_image_url: imageData }).eq("id", perfume.id);
+    setInspirationSaving(false);
+    fetchPerfume(false);
+  };
+
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <LinearGradient colors={TEAL} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView>
+    </LinearGradient>
   );
 
-  if (!perfume) return (
-    <GradientScreen gradient="collection">
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: "rgba(255,255,255,0.5)" }}>Perfume not found</Text>
-      </View>
-    </GradientScreen>
-  );
+  if (loading) return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color="#13131a" size="large" /></View></Wrapper>;
+  if (!perfume) return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Text style={{ color: "rgba(19,19,26,0.5)" }}>Not found</Text></View></Wrapper>;
 
   return (
-    <GradientScreen gradient="collection">
-      <View style={s.navBar}>
-        <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>← Back</Text></TouchableOpacity>
-        <View style={{ flexDirection: "row", gap: 16 }}>
-          <TouchableOpacity onPress={() => setEditVisible(true)}><Text style={s.back}>Edit</Text></TouchableOpacity>
-          <TouchableOpacity onPress={handleDelete}><Text style={s.deleteBtn}>Delete</Text></TouchableOpacity>
+    <Wrapper>
+      {/* Top Nav */}
+      <View style={d.topNav}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
+            <Text style={d.backIcon}>‹</Text>
+          </TouchableOpacity>
+          <Text style={d.logoText}>SP/LS.</Text>
         </View>
+        <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
+          <Text style={d.profileIcon}>👤</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {perfume.image_url ? (
-          <Image source={{ uri: perfume.image_url }} style={s.heroImage} resizeMode="cover" />
-        ) : (
-          <View style={s.heroPlaceholder}><Text style={{ fontSize: 64 }}>🌸</Text></View>
-        )}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+        {/* Page title */}
+        <Text style={d.pageTitle}>Collection</Text>
 
-        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={s.name}>{perfume.name}</Text>
-            {perfume.brand ? <Text style={s.brandText}>{perfume.brand}</Text> : null}
+        {/* Entry Header */}
+        <View style={d.entryHeader}>
+          {/* Photo card with name + heart inside */}
+          <View style={d.photoCard}>
+            <View style={d.photoBox}>
+              {perfume.image_url
+                ? <Image source={{ uri: perfume.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
+                : <Text style={d.photoPlaceholder}>Photo</Text>}
+            </View>
+            <Text style={d.photoName} numberOfLines={1}>{perfume.name}</Text>
+            <Text style={d.photoHeart}>{perfume.is_favorite ? "♥" : "♡"}</Text>
           </View>
-          <Text style={{ fontSize: 24 }}>{perfume.is_favorite ? "❤️" : "🤍"}</Text>
+
+          <View style={d.entryMeta}>
+            <Text style={d.entryTitle} numberOfLines={2}>{perfume.name}</Text>
+            {perfume.brand ? <Text style={d.entryBrand}>{perfume.brand}</Text> : null}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {perfume.status ? <View style={d.tag}><Text style={d.tagText}>{perfume.status}</Text></View> : null}
+              {perfume.concentration ? <View style={d.tag}><Text style={d.tagText}>{perfume.concentration}</Text></View> : null}
+              {perfume.category ? <View style={d.tag}><Text style={d.tagText}>{perfume.category}</Text></View> : null}
+            </View>
+          </View>
         </View>
 
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-          {perfume.status ? <View style={s.tagAccent}><Text style={s.tagAccentText}>{perfume.status}</Text></View> : null}
-          {perfume.category ? <View style={s.tag}><Text style={s.tagText}>{perfume.category}</Text></View> : null}
-          {perfume.concentration ? <View style={s.tag}><Text style={s.tagText}>{perfume.concentration}</Text></View> : null}
+        {/* ONE big card — all info */}
+        <View style={d.card}>
+          {perfume.brand ? <Row label="Brand" value={perfume.brand} /> : null}
+          {perfume.perfumer ? <Row label="Perfumer" value={perfume.perfumer} /> : null}
+          {perfume.gender ? <Row label="Gender" value={perfume.gender} /> : null}
+          {perfume.season?.length ? <Row label="Season(s)" value={perfume.season.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ")} /> : null}
+          <Row label="Concentration" value={perfume.concentration ?? "—"} />
+          <Row label="Category" value={perfume.category ?? "—"} />
+          {perfume.price != null ? <Row label="Price" value={`$${perfume.price}`} /> : null}
+          {perfume.rating != null ? <Row label="Rating" value={String(perfume.rating)} /> : null}
+
+          {/* Accords as right-aligned text under rating */}
+          {perfume.accords?.length ? (
+            <View style={[d.row, { paddingTop: 0 }]}>
+              <Text style={d.rowLabel} />
+              <Text style={[d.rowValue, { flex: 2 }]}>{perfume.accords.join(", ")}</Text>
+            </View>
+          ) : null}
+
+          {(perfume.top_notes?.length || perfume.heart_notes?.length || perfume.base_notes?.length) ? (
+            <View style={d.divider} />
+          ) : null}
+
+          {perfume.top_notes?.length ? <Row label="Top Notes" value={perfume.top_notes.join(", ")} /> : null}
+          {perfume.heart_notes?.length ? <Row label="Middle Notes" value={perfume.heart_notes.join(", ")} /> : null}
+          {perfume.base_notes?.length ? <Row label="Base Notes" value={perfume.base_notes.join(", ")} /> : null}
+
+          <View style={d.divider} />
+
+          {perfume.projection ? <Row label="Projection" value={perfume.projection} /> : null}
+          {perfume.sillage ? <Row label="Sillage" value={perfume.sillage} /> : null}
+          {perfume.longevity ? <Row label="Longevity" value={perfume.longevity} /> : null}
+          {perfume.dry_down ? <Row label="Dry Down" value={perfume.dry_down} /> : null}
+
+          {/* Inspiration photo */}
+          <TouchableOpacity style={d.inspirationInCard} onPress={pickInspirationPhoto} activeOpacity={0.8}>
+            {perfume.inspiration_image_url ? (
+              <Image source={{ uri: perfume.inspiration_image_url }} style={{ width: "100%", height: "100%", borderRadius: 14 }} resizeMode="contain" />
+            ) : null}
+            {inspirationSaving ? (
+              <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.6)", borderRadius: 14 }]}>
+                <ActivityIndicator color="#13131a" />
+              </View>
+            ) : !perfume.inspiration_image_url ? (
+              <Text style={d.photoPlaceholder}>Upload Inspiration Photo</Text>
+            ) : (
+              <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Colors */}
+          <View style={d.row}>
+            <Text style={d.rowLabel}>Colors</Text>
+            {perfume.colors?.length ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", flex: 2 }}>
+                {perfume.colors.map((c, i) => (
+                  <View key={i} style={[d.colorSwatch, { backgroundColor: c }]} />
+                ))}
+              </View>
+            ) : (
+              <Text style={d.rowValue}>—</Text>
+            )}
+          </View>
+
+          {/* Music */}
+          <View style={d.row}>
+            <Text style={d.rowLabel}>Music</Text>
+            <Text style={[d.rowValue, { flexShrink: 1 }]} numberOfLines={2}>
+              {perfume.music || "—"}
+            </Text>
+          </View>
+
+          {/* Notes */}
+          <Text style={d.cardSectionLabel}>Notes</Text>
+          <Text style={[d.descText, !perfume.notes && { color: "rgba(19,19,26,0.3)" }]}>
+            {perfume.notes || "No notes added."}
+          </Text>
         </View>
 
-        <GlassRow style={s.infoBlock}>
-          <InfoRow label="Year" value={perfume.year} />
-          <InfoRow label="Size" value={perfume.size_ml ? `${perfume.size_ml} ml` : null} />
-          <InfoRow label="Rating" value={perfume.rating != null ? `★ ${perfume.rating}/10` : null} />
-          <InfoRow label="Longevity" value={perfume.longevity} />
-          <InfoRow label="Sillage" value={perfume.sillage} />
-          <InfoRow label="Retailer" value={perfume.retailer} />
-          <InfoRow label="Price" value={perfume.price != null ? `$${perfume.price}` : null} />
-        </GlassRow>
-
-        {perfume.notes ? (
-          <GlassRow style={[s.infoBlock, { marginTop: 12 }]}>
-            <Text style={s.rowLabel}>Notes</Text>
-            <Text style={{ color: "#fff", fontSize: 15, marginTop: 4 }}>{perfume.notes}</Text>
-          </GlassRow>
-        ) : null}
-
-        <TagRow label="Top Notes" tags={perfume.top_notes} />
-        <TagRow label="Heart Notes" tags={perfume.heart_notes} />
-        <TagRow label="Base Notes" tags={perfume.base_notes} />
-        <TagRow label="Accords" tags={perfume.accords} />
+        {/* Centered Edit button */}
+        <TouchableOpacity style={d.editPill} onPress={() => setEditVisible(true)}>
+          <Text style={d.editPillText}>Edit</Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      {/* Bottom Bar */}
+      <View style={d.bottomBar}>
+        <TouchableOpacity style={d.moreBtn} onPress={() => setMoreVisible(true)}>
+          <Text style={d.moreBtnText}>More</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={d.saveBottomBtn} onPress={() => setEditVisible(true)}>
+          <Text style={d.saveBottomBtnText}>Save</Text>
+        </TouchableOpacity>
+      </View>
 
       {perfume && (
         <EditModal
           visible={editVisible}
           perfume={perfume}
           onClose={() => setEditVisible(false)}
-          onSaved={() => { setEditVisible(false); fetch(); }}
+          onSaved={() => { setEditVisible(false); fetchPerfume(false); }}
         />
       )}
-    </GradientScreen>
+
+      {/* More Sheet */}
+      <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={() => setMoreVisible(false)}>
+        <View style={ms.backdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setMoreVisible(false)} />
+          <View style={ms.sheet}>
+            <View style={ms.handle} />
+            <TouchableOpacity style={ms.btn} onPress={handleShare}>
+              <Text style={ms.btnText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[ms.btn, ms.btnDanger]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
+              <Text style={[ms.btnText, { color: "#dc2626" }]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </Wrapper>
   );
 }
 
-const s = StyleSheet.create({
-  navBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  back: { color: "#a78bfa", fontSize: 16 },
-  deleteBtn: { color: "#f87171", fontSize: 16 },
-  heroImage: { width: "100%", height: 220, borderRadius: 16, marginBottom: 16 },
-  heroPlaceholder: { width: "100%", height: 160, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 16 },
-  name: { color: "#fff", fontSize: 24, fontWeight: "700" },
-  brandText: { color: "rgba(255,255,255,0.5)", fontSize: 16, marginTop: 2 },
-  tag: { backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  tagText: { color: "#fff", fontSize: 12 },
-  tagAccent: { backgroundColor: "rgba(167,139,250,0.2)", borderWidth: 1, borderColor: "rgba(167,139,250,0.4)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  tagAccentText: { color: "#a78bfa", fontSize: 12 },
-  infoBlock: { padding: 16 },
-  rowLabel: { color: "rgba(255,255,255,0.4)", fontSize: 12 },
-  chip: { marginRight: 8, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)", backgroundColor: "rgba(255,255,255,0.08)" },
-  chipActive: { backgroundColor: "#a78bfa", borderColor: "#a78bfa" },
-  chipText: { color: "#fff", fontSize: 12 },
-  modal: { flex: 1, backgroundColor: "#160a30" },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
-  modalTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
-  modalClose: { color: "rgba(255,255,255,0.5)", fontSize: 18 },
-  fieldLabel: { color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 6, marginTop: 4 },
-  input: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 15, marginBottom: 14 },
-  saveBtn: { backgroundColor: "#a78bfa", borderRadius: 12, paddingVertical: 15, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const d = StyleSheet.create({
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  logoText: { color: "#13131a", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  backIcon: { color: "#13131a", fontSize: 24, fontWeight: "300", lineHeight: 28, marginTop: -2 },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  profileIcon: { fontSize: 16 },
+
+  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, marginBottom: 20, paddingHorizontal: 2 },
+
+  entryHeader: { flexDirection: "row", gap: 16, marginBottom: 16 },
+
+  photoCard: { width: 140, backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", overflow: "hidden", paddingBottom: 10 },
+  photoBox: { width: "100%", height: 140, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  photoPlaceholder: { color: "rgba(19,19,26,0.35)", fontSize: 13 },
+  photoName: { color: "#13131a", fontSize: 11, fontWeight: "600", marginTop: 8, paddingHorizontal: 8, textAlign: "center" },
+  photoHeart: { color: "#13131a", fontSize: 18, marginTop: 4, alignSelf: "flex-end", paddingRight: 10 },
+
+  entryMeta: { flex: 1, justifyContent: "center", paddingLeft: 4, gap: 4 },
+  entryTitle: { color: "#13131a", fontSize: 20, fontWeight: "800", lineHeight: 26 },
+  entryBrand: { color: "rgba(19,19,26,0.55)", fontSize: 14, fontWeight: "500" },
+
+  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  tagText: { color: "#13131a", fontSize: 12, fontWeight: "500" },
+
+  card: { backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, marginBottom: 12 },
+  cardSectionLabel: { color: "rgba(19,19,26,0.4)", fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", paddingTop: 12, paddingBottom: 8 },
+
+  row: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingVertical: 16 },
+  rowLabel: { color: "rgba(19,19,26,0.45)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", flex: 1, paddingTop: 1 },
+  rowValue: { color: "#13131a", fontSize: 13, fontWeight: "500", flex: 2, textAlign: "right" },
+
+  divider: { height: 1, backgroundColor: "rgba(0,0,0,0.1)", marginVertical: 4 },
+
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 12 },
+
+  colorSwatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
+
+  descText: { color: "rgba(19,19,26,0.75)", fontSize: 14, lineHeight: 22, paddingBottom: 14 },
+
+  inspirationInCard: { height: 420, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.5)", borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", alignItems: "center", justifyContent: "center", marginVertical: 12, overflow: "hidden" },
+
+  editPill: { alignSelf: "center", backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 48, paddingVertical: 14, marginTop: 8, marginBottom: 24 },
+  editPillText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 12, paddingBottom: 24 },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 100, paddingHorizontal: 24, paddingVertical: 13 },
+  moreBtnText: { color: "#13131a", fontSize: 14 },
+  saveBottomBtn: { backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 14 },
+  saveBottomBtnText: { color: "#E5F772", fontSize: 15, fontWeight: "700" },
 });

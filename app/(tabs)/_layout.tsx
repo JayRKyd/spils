@@ -69,7 +69,7 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             const ts = String(Date.now());
             if (current === "materials") navigation.navigate("materials", { openAdd: ts } as any);
             else if (current === "formulas") navigation.navigate("formulas", { openAdd: ts } as any);
-            else if (current === "collection") navigation.navigate("collection", { openAdd: ts } as any);
+            else if (current === "collection") router.push("/collection/new" as any);
             else router.push("/journal/new" as any);
           }}
           activeOpacity={0.75}
