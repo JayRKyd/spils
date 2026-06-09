@@ -450,7 +450,7 @@ export default function JournalDetail() {
         <View style={d.entryHeader}>
           <View style={d.photoBox}>
             {entry.image_url
-              ? <Image source={{ uri: entry.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+              ? <Image source={{ uri: entry.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
               : <Text style={d.photoPlaceholder}>Photo</Text>}
           </View>
           <View style={d.entryMeta}>
@@ -462,41 +462,27 @@ export default function JournalDetail() {
 
         {/* Main details card */}
         <View style={d.card}>
-          {entry.brand ? <Row label="Brand" value={entry.brand} /> : null}
-          {entry.perfumer ? <Row label="Perfumer" value={entry.perfumer} /> : null}
-          {entry.gender ? <Row label="Gender" value={entry.gender} /> : null}
-          {entry.seasons?.length ? <Row label="Season(s)" value={entry.seasons.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ")} /> : null}
-          {entry.price_text ? <Row label="Price" value={entry.price_text} /> : null}
-          {entry.rating_10 != null ? <Row label="Rating" value={String(entry.rating_10)} /> : null}
+          <Row label="Brand" value={entry.brand ?? "—"} />
+          <Row label="Perfumer" value={entry.perfumer ?? "—"} />
+          <Row label="Gender" value={entry.gender ?? "—"} />
+          <Row label="Season(s)" value={entry.seasons?.length ? entry.seasons.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ") : "—"} />
+          <Row label="Price" value={entry.price_text ?? "—"} />
+          <Row label="Rating" value={entry.rating_10 != null ? String(entry.rating_10) : "—"} />
+          <Row label="Fragrance Family" value={entry.accords?.length ? entry.accords.join(", ") : "—"} />
 
-          {/* Divider before notes */}
-          {(entry.notes_top?.length || entry.notes_heart?.length || entry.notes_base?.length) ? (
-            <View style={d.divider} />
-          ) : null}
+          <View style={d.divider} />
 
-          {entry.notes_top?.length ? <Row label="Top Notes" value={entry.notes_top.join(", ")} /> : null}
-          {entry.notes_heart?.length ? <Row label="Middle Notes" value={entry.notes_heart.join(", ")} /> : null}
-          {entry.notes_base?.length ? <Row label="Base Notes" value={entry.notes_base.join(", ")} /> : null}
+          <Row label="Top Notes" value={entry.notes_top?.length ? entry.notes_top.join(", ") : "—"} />
+          <Row label="Middle Notes" value={entry.notes_heart?.length ? entry.notes_heart.join(", ") : "—"} />
+          <Row label="Base Notes" value={entry.notes_base?.length ? entry.notes_base.join(", ") : "—"} />
         </View>
-
-        {/* Accords */}
-        {entry.accords?.length ? (
-          <View style={d.card}>
-            <Text style={d.cardSectionLabel}>Fragrance Family</Text>
-            <View style={d.tagRow}>
-              {entry.accords.map((a) => (
-                <View key={a} style={d.tag}><Text style={d.tagText}>{a}</Text></View>
-              ))}
-            </View>
-          </View>
-        ) : null}
 
         {/* One unified card: Performance + Inspiration + Colors + Music + Notes */}
         <View style={d.card}>
-          {entry.projection ? <Row label="Projection" value={entry.projection} /> : null}
-          {entry.sillage ? <Row label="Sillage" value={entry.sillage} /> : null}
-          {entry.longevity ? <Row label="Longevity" value={entry.longevity} /> : null}
-          {entry.dry_down ? <Row label="Dry Down" value={entry.dry_down} /> : null}
+          <Row label="Projection" value={entry.projection ?? "—"} />
+          <Row label="Sillage" value={entry.sillage ?? "—"} />
+          <Row label="Longevity" value={entry.longevity ?? "—"} />
+          <Row label="Dry Down" value={entry.dry_down ?? "—"} />
 
           {/* Inspiration photo box inside the card */}
           <TouchableOpacity style={d.inspirationInCard} onPress={pickInspirationPhoto} activeOpacity={0.8}>

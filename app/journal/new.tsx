@@ -121,7 +121,7 @@ export default function JournalNew() {
   const [gender, setGender] = useState("");
   const [priceText, setPriceText] = useState("");
   const [rating, setRating] = useState("");
-  const [seasons, setSeasons] = useState("");
+  const [seasons, setSeasons] = useState<string[]>([]);
   const [entryDate] = useState(new Date().toISOString().slice(0, 10));
 
   const [families, setFamilies] = useState<string[]>([]);
@@ -250,7 +250,7 @@ export default function JournalNew() {
       const resp = await (supabase as any).functions.invoke("journal-ai", {
         body: {
           mode: "action", action,
-          context: { perfume: title, brand, gender, seasons, notes: description, pyramid: { top: notesTop, heart: notesHeart, base: notesBase } },
+          context: { perfume: title, brand, gender, seasons: seasons.join(", "), notes: description, pyramid: { top: notesTop, heart: notesHeart, base: notesBase } },
         },
       });
       if (resp.error) throw resp.error;
@@ -327,7 +327,7 @@ export default function JournalNew() {
 
   const handleClearAll = () => {
     setTitle(""); setDescription(""); setBrand(""); setPerfumer("");
-    setGender(""); setPriceText(""); setRating(""); setSeasons("");
+    setGender(""); setPriceText(""); setRating(""); setSeasons([]);
     setFamilies([]); setPendingFamily("");
     setNotesTop([]); setNotesHeart([]); setNotesBase([]);
     setTopInput(""); setMidInput(""); setBaseInput("");
@@ -352,7 +352,7 @@ export default function JournalNew() {
       gender: gender.trim() || null,
       price_text: priceText.trim() || null,
       rating_10: rating ? parseFloat(rating) : null,
-      seasons: seasons.trim() ? seasons.split(",").map((x) => x.trim()).filter(Boolean) : null,
+      seasons: seasons.length ? seasons : null,
       is_public: false,
       entry_date: entryDate,
       notes_top: notesTop.length ? notesTop : null,
@@ -435,7 +435,7 @@ export default function JournalNew() {
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.field, { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]} onPress={() => setSeasonPickerVisible(true)}>
-                  <Text style={seasons ? s.chooserFilled : s.chooserEmpty}>{seasons || "Season"}</Text>
+                  <Text style={seasons.length ? s.chooserFilled : s.chooserEmpty}>{seasons.length ? seasons.join(", ") : "Season"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
               </View>
@@ -683,15 +683,17 @@ export default function JournalNew() {
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSeasonPickerVisible(false)} />
             <View style={ms.sheet}>
               <View style={ms.handle} />
-              {["Spring", "Summer", "Fall", "Winter"].map((val) => (
-                <TouchableOpacity
-                  key={val}
-                  style={[ms.btn, seasons === val && ms.btnDark]}
-                  onPress={() => { setSeasons(val); setSeasonPickerVisible(false); }}
-                >
-                  <Text style={[ms.btnText, seasons === val && ms.btnTextLight]}>{val}</Text>
-                </TouchableOpacity>
-              ))}
+              {["Spring", "Summer", "Fall", "Winter"].map((val) => {
+                const active = seasons.includes(val);
+                return (
+                  <TouchableOpacity key={val} style={[ms.btn, active && ms.btnDark]} onPress={() => setSeasons((prev) => active ? prev.filter((s) => s !== val) : [...prev, val])}>
+                    <Text style={[ms.btnText, active && ms.btnTextLight]}>{val} {active ? "✓" : ""}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity style={[ms.btn, ms.btnDark, { marginTop: 8 }]} onPress={() => setSeasonPickerVisible(false)}>
+                <Text style={[ms.btnText, ms.btnTextLight]}>Done</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>

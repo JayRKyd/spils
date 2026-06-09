@@ -361,12 +361,12 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
                 onPress={() => { if (cell.current) setSelectedDate(isSelected ? null : cell.key); }}
                 activeOpacity={cell.current ? 0.7 : 1}
               >
-                <View style={[cal.dayCircle, isSelected && cal.cellSelected, isToday && !isSelected && cal.cellToday]}>
+                <View style={[cal.dayCircle, (isSelected || hasEntries) && cal.cellSelected, isToday && !isSelected && !hasEntries && cal.cellToday]}>
                   <Text style={[
                     cal.cellText,
                     !cell.current && cal.cellTextDim,
-                    isSelected && cal.cellTextSelected,
-                    isToday && !isSelected && cal.cellTextToday,
+                    (isSelected || hasEntries) && cal.cellTextSelected,
+                    isToday && !isSelected && !hasEntries && cal.cellTextToday,
                   ]}>
                     {cell.day}
                   </Text>
@@ -594,18 +594,6 @@ export default function Journal() {
                     <View style={s.sotdActions}>
                       <TouchableOpacity onPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); }}>
                         <Text style={s.sotdActionBtn}>EDIT</Text>
-                      </TouchableOpacity>
-                      <Text style={s.sotdActionSep}>|</Text>
-                      <TouchableOpacity onPress={() => {
-                        Alert.alert("Delete", "Remove this SOTD entry?", [
-                          { text: "Cancel", style: "cancel" },
-                          { text: "Delete", style: "destructive", onPress: async () => {
-                            await (supabase as any).from("scent_of_day").delete().eq("id", item.id);
-                            fetchSotdEntries();
-                          }},
-                        ]);
-                      }}>
-                        <Text style={s.sotdActionBtn}>DELETE</Text>
                       </TouchableOpacity>
                       <Text style={s.sotdRowDate}>{date}</Text>
                     </View>
