@@ -24,7 +24,7 @@ const FRAGRANCE_FAMILIES = [
   "Woody Green", "Woody Spicy",
 ];
 
-const CONCENTRATION_OPTIONS = ["Parfum/Extrait", "EDP", "EDT", "Cologne", "Oil"];
+const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Cologne", "Oil"];
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
 const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
 
@@ -122,7 +122,7 @@ export default function CollectionNew() {
   const [priceText, setPriceText] = useState("");
   const [sizeText, setSizeText] = useState("");
   const [rating, setRating] = useState("");
-  const [seasons, setSeasons] = useState("");
+  const [seasons, setSeasons] = useState<string[]>([]);
   const [concentration, setConcentration] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("Owned");
@@ -156,6 +156,8 @@ export default function CollectionNew() {
   const [bottleImage, setBottleImage] = useState<string | null>(null);
   const [bottleBase64, setBottleBase64] = useState<string | null>(null);
   const [inspirationImage, setInspirationImage] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
   const [moreView, setMoreView] = useState<"main" | "delete" | "share">("main");
@@ -172,7 +174,8 @@ export default function CollectionNew() {
           const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
           if (!result.canceled && result.assets[0]) {
             setBottleImage(result.assets[0].uri);
-            if (result.assets[0].base64) setBottleBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            const dataUrl = result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : null;
+            if (dataUrl) { setBottleBase64(dataUrl); runVisionAI(dataUrl); }
           }
         },
       },
@@ -184,12 +187,35 @@ export default function CollectionNew() {
           const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
           if (!result.canceled && result.assets[0]) {
             setBottleImage(result.assets[0].uri);
-            if (result.assets[0].base64) setBottleBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            const dataUrl = result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : null;
+            if (dataUrl) { setBottleBase64(dataUrl); runVisionAI(dataUrl); }
           }
         },
       },
       { text: "Cancel", style: "cancel" },
     ]);
+  };
+
+  const runVisionAI = async (dataUrl: string) => {
+    setAiLoading(true);
+    setAiStatus("Scanning label…");
+    try {
+      const resp = await (supabase as any).functions.invoke("journal-ai", { body: { mode: "vision", imageDataUrl: dataUrl } });
+      if (resp.error) throw resp.error;
+      const a = resp.data?.autofill;
+      if (a && typeof a === "object") {
+        if (!title && a.perfume) setTitle(a.perfume);
+        if (!brand && a.brand) setBrand(a.brand);
+        if (!perfumer && a.perfumer) setPerfumer(a.perfumer);
+        setAiStatus("✦ Auto-filled from label");
+      } else {
+        setAiStatus(null);
+      }
+    } catch {
+      setAiStatus(null);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const pickInspirationPhoto = () => {
@@ -250,7 +276,7 @@ export default function CollectionNew() {
 
   const handleClearAll = () => {
     setTitle(""); setDescription(""); setBrand(""); setPerfumer("");
-    setGender(""); setPriceText(""); setSizeText(""); setRating(""); setSeasons("");
+    setGender(""); setPriceText(""); setSizeText(""); setRating(""); setSeasons([]);
     setConcentration(""); setCategory(""); setStatus("Owned");
     setFamilies([]); setPendingFamily("");
     setNotesTop([]); setNotesHeart([]); setNotesBase([]);
@@ -276,7 +302,7 @@ export default function CollectionNew() {
       price: priceText ? parseFloat(priceText) : null,
       size_ml: sizeText ? parseFloat(sizeText) : null,
       rating: rating ? parseFloat(rating) : null,
-      season: seasons ? [seasons] : null,
+      season: seasons.length ? seasons : null,
       concentration: concentration || null,
       category: category || null,
       status: tags.includes("Wishlist") ? "Wishlist" : tags.includes("Sell-Trade") ? "Sell-Trade" : status || "Owned",
@@ -326,6 +352,17 @@ export default function CollectionNew() {
               {/* Bottle photo */}
               <TouchableOpacity style={s.photoUpload} onPress={pickPhoto} activeOpacity={0.85}>
                 {bottleImage && <Image source={{ uri: bottleImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />}
+                {aiLoading && (
+                  <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "rgba(13,184,170,0.45)", borderRadius: 18 }]}>
+                    <ActivityIndicator color="#fff" size="large" />
+                    <Text style={{ color: "#fff", fontSize: 13 }}>{aiStatus}</Text>
+                  </View>
+                )}
+                {bottleImage && !aiLoading && aiStatus && (
+                  <View style={[{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(13,184,170,0.3)", paddingVertical: 6, paddingHorizontal: 12, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }]}>
+                    <Text style={{ color: "#0d9488", fontSize: 12, textAlign: "center" }}>{aiStatus}</Text>
+                  </View>
+                )}
                 {!bottleImage && (
                   <>
                     <View style={[s.corner, s.cornerTL]} />
@@ -350,7 +387,7 @@ export default function CollectionNew() {
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.field, s.chooser, { flex: 1 }]} onPress={() => setSeasonPickerVisible(true)}>
-                  <Text style={seasons ? s.chooserFilled : s.chooserEmpty}>{seasons || "Season"}</Text>
+                  <Text style={seasons.length ? s.chooserFilled : s.chooserEmpty}>{seasons.length ? seasons.join(", ") : "Season"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
               </View>
@@ -594,11 +631,17 @@ export default function CollectionNew() {
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSeasonPickerVisible(false)} />
             <View style={ms.sheet}>
               <View style={ms.handle} />
-              {["Spring", "Summer", "Fall", "Winter"].map((val) => (
-                <TouchableOpacity key={val} style={[ms.btn, seasons === val && ms.btnDark]} onPress={() => { setSeasons(val); setSeasonPickerVisible(false); }}>
-                  <Text style={[ms.btnText, seasons === val && ms.btnTextLight]}>{val}</Text>
-                </TouchableOpacity>
-              ))}
+              {["Spring", "Summer", "Fall", "Winter"].map((val) => {
+                const active = seasons.includes(val);
+                return (
+                  <TouchableOpacity key={val} style={[ms.btn, active && ms.btnDark]} onPress={() => setSeasons((prev) => active ? prev.filter((s) => s !== val) : [...prev, val])}>
+                    <Text style={[ms.btnText, active && ms.btnTextLight]}>{val} {active ? "✓" : ""}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity style={[ms.btn, ms.btnDark, { marginTop: 8 }]} onPress={() => setSeasonPickerVisible(false)}>
+                <Text style={[ms.btnText, ms.btnTextLight]}>Done</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>

@@ -55,7 +55,7 @@ function CollectionCard({ item, onFavoriteToggle }: { item: Perfume; onFavoriteT
     <TouchableOpacity style={[s.card, { width: cardWidth }]} onPress={() => router.push(`/collection/${item.id}` as any)} activeOpacity={0.8}>
       <View style={s.cardImageWrap}>
         {item.image_url ? (
-          <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+          <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
         ) : null}
       </View>
       <View style={s.cardInfo}>

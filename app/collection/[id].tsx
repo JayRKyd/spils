@@ -48,7 +48,7 @@ type Perfume = {
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
-const CONCENTRATION_OPTIONS = ["Parfum/Extrait", "EDP", "EDT", "Cologne", "Oil"];
+const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Cologne", "Oil"];
 const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
 
 const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
@@ -567,6 +567,12 @@ export default function CollectionDetail() {
             <View style={ms.handle} />
             <TouchableOpacity style={ms.btn} onPress={handleShare}>
               <Text style={ms.btnText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={ms.btn} onPress={() => { setMoreVisible(false); Alert.alert("+Collection", "Already in your collection."); }}>
+              <Text style={ms.btnText}>+Collection</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={ms.btn} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
+              <Text style={ms.btnText}>Print</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[ms.btn, ms.btnDanger]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
               <Text style={[ms.btnText, { color: "#dc2626" }]}>Delete</Text>
