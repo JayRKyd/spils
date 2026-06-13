@@ -193,7 +193,7 @@ function MaterialModal({
                 onPress={() => setIsFavorite((v) => !v)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={[mo.heart, isFavorite && mo.heartActive]}>♥</Text>
+                <Text style={[mo.heart, isFavorite && mo.heartActive]}>{isFavorite ? "♥" : "♡"}</Text>
               </TouchableOpacity>
             </View>
 
@@ -373,7 +373,7 @@ function MaterialCard({
           onPress={onToggleFavorite}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={[cd.heart, item.is_favorite && cd.heartActive]}>♥</Text>
+          <Text style={[cd.heart, item.is_favorite && cd.heartActive]}>{item.is_favorite ? "♥" : "♡"}</Text>
         </TouchableOpacity>
       </View>
 
@@ -775,7 +775,7 @@ const cd = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, marginRight: 8 },
   symbol: { fontSize: 13, color: "#13131a", marginTop: 1 },
   name: { fontSize: 15, fontWeight: "700", color: "#13131a", flex: 1 },
-  heart: { fontSize: 20, color: "#cccccc" },
+  heart: { fontSize: 20, color: "rgba(19,19,26,0.4)" },
   heartActive: { color: "#13131a" },
 
   desc: {
@@ -921,7 +921,7 @@ const mo = StyleSheet.create({
     marginBottom: 12,
   },
   nameInput: { flex: 1, fontSize: 15, color: "#13131a", fontWeight: "500" },
-  heart: { fontSize: 22, color: "#cccccc" },
+  heart: { fontSize: 22, color: "rgba(19,19,26,0.4)" },
   heartActive: { color: "#13131a" },
 
   descWrap: {

@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  Modal, ScrollView, ActivityIndicator, Alert, StyleSheet,
+  Modal, ScrollView, ActivityIndicator, StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-import GradientScreen from "@/components/GradientScreen";
-import { GlassRow } from "@/components/GlassCard";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Formula {
   id: number;
@@ -16,85 +17,122 @@ interface Formula {
   description: string | null;
   date_created: string;
   material_count?: number;
+  is_favorite?: boolean;
+  status?: string | null;
 }
 
-function getStatus(count: number) {
-  if (count === 0) return { label: "Draft", progress: 0 };
-  if (count <= 3) return { label: "In Progress", progress: 30 };
-  if (count <= 6) return { label: "In Progress", progress: 60 };
-  return { label: "Final", progress: 100 };
+interface FormulaVersion {
+  id: number;
+  formula_id: number;
+  version_number: string;
+  created_at: string;
 }
 
-function ProgressBar({ progress }: { progress: number }) {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${mm}.${dd}.${yy}`;
+}
+
+function getStatus(formula: Formula) {
+  if (formula.status) return formula.status;
+  const count = formula.material_count ?? 0;
+  if (count === 0) return "Draft";
+  if (count < 10) return "In Progress";
+  return "Final";
+}
+
+// ─── Formula Card ─────────────────────────────────────────────────────────────
+
+function FormulaCard({ formula, onToggleFavorite }: {
+  formula: Formula;
+  onToggleFavorite: () => void;
+}) {
+  const [versionsExpanded, setVersionsExpanded] = useState(false);
+  const [versions, setVersions] = useState<FormulaVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+
+  const status = getStatus(formula);
+  const date = formatDate(formula.date_created);
+
+  const toggleVersions = async () => {
+    if (!versionsExpanded && versions.length === 0) {
+      setVersionsLoading(true);
+      const { data } = await supabase
+        .from("formula_versions")
+        .select("*")
+        .eq("formula_id", formula.id)
+        .order("created_at", { ascending: false });
+      setVersions((data as FormulaVersion[]) ?? []);
+      setVersionsLoading(false);
+    }
+    setVersionsExpanded((v) => !v);
+  };
+
   return (
-    <View style={s.progressTrack}>
-      <View style={[s.progressFill, { width: `${progress}%` as any }]} />
+    <View style={c.card}>
+      {/* Top row: name + heart */}
+      <TouchableOpacity
+        style={c.topRow}
+        onPress={() => router.push(`/formula/${formula.id}` as any)}
+        activeOpacity={0.75}
+      >
+        <Text style={c.name} numberOfLines={1}>{formula.name}</Text>
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation?.(); onToggleFavorite(); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[c.heart, formula.is_favorite && c.heartActive]}>{formula.is_favorite ? "♥" : "♡"}</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+
+      {/* Description */}
+      <Text style={c.desc} numberOfLines={3}>
+        {formula.description || "No description"}
+      </Text>
+
+      {/* Bottom row */}
+      <View style={c.bottomRow}>
+        <View style={c.bottomLeft}>
+          <Text style={c.statusText}>{status}</Text>
+          <Text style={c.sep}>  |  </Text>
+          <Text style={c.meta}>{formula.material_count ?? 0} Materials</Text>
+          {(formula.material_count ?? 0) > 0 && (
+            <>
+              <Text style={c.sep}>  |  </Text>
+              <TouchableOpacity onPress={toggleVersions}>
+                <Text style={c.versionsLink}>Versions.</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+        <Text style={c.date}>{date}</Text>
+      </View>
+
+      {/* Version history */}
+      {versionsExpanded && (
+        versionsLoading
+          ? <ActivityIndicator size="small" color="#999" style={{ marginTop: 8 }} />
+          : versions.map((v) => (
+            <View key={v.id} style={c.versionPill}>
+              <Text style={c.versionName} numberOfLines={1}>
+                {formula.name} <Text style={c.versionTag}>[version {v.version_number}]</Text>
+              </Text>
+              <Text style={c.versionDate}>{formatDate(v.created_at)}</Text>
+            </View>
+          ))
+      )}
     </View>
   );
 }
 
-function CreateModal({ visible, userId, onClose, onCreated }: {
-  visible: boolean; userId?: string; onClose: () => void; onCreated: (id: number) => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
+// ─── Create Modal ─────────────────────────────────────────────────────────────
 
-  useEffect(() => { if (visible) { setName(""); setDescription(""); } }, [visible]);
-
-  const handleCreate = async () => {
-    if (!name.trim()) return;
-    setSaving(true);
-    const { data, error } = await supabase.from("formulas").insert([{ name: name.trim(), description: description.trim() || null, user_id: userId }]).select().single();
-    setSaving(false);
-    if (!error && data) onCreated(data.id);
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={s.modal}>
-        <View style={s.modalHeader}>
-          <Text style={s.modalTitle}>New Project</Text>
-          <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
-        </View>
-        <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
-          <Text style={s.fieldLabel}>Name *</Text>
-          <TextInput style={s.input} placeholder="Formula name" placeholderTextColor="rgba(255,255,255,0.35)" value={name} onChangeText={setName} />
-          <Text style={s.fieldLabel}>Description</Text>
-          <TextInput style={[s.input, { height: 100, textAlignVertical: "top" }]} placeholder="Optional description" placeholderTextColor="rgba(255,255,255,0.35)" value={description} onChangeText={setDescription} multiline />
-          <TouchableOpacity style={[s.saveBtn, (!name.trim() || saving) && { opacity: 0.5 }]} onPress={handleCreate} disabled={saving || !name.trim()}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Create Project</Text>}
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-function FormulaCard({ formula, onDelete }: { formula: Formula; onDelete: () => void }) {
-  const status = getStatus(formula.material_count ?? 0);
-  return (
-    <TouchableOpacity onPress={() => router.push(`/formula/${formula.id}` as any)} activeOpacity={0.75}>
-      <GlassRow style={s.card}>
-        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
-          <Text style={[s.cardTitle, { flex: 1, marginRight: 8 }]} numberOfLines={1}>{formula.name}</Text>
-          <Text style={s.cardDate}>{new Date(formula.date_created).toLocaleDateString()}</Text>
-        </View>
-        <Text style={s.cardDesc} numberOfLines={2}>{formula.description || "No description"}</Text>
-        <ProgressBar progress={status.progress} />
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Text style={s.cardMeta}>{formula.material_count ?? 0} materials</Text>
-            <Text style={s.cardMeta}>· {status.label}</Text>
-          </View>
-          <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onDelete(); }}>
-            <Text style={s.deleteBtn}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      </GlassRow>
-    </TouchableOpacity>
-  );
-}
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function Formulas() {
   const { user } = useAuth();
@@ -102,13 +140,21 @@ export default function Formulas() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const { openAdd } = useLocalSearchParams<{ openAdd?: string }>();
-  const [createVisible, setCreateVisible] = useState(false);
-  useEffect(() => { if (openAdd) setCreateVisible(true); }, [openAdd]);
+  const [ifraVisible, setIfraVisible] = useState(false);
+  const [secureVisible, setSecureVisible] = useState(false);
+
+  useEffect(() => { if (openAdd) router.push("/formula/new" as any); }, [openAdd]);
 
   const fetchFormulas = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from("formulas").select("*, formula_lines(count)").order("name", { ascending: true });
-    const mapped = (data ?? []).map((f: any) => ({ ...f, material_count: f.formula_lines?.[0]?.count ?? 0 }));
+    const { data } = await supabase
+      .from("formulas")
+      .select("*, formula_lines(count)")
+      .order("date_created", { ascending: false });
+    const mapped = (data ?? []).map((f: any) => ({
+      ...f,
+      material_count: f.formula_lines?.[0]?.count ?? 0,
+    }));
     setFormulas(mapped);
     setLoading(false);
   }, []);
@@ -120,71 +166,413 @@ export default function Formulas() {
     (f.description?.toLowerCase().includes(search.toLowerCase()) ?? false)
   );
 
-  const handleDelete = (id: number, name: string) => {
-    Alert.alert("Delete Project", `Remove "${name}"? This cannot be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await supabase.from("formulas").delete().eq("id", id); fetchFormulas(); } },
-    ]);
+  const handleToggleFavorite = async (formula: Formula) => {
+    const newVal = !formula.is_favorite;
+    setFormulas((prev) => prev.map((f) => f.id === formula.id ? { ...f, is_favorite: newVal } : f));
+    await supabase.from("formulas").update({ is_favorite: newVal }).eq("id", formula.id);
   };
 
   return (
-    <GradientScreen gradient="lab">
-      <View style={s.header}>
+    <LinearGradient
+      colors={["#FFD4E6", "#F5AEC8", "#EC8FB5"]}
+      start={{ x: 0.1, y: 0 }}
+      end={{ x: 0.9, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Top nav */}
+        <View style={s.topNav}>
+          <Text style={s.logo}>SP/LS.</Text>
+          <TouchableOpacity style={s.profileCircle}>
+            <Text style={s.profileIcon}>👤</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Title */}
         <Text style={s.pageTitle}>Lab</Text>
-        <TextInput style={s.searchBar} placeholder="Search projects..." placeholderTextColor="rgba(255,255,255,0.4)" value={search} onChangeText={setSearch} />
-      </View>
 
-      {loading ? <ActivityIndicator color="#a78bfa" style={{ marginTop: 48 }} /> : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-          ListEmptyComponent={
-            <View style={{ alignItems: "center", marginTop: 64 }}>
-              <Text style={s.empty}>{search ? "No projects match your search" : "No projects yet"}</Text>
-              {!search && (
-                <TouchableOpacity style={[s.saveBtn, { marginTop: 16, paddingHorizontal: 24 }]} onPress={() => setCreateVisible(true)}>
-                  <Text style={s.saveBtnText}>Create First Project</Text>
-                </TouchableOpacity>
-              )}
+        {/* Search */}
+        <View style={s.searchWrap}>
+          <Text style={s.searchIcon}>🔍</Text>
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search projects..."
+            placeholderTextColor="rgba(0,0,0,0.35)"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <Text style={s.searchClear}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filter row */}
+        <View style={s.filterRow}>
+          <View style={s.filterLeft}>
+            <TouchableOpacity style={s.secureBadge} onPress={() => setSecureVisible(true)}>
+              <Text style={s.secureBadgeText}>Your Formulas are Secure</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.ifraPill} onPress={() => setIfraVisible(true)}>
+              <Text style={s.ifraPillText}>IFRA</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity>
+            <Text style={s.sortText}>Sort</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* List */}
+        {loading ? (
+          <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 }}
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            ListEmptyComponent={
+              <Text style={s.empty}>
+                {search ? "No projects match your search." : "No projects yet. Tap + to create one."}
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <FormulaCard
+                formula={item}
+                onToggleFavorite={() => handleToggleFavorite(item)}
+              />
+            )}
+          />
+        )}
+
+        {/* Secure modal */}
+        <Modal visible={secureVisible} transparent animationType="fade" onRequestClose={() => setSecureVisible(false)}>
+          <View style={s.bannerOverlay}>
+            <View style={s.secureCard}>
+              <TouchableOpacity style={s.bannerClose} onPress={() => setSecureVisible(false)}>
+                <Text style={s.bannerCloseText}>✕</Text>
+              </TouchableOpacity>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={s.secureTitle}>YOUR FORMULAS ARE SECURE</Text>
+                <Text style={s.secureBody}>
+                  Your formulas and notes are private and securely stored. No one including SPILS can see them unless you choose to share. You are in full control. Export your creations as a .CSV or share them with collaborators any time.
+                </Text>
+                <Text style={s.secureSection}>LEGAL & PRIVACY NOTE:</Text>
+                <Text style={s.secureBody}>
+                  All Lab data is encrypted in transit and at rest using industry-standard security measures. Data is stored securely with our backend provider and cannot be accessed by SPILS personnel. SPILS is not responsible for unauthorized access outside our systems. SPILS is not liable for lost, deleted, or inaccessible formulas due to user error or events beyond our control. Please back up or export your creations regularly.
+                </Text>
+                <Text style={s.secureSection}>SHARING REMINDER:</Text>
+                <Text style={s.secureBody}>
+                  If you share a formula externally, SPILS cannot guarantee its privacy. You are responsible for any use outside the app.
+                </Text>
+                <Text style={s.secureFooter}>For any questions about your data, contact info@spils.app</Text>
+              </ScrollView>
             </View>
-          }
-          renderItem={({ item }) => <FormulaCard formula={item} onDelete={() => handleDelete(item.id, item.name)} />}
-        />
-      )}
+          </View>
+        </Modal>
 
+        {/* IFRA notice modal */}
+        <Modal visible={ifraVisible} transparent animationType="fade" onRequestClose={() => setIfraVisible(false)}>
+          <View style={s.bannerOverlay}>
+            <View style={s.bannerCard}>
+              <TouchableOpacity style={s.bannerClose} onPress={() => setIfraVisible(false)}>
+                <Text style={s.bannerCloseText}>✕</Text>
+              </TouchableOpacity>
+              <Text style={s.bannerHeading}>IFRA Compliance Coming Soon:</Text>
+              <Text style={s.bannerBody}>
+                Always double-check your formulas against IFRA guidelines.{"\n"}Our full IFRA assistant will arrive in future updates.
+              </Text>
+            </View>
+          </View>
+        </Modal>
 
-      <CreateModal
-        visible={createVisible}
-        userId={user?.id}
-        onClose={() => setCreateVisible(false)}
-        onCreated={(id) => { setCreateVisible(false); fetchFormulas(); router.push(`/formula/${id}` as any); }}
-      />
-    </GradientScreen>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
-  pageTitle: { color: "#fff", fontSize: 24, fontWeight: "700", marginBottom: 12 },
-  searchBar: { backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, color: "#fff" },
-  card: { paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10 },
-  cardTitle: { color: "#fff", fontWeight: "600", fontSize: 15 },
-  cardDate: { color: "rgba(255,255,255,0.35)", fontSize: 12 },
-  cardDesc: { color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 10 },
-  cardMeta: { color: "rgba(255,255,255,0.35)", fontSize: 12 },
-  deleteBtn: { color: "#f87171", fontSize: 12 },
-  progressTrack: { height: 4, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 2, overflow: "hidden" },
-  progressFill: { height: "100%", backgroundColor: "#a78bfa", borderRadius: 2 },
-  empty: { color: "rgba(255,255,255,0.5)", textAlign: "center", fontSize: 14 },
-  fab: { position: "absolute", bottom: 24, right: 24, backgroundColor: "#a78bfa", width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
-  fabIcon: { color: "#fff", fontSize: 28, fontWeight: "300", lineHeight: 32 },
-  modal: { flex: 1, backgroundColor: "#0e1828" },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
-  modalTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
-  modalClose: { color: "rgba(255,255,255,0.5)", fontSize: 18 },
-  fieldLabel: { color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 6, marginTop: 4 },
-  input: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 15, marginBottom: 14 },
-  saveBtn: { backgroundColor: "#a78bfa", borderRadius: 12, paddingVertical: 15, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  topNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  logo: { fontSize: 20, fontWeight: "900", color: "#13131a", letterSpacing: -0.5 },
+  profileCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    borderWidth: 1, borderColor: "rgba(0,0,0,0.1)",
+    alignItems: "center", justifyContent: "center",
+  },
+  profileIcon: { fontSize: 16 },
+
+  pageTitle: {
+    fontSize: 32, fontWeight: "800", color: "#13131a",
+    letterSpacing: -1, paddingHorizontal: 20, marginTop: 6, marginBottom: 12,
+  },
+
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.55)",
+    borderRadius: 24,
+    marginHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
+  },
+  searchIcon: { fontSize: 15, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 14, color: "#13131a" },
+  searchClear: { color: "rgba(0,0,0,0.3)", fontSize: 15, paddingLeft: 8 },
+
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  filterLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  secureBadge: {
+    backgroundColor: "#C6FF00",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  secureBadgeText: { fontSize: 12, fontWeight: "700", color: "#13131a" },
+  ifraPill: {
+    backgroundColor: "#13131a",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+  },
+  ifraPillText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+  sortText: { fontSize: 14, fontWeight: "600", color: "#13131a" },
+
+  empty: {
+    color: "rgba(0,0,0,0.45)",
+    textAlign: "center",
+    marginTop: 56,
+    fontSize: 14,
+  },
+
+  bannerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  bannerCard: {
+    backgroundColor: "#13131a",
+    borderRadius: 18,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 26,
+    width: "100%",
+  },
+  bannerClose: {
+    position: "absolute",
+    top: 14,
+    right: 16,
+    padding: 6,
+  },
+  bannerCloseText: { color: "rgba(255,255,255,0.5)", fontSize: 16 },
+  bannerHeading: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 10,
+    marginTop: 8,
+    paddingRight: 24,
+    textAlign: "center",
+  },
+  bannerBody: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+  },
+
+  secureCard: {
+    backgroundColor: "#13131a",
+    borderRadius: 18,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 28,
+    width: "100%",
+    maxHeight: "85%",
+  },
+  secureTitle: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontWeight: "800",
+    marginBottom: 14,
+    marginTop: 8,
+    letterSpacing: 0.3,
+  },
+  secureSection: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 20,
+    marginBottom: 10,
+    letterSpacing: 0.2,
+  },
+  secureBody: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  secureFooter: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+    marginTop: 24,
+    lineHeight: 18,
+  },
+});
+
+// Card styles
+const c = StyleSheet.create({
+  card: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  name: { fontSize: 15, fontWeight: "700", color: "#13131a", flex: 1, marginRight: 8 },
+  heart: { fontSize: 20, color: "rgba(19,19,26,0.4)" },
+  heartActive: { color: "#13131a" },
+
+  desc: {
+    fontSize: 13,
+    color: "#888888",
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  bottomLeft: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
+  statusText: { fontSize: 12, color: "#13131a", fontWeight: "500" },
+  sep: { fontSize: 12, color: "rgba(0,0,0,0.3)" },
+  meta: { fontSize: 12, color: "#555555" },
+  versionsLink: {
+    fontSize: 12,
+    color: "#13131a",
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+  date: { fontSize: 12, color: "#555555", marginLeft: 8 },
+
+  versionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255,255,255,0.35)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  versionName: { fontSize: 13, color: "#13131a", flex: 1, marginRight: 8 },
+  versionTag: { fontWeight: "400", color: "#555" },
+  versionDate: { fontSize: 12, color: "#555555" },
+});
+
+// Create modal styles
+const mo = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 4,
+  },
+  logo: { fontSize: 20, fontWeight: "800", color: "#13131a", letterSpacing: 1 },
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.08)",
+    borderWidth: 1, borderColor: "rgba(0,0,0,0.12)",
+    alignItems: "center", justifyContent: "center",
+  },
+  backIcon: { color: "#13131a", fontSize: 24, fontWeight: "300", lineHeight: 28, marginTop: -2 },
+  profileCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.08)",
+    borderWidth: 1, borderColor: "rgba(0,0,0,0.12)",
+    alignItems: "center", justifyContent: "center",
+  },
+  profileIcon: { fontSize: 16 },
+  pageTitle: {
+    fontSize: 32, fontWeight: "800", color: "#13131a",
+    letterSpacing: -1, paddingHorizontal: 20, marginTop: 6, marginBottom: 16,
+  },
+  fieldWrap: {
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.8)",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  input: { fontSize: 15, color: "#13131a", fontWeight: "500" },
+  descWrap: {
+    backgroundColor: "rgba(255,255,255,0.6)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.8)",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    marginBottom: 16,
+  },
+  descLabel: { fontSize: 12, fontWeight: "600", color: "rgba(0,0,0,0.45)", marginBottom: 6 },
+  descInput: { fontSize: 14, color: "#13131a", minHeight: 80 },
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  cancelBtn: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.15)",
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+  },
+  cancelBtnText: { color: "#13131a", fontSize: 14 },
+  saveBtn: {
+    backgroundColor: "#C6FF00",
+    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 13,
+  },
+  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 });

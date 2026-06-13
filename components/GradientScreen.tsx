@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export const GRADIENTS = {
   default:     ["#5c3aae", "#3d2180", "#261456"] as const,
   materials:   ["#1e6035", "#145528", "#0e3a1c"] as const,
-  lab:         ["#1a4878", "#103260", "#0a2048"] as const,
+  lab:         ["#FFD4E6", "#F5AEC8", "#EC8FB5"] as const,
   collection:  ["#5c1c8a", "#421268", "#2c0a48"] as const,
   journal:     ["#7a3c18", "#5a2810", "#3c180a"] as const,
   community:   ["#1a5c6e", "#104855", "#0a3040"] as const,
