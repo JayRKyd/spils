@@ -361,12 +361,11 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
                 onPress={() => { if (cell.current) setSelectedDate(isSelected ? null : cell.key); }}
                 activeOpacity={cell.current ? 0.7 : 1}
               >
-                <View style={[cal.dayCircle, (isSelected || hasEntries) && cal.cellSelected, isToday && !isSelected && !hasEntries && cal.cellToday]}>
+                <View style={[cal.dayCircle, isToday && cal.cellSelected, hasEntries && !isToday && cal.cellToday]}>
                   <Text style={[
                     cal.cellText,
                     !cell.current && cal.cellTextDim,
-                    (isSelected || hasEntries) && cal.cellTextSelected,
-                    isToday && !isSelected && !hasEntries && cal.cellTextToday,
+                    isToday && cal.cellTextSelected,
                   ]}>
                     {cell.day}
                   </Text>
