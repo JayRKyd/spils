@@ -473,7 +473,7 @@ export default function Journal() {
   const handleSotdEdit = async () => {
     if (!sotdSelected || !sotdEditValue.trim()) return;
     setSotdActionSaving(true);
-    await (supabase as any).from("scent_of_day").update({ perfume_name: sotdEditValue.trim(), gender: sotdEditGender || null }).eq("id", sotdSelected.id);
+    await (supabase as any).from("scent_of_day").update({ perfume_name: sotdEditValue.trim() }).eq("id", sotdSelected.id);
     setSotdActionSaving(false);
     setSotdSelected(null);
     fetchSotdEntries();
@@ -686,18 +686,6 @@ export default function Journal() {
                   placeholderTextColor="rgba(255,255,255,0.3)"
                   autoFocus={false}
                 />
-                <Text style={fm.genderLabel}>Gender</Text>
-                <View style={fm.genderRow}>
-                  {["Female", "Male", "Unisex"].map((g) => (
-                    <TouchableOpacity
-                      key={g}
-                      style={[fm.genderChip, sotdEditGender === g && fm.genderChipActive]}
-                      onPress={() => setSotdEditGender(sotdEditGender === g ? "" : g)}
-                    >
-                      <Text style={[fm.genderChipText, sotdEditGender === g && fm.genderChipTextActive]}>{g}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
                 <TouchableOpacity
                   style={[s.sotdModalBtn, { backgroundColor: "#E5F772", marginBottom: 10 }, (!sotdEditValue.trim() || sotdActionSaving) && { opacity: 0.4 }]}
                   onPress={handleSotdEdit}
