@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  ScrollView, ActivityIndicator, Modal, StyleSheet,
+  ScrollView, ActivityIndicator, Modal, StyleSheet, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,8 +18,16 @@ const DILUENTS = [
   "Perfumers Alcohol",
 ];
 
+const SYMBOL_ICONS: Record<string, string> = {
+  Top: "▲", Mid: "■", Base: "●", Solvent: "★", Other: "✴",
+};
+
+type Material = { id: number; name: string; type: string | null; };
+type PendingLine = { tempId: string; material: Material | null; name: string; amount: string; };
+
 export default function NewFormula() {
   const { user } = useAuth();
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [bottleSizeMl, setBottleSizeMl] = useState(15);
@@ -29,26 +37,91 @@ export default function NewFormula() {
   const [notesExpanded, setNotesExpanded] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Material inline add
+  const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<Material[]>([]);
+  const [selected, setSelected] = useState<Material | null>(null);
+  const [amount, setAmount] = useState("0.000");
+  const [lines, setLines] = useState<PendingLine[]>([]);
+
+  const totalG = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
   const targetConcentrateG = (bottleSizeMl * concPercent) / 100;
+  const diluentMl = Math.max(0, bottleSizeMl - totalG).toFixed(1);
+  const atTarget = Math.abs(totalG - targetConcentrateG) < 0.001;
+
+  // Debounced search — user's Organ only
+  useEffect(() => {
+    if (!search.trim() || selected) { setSearchResults([]); return; }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("materials")
+        .select("id,name,type")
+        .eq("user_id", user?.id)
+        .ilike("name", `%${search}%`)
+        .limit(10);
+      setSearchResults((data as Material[]) ?? []);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search, selected, user?.id]);
+
+  const handleAddLine = () => {
+    const matName = selected?.name ?? search.trim();
+    if (!matName) return;
+    setLines((prev) => [
+      ...prev,
+      { tempId: `${Date.now()}-${Math.random()}`, material: selected, name: matName, amount },
+    ]);
+    setSearch(""); setSelected(null); setAmount("0.000"); setSearchResults([]);
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const { data, error } = await supabase
-      .from("formulas")
-      .insert([{
-        name: name.trim(),
-        description: description.trim() || null,
-        user_id: user?.id,
-        bottle_size_ml: bottleSizeMl,
-        concentration_pct: concPercent,
-        diluent,
-      }])
-      .select()
-      .single();
-    setSaving(false);
-    if (!error && data) router.replace(`/formula/${data.id}` as any);
+    try {
+      // Store params in notes field (matches how [id].tsx reads them)
+      const notesStr = `Bottle: ${bottleSizeMl}mL, Concentration: ${concPercent}%, Diluent: ${diluent}`;
+      const { data: formula, error: fErr } = await supabase
+        .from("formulas")
+        .insert([{
+          name: name.trim(),
+          description: description.trim() || null,
+          user_id: user?.id,
+          notes: notesStr,
+        }])
+        .select()
+        .single();
+      if (fErr || !formula) throw fErr ?? new Error("Failed to create formula");
+
+      for (const line of lines) {
+        let materialId = line.material?.id ?? null;
+        if (!materialId) {
+          // New material — auto-add to Organ
+          const { data: mat, error: matErr } = await supabase
+            .from("materials")
+            .insert([{ name: line.name, user_id: user?.id }])
+            .select("id")
+            .single();
+          if (matErr || !mat) continue;
+          materialId = mat.id;
+        }
+        await supabase.from("formula_lines").insert([{
+          formula_id: formula.id,
+          material_id: materialId,
+          amount_g: parseFloat(line.amount) || 0,
+        }]);
+      }
+
+      router.replace(`/formula/${formula.id}` as any);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Failed to create formula");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const showDropdown = search.trim().length > 0 && !selected;
+  const exactMatch = searchResults.some((r) => r.name.toLowerCase() === search.toLowerCase());
+  const canAdd = !!(selected || search.trim());
 
   return (
     <LinearGradient colors={["#FFD4E6", "#F5AEC8", "#EC8FB5"]} style={{ flex: 1 }}>
@@ -85,16 +158,16 @@ export default function NewFormula() {
             />
           </View>
 
-          {/* ① Mood Board */}
+          {/* ① Mood Board (placeholder — functional after create) */}
           <View style={[s.panel, { marginHorizontal: 16, marginBottom: 16 }]}>
-            <View style={s.sectionHeader}>
+            <View style={[s.sectionHeader, { marginBottom: 14 }]}>
               <Text style={s.sectionTitle}>Mood Board</Text>
-              <View style={s.addBtn}>
+              <View style={[s.addBtn, { opacity: 0.4 }]}>
                 <Text style={s.addBtnText}>+ Add Item</Text>
               </View>
             </View>
-            <View style={{ alignItems: "center", paddingVertical: 24 }}>
-              <Text style={s.emptyHint}>No mood board items yet.{"\n"}Add images or notes for inspiration.</Text>
+            <View style={{ alignItems: "center", paddingVertical: 12 }}>
+              <Text style={s.emptyHint}>Mood board available after creating the formula.</Text>
             </View>
           </View>
 
@@ -106,7 +179,7 @@ export default function NewFormula() {
                 <Text style={s.paramLabel}>Bottle Size (mL)</Text>
                 <TextInput
                   style={s.paramInput}
-                  value={bottleSizeMl.toString()}
+                  value={String(bottleSizeMl)}
                   onChangeText={(v) => setBottleSizeMl(parseFloat(v) || 0)}
                   keyboardType="decimal-pad"
                   placeholderTextColor="rgba(0,0,0,0.3)"
@@ -116,7 +189,7 @@ export default function NewFormula() {
                 <Text style={s.paramLabel}>Concentration (%)</Text>
                 <TextInput
                   style={s.paramInput}
-                  value={concPercent.toString()}
+                  value={String(concPercent)}
                   onChangeText={(v) => setConcPercent(parseFloat(v) || 0)}
                   keyboardType="decimal-pad"
                   placeholderTextColor="rgba(0,0,0,0.3)"
@@ -129,31 +202,75 @@ export default function NewFormula() {
               <Text style={{ color: "rgba(0,0,0,0.4)", fontSize: 15 }}>▾</Text>
             </TouchableOpacity>
             <Text style={s.paramCalc}>
-              Current concentrate: 0.000g · Target concentrate: {targetConcentrateG.toFixed(3)}g · Diluent to add: {bottleSizeMl - (bottleSizeMl * concPercent / 100)} mL
+              Current concentrate: {totalG.toFixed(3)}g · Target: {targetConcentrateG.toFixed(3)}g · Diluent to add: {diluentMl} mL
             </Text>
-            <TouchableOpacity style={[s.normalizeBtn, { opacity: 0.4 }]} disabled>
-              <Text style={s.normalizeBtnText}>Normalize to Target</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* ③ Inline add (disabled on new page) */}
+          {/* ③ Inline material add */}
           <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+              <View style={{ flex: 1 }}>
+                <TextInput
+                  style={s.searchBarInline}
+                  placeholder="Search or type material name..."
+                  placeholderTextColor="rgba(0,0,0,0.3)"
+                  value={search}
+                  onChangeText={(v) => { setSearch(v); setSelected(null); }}
+                />
+                {/* Dropdown */}
+                {showDropdown && (
+                  <View style={s.dropdown}>
+                    {searchResults.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={s.dropdownRow}
+                        onPress={() => { setSelected(item); setSearch(item.name); setSearchResults([]); }}
+                      >
+                        <Text style={s.dropdownName}>{item.name}</Text>
+                        {item.type ? (
+                          <Text style={s.dropdownType}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text>
+                        ) : null}
+                      </TouchableOpacity>
+                    ))}
+                    {!exactMatch && (
+                      <TouchableOpacity
+                        style={[s.dropdownRow, { borderTopWidth: searchResults.length > 0 ? 1 : 0, borderTopColor: "rgba(0,0,0,0.08)" }]}
+                        onPress={() => { setSearchResults([]); }}
+                      >
+                        <Text style={s.dropdownNew}>+ Add "{search}" as new material</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+                {selected && (
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 2 }}>
+                    <Text style={{ color: "#0d9488", fontSize: 13 }}>✓ {selected.name} (from Organ)</Text>
+                    <TouchableOpacity onPress={() => { setSelected(null); setSearch(""); }} style={{ marginLeft: 10 }}>
+                      <Text style={{ color: "rgba(0,0,0,0.4)", fontSize: 13 }}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {!selected && search.trim() && !showDropdown && (
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 2 }}>
+                    <Text style={{ color: "#c27a00", fontSize: 13 }}>★ "{search}" will be added to your Organ</Text>
+                  </View>
+                )}
+              </View>
               <TextInput
-                style={[s.searchBarInline, { flex: 1, opacity: 0.5 }]}
-                placeholder="Type to search materials..."
-                placeholderTextColor="rgba(0,0,0,0.3)"
-                editable={false}
-              />
-              <TextInput
-                style={[s.amountInline, { opacity: 0.5 }]}
+                style={s.amountInline}
                 placeholder="0.000"
                 placeholderTextColor="rgba(0,0,0,0.3)"
-                editable={false}
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="decimal-pad"
               />
-              <View style={[s.addBtn, { opacity: 0.4 }]}>
+              <TouchableOpacity
+                style={[s.addBtn, !canAdd && { opacity: 0.4 }]}
+                onPress={handleAddLine}
+                disabled={!canAdd}
+              >
                 <Text style={s.addBtnText}>Add</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -166,13 +283,42 @@ export default function NewFormula() {
                 <Text style={[s.tableHeaderText, { width: 68, textAlign: "right" }]}>Amount (g)</Text>
                 <View style={{ width: 30 }} />
               </View>
-              <View style={{ paddingVertical: 24, alignItems: "center" }}>
-                <Text style={s.emptyHint}>No ingredients yet. Add some to get started.</Text>
-              </View>
+              {lines.length === 0 ? (
+                <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                  <Text style={s.emptyHint}>No ingredients yet. Add some to get started.</Text>
+                </View>
+              ) : (
+                lines.map((line) => (
+                  <View key={line.tempId} style={s.tableRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.tableRowName} numberOfLines={1}>{line.name}</Text>
+                      {!line.material && (
+                        <Text style={{ color: "#c27a00", fontSize: 10 }}>New → Organ</Text>
+                      )}
+                    </View>
+                    <Text style={[s.tableRowType, { width: 52 }]}>
+                      {line.material?.type ? SYMBOL_ICONS[line.material.type] ?? "—" : "—"}
+                    </Text>
+                    <Text style={[s.tableRowAmount, { width: 68 }]}>
+                      {parseFloat(line.amount).toFixed(3)}
+                    </Text>
+                    <TouchableOpacity style={{ width: 30, alignItems: "center" }} onPress={() => setLines((p) => p.filter((l) => l.tempId !== line.tempId))}>
+                      <Text style={{ color: "#e05555", fontSize: 18, lineHeight: 22 }}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
               <View style={s.tableTotalRow}>
                 <Text style={[s.tableTotalLabel, { flex: 1 }]}>Total</Text>
-                <Text style={s.tableTotalVal}>0.000</Text>
-                <Text style={[s.tableTotalVal, { width: 44, textAlign: "right" }]}>100.000%</Text>
+                <Text style={s.tableTotalVal}>{totalG.toFixed(3)}</Text>
+                {lines.length > 0 && !atTarget && (
+                  <Text style={{ color: "rgba(0,0,0,0.4)", fontSize: 12, marginLeft: 6 }}>
+                    (under by {Math.abs(targetConcentrateG - totalG).toFixed(3)}g)
+                  </Text>
+                )}
+                <Text style={[s.tableTotalVal, { width: 68, textAlign: "right" }]}>
+                  {totalG > 0 ? "100.000%" : "—"}
+                </Text>
                 <View style={{ width: 30 }} />
               </View>
             </View>
@@ -183,7 +329,7 @@ export default function NewFormula() {
             <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Formula Summary</Text>
             <View style={{ flexDirection: "row" }}>
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={s.statVal}>0.000g</Text>
+                <Text style={s.statVal}>{totalG.toFixed(3)}g</Text>
                 <Text style={s.statLabel}>Current Total</Text>
               </View>
               <View style={s.statDivider} />
@@ -193,7 +339,7 @@ export default function NewFormula() {
               </View>
               <View style={s.statDivider} />
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={s.statVal}>{(bottleSizeMl - targetConcentrateG).toFixed(1)} mL</Text>
+                <Text style={s.statVal}>{diluentMl} mL</Text>
                 <Text style={s.statLabel}>Base/Diluent Needed</Text>
               </View>
             </View>
@@ -213,7 +359,14 @@ export default function NewFormula() {
             </TouchableOpacity>
             {notesExpanded && (
               <View style={s.notesBody}>
-                <Text style={{ color: "rgba(0,0,0,0.3)", fontSize: 14 }}>No notes yet.</Text>
+                <TextInput
+                  style={{ color: "#13131a", fontSize: 14, minHeight: 80, textAlignVertical: "top" }}
+                  placeholder="Add formula notes..."
+                  placeholderTextColor="rgba(0,0,0,0.3)"
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                />
               </View>
             )}
           </View>
@@ -245,7 +398,7 @@ export default function NewFormula() {
               <View style={{ width: 60 }} />
               <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>Select Diluent</Text>
               <TouchableOpacity onPress={() => setDiluentPickerVisible(false)}>
-                <Text style={{ color: "#13131a", fontSize: 16, fontWeight: "600" }}>Done</Text>
+                <Text style={{ color: "#a78bfa", fontSize: 16, fontWeight: "600" }}>Done</Text>
               </TouchableOpacity>
             </View>
             <ScrollView>
@@ -286,14 +439,22 @@ const s = StyleSheet.create({
   paramInput: { backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: "#13131a", fontSize: 15 },
   diluentRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   paramCalc: { color: "rgba(0,0,0,0.4)", fontSize: 12, lineHeight: 18 },
-  normalizeBtn: { marginTop: 14, backgroundColor: "rgba(139,117,250,0.25)", borderWidth: 1, borderColor: "rgba(167,139,250,0.5)", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-  normalizeBtnText: { color: "#5b3fd4", fontWeight: "600", fontSize: 15 },
 
   searchBarInline: { backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11, color: "#13131a", fontSize: 14 },
   amountInline: { backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 11, color: "#13131a", fontSize: 14, width: 72, textAlign: "center" },
 
+  dropdown: { position: "absolute", top: "100%", left: 0, right: 0, backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", zIndex: 99, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, marginTop: 4 },
+  dropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
+  dropdownName: { color: "#13131a", fontSize: 14, flex: 1 },
+  dropdownType: { color: "rgba(0,0,0,0.4)", fontSize: 12 },
+  dropdownNew: { color: "#0d9488", fontSize: 14, fontWeight: "600" },
+
   tableHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
   tableHeaderText: { color: "rgba(0,0,0,0.4)", fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
+  tableRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
+  tableRowName: { color: "#13131a", fontSize: 14, flex: 1 },
+  tableRowType: { color: "rgba(0,0,0,0.4)", fontSize: 13 },
+  tableRowAmount: { color: "#13131a", fontSize: 14, textAlign: "right" },
   tableTotalRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)", marginTop: 2 },
   tableTotalLabel: { color: "#13131a", fontWeight: "700", fontSize: 14 },
   tableTotalVal: { color: "#13131a", fontWeight: "700", fontSize: 14 },

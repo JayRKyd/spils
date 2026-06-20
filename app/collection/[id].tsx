@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Alert, Modal, StyleSheet, Image, Share,
+  ActivityIndicator, Alert, Modal, StyleSheet, Image, Share, Linking,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
@@ -47,9 +49,10 @@ type Perfume = {
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
+const GENDER_OPTIONS = ["Female", "Male", "Unisex"];
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
-const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Cologne", "Oil"];
-const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
+const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Toilet", "Cologne", "Oil"];
+const STATUS_OPTIONS = ["Favorite", "Wishlist", "Sell/Trade"];
 
 const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
 
@@ -70,6 +73,10 @@ const em = StyleSheet.create({
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   tagText: { color: "#13131a", fontSize: 13 },
+  colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
+  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
+  addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" as const },
+  addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" as const },
 });
 
 // ─── Edit Modal Components (module-level to avoid remount on re-render) ────────
@@ -138,6 +145,10 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
   const [baseInput, setBaseInput] = useState("");
   const [accordInput, setAccordInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [image, setImage] = useState<string | null>(null);
+  const [inspirationImage, setInspirationImage] = useState<string | null>(null);
+  const [colors, setColors] = useState<string[]>([]);
+  const [selectedColor, setSelectedColor] = useState("#a78bfa");
 
   useEffect(() => {
     if (!visible) return;
@@ -162,11 +173,35 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
     setDryDown(perfume.dry_down ?? "");
     setMusic(perfume.music ?? "");
     setNotes(perfume.notes ?? "");
+    setImage(perfume.image_url ?? null);
+    setInspirationImage(perfume.inspiration_image_url ?? null);
+    setColors(perfume.colors ?? []);
+    setSelectedColor("#a78bfa");
     setTopInput(""); setHeartInput(""); setBaseInput(""); setAccordInput("");
   }, [visible, perfume]);
 
   const toggleSeason = (s: string) =>
     setSeasons((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
+
+  const pickPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] as any, allowsEditing: false, quality: 0.7, base64: true });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+    }
+  };
+
+  const pickInspirationPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] as any, allowsEditing: false, quality: 0.7, base64: true });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setInspirationImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -174,7 +209,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       name: name.trim() || perfume.name,
       brand: brand.trim() || null,
       perfumer: perfumer.trim() || null,
-      gender: gender.trim() || null,
+      gender: gender || null,
       size_ml: sizeText ? parseFloat(sizeText) : null,
       price: priceText ? parseFloat(priceText) : null,
       rating: rating ? parseFloat(rating) : null,
@@ -182,6 +217,9 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       concentration: concentration || null,
       category: category || null,
       status: status || null,
+      image_url: image ?? null,
+      inspiration_image_url: inspirationImage ?? null,
+      colors: colors.length ? colors : null,
       top_notes: notesTop.length ? notesTop : null,
       heart_notes: notesHeart.length ? notesHeart : null,
       base_notes: notesBase.length ? notesBase : null,
@@ -209,7 +247,24 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             </TouchableOpacity>
           </View>
 
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+            {/* Photo upload box */}
+            <Text style={em.label}>Photo</Text>
+            <TouchableOpacity onPress={pickPhoto} activeOpacity={0.8}
+              style={{ height: 180, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
+              {image ? (
+                <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              ) : (
+                <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Upload Photo</Text>
+              )}
+              {image ? (
+                <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                  <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+
             <Text style={em.label}>Name</Text>
             <F placeholder="Perfume name…" value={name} onChangeText={setName} />
 
@@ -220,7 +275,13 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
 
             <Text style={em.label}>Gender</Text>
-            <F placeholder="Unisex, Feminine…" value={gender} onChangeText={setGender} />
+            <View style={em.chipRow}>
+              {GENDER_OPTIONS.map((opt) => (
+                <TouchableOpacity key={opt} style={[em.chip, gender === opt && em.chipActive]} onPress={() => setGender(gender === opt ? "" : opt)}>
+                  <Text style={[em.chipText, gender === opt && em.chipTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <View style={{ flexDirection: "row", gap: 10 }}>
               <View style={{ flex: 1 }}>
@@ -308,7 +369,49 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
 
             <Text style={em.label}>Notes</Text>
             <F placeholder="Your thoughts…" value={notes} onChangeText={setNotes} multiline style={{ height: 120, textAlignVertical: "top" }} />
+
+            {/* Inspiration Photo */}
+            <Text style={em.label}>Inspiration Photo</Text>
+            <TouchableOpacity onPress={pickInspirationPhoto} activeOpacity={0.8}
+              style={{ height: 180, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
+              {inspirationImage ? (
+                <Image source={{ uri: inspirationImage }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              ) : (
+                <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Upload Inspiration Photo</Text>
+              )}
+              {inspirationImage ? (
+                <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                  <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+
+            {/* Color Wheel */}
+            <Text style={em.label}>Color(s)</Text>
+            <View style={em.colorWheelWrap}>
+              <ColorPicker
+                color={selectedColor}
+                onColorChange={setSelectedColor}
+                thumbSize={28}
+                sliderSize={28}
+                noSnap={true}
+                row={false}
+                swatches={false}
+                discrete={false}
+              />
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                {colors.map((c, i) => (
+                  <TouchableOpacity key={i} style={[em.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
+                ))}
+              </View>
+              <TouchableOpacity style={[em.addBtn, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
+                <Text style={em.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
     </Modal>
@@ -381,7 +484,7 @@ export default function CollectionDetail() {
         onPress: async () => {
           const perm = await ImagePicker.requestCameraPermissionsAsync();
           if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"] as any, allowsEditing: false, quality: 0.7, base64: true });
           if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
         },
       },
@@ -390,7 +493,7 @@ export default function CollectionDetail() {
         onPress: async () => {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] as any, allowsEditing: false, quality: 0.7, base64: true });
           if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
         },
       },
@@ -522,9 +625,17 @@ export default function CollectionDetail() {
           {/* Music */}
           <View style={d.row}>
             <Text style={d.rowLabel}>Music</Text>
-            <Text style={[d.rowValue, { flexShrink: 1 }]} numberOfLines={2}>
-              {perfume.music || "—"}
-            </Text>
+            {perfume.music?.startsWith("http") ? (
+              <TouchableOpacity onPress={() => Linking.openURL(perfume.music!)} style={{ flexShrink: 1 }}>
+                <Text style={[d.rowValue, { flexShrink: 1, textDecorationLine: "underline" }]} numberOfLines={2}>
+                  {perfume.music}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[d.rowValue, { flexShrink: 1 }]} numberOfLines={2}>
+                {perfume.music || "—"}
+              </Text>
+            )}
           </View>
 
           {/* Notes */}

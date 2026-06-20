@@ -5,6 +5,7 @@ import {
   Modal, ScrollView, ActivityIndicator, Alert, StyleSheet, Share, Linking,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -45,7 +46,7 @@ const LOW_STOCK_THRESHOLD = 20;
 // ─── Dropdown Picker Modal ────────────────────────────────────────────────────
 
 function DropdownModal({
-  visible, title, options, selected, onSelect, onClose,
+  visible, title, options, selected, onSelect, onClose, icons,
 }: {
   visible: boolean;
   title: string;
@@ -53,6 +54,7 @@ function DropdownModal({
   selected: string;
   onSelect: (opt: string) => void;
   onClose: () => void;
+  icons?: Record<string, string>;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -65,7 +67,9 @@ function DropdownModal({
               style={[dd.option, selected === opt && dd.optionActive]}
               onPress={() => { onSelect(opt); onClose(); }}
             >
-              <Text style={[dd.optionText, selected === opt && dd.optionTextActive]}>{opt}</Text>
+              <Text style={[dd.optionText, selected === opt && dd.optionTextActive]}>
+                {icons?.[opt] ? `${icons[opt]}  ${opt}` : opt}
+              </Text>
               {selected === opt && <Text style={dd.check}>✓</Text>}
             </TouchableOpacity>
           ))}
@@ -425,6 +429,9 @@ export default function Materials() {
   const [compDropVisible, setCompDropVisible] = useState(false);
   const [indexDropVisible, setIndexDropVisible] = useState(false);
   const [ifraBannerVisible, setIfraBannerVisible] = useState(true);
+  const [csvImportVisible, setCsvImportVisible] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<Array<Record<string, string>> | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
 
   useEffect(() => {
     if (openAdd) { setEditTarget(undefined); setModalVisible(true); }
@@ -435,10 +442,11 @@ export default function Materials() {
     const { data } = await supabase
       .from("materials")
       .select("*")
+      .eq("user_id", user?.id)
       .order("name", { ascending: true });
     setMaterials((data as Material[]) ?? []);
     setLoading(false);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => { fetchMaterials(); }, [fetchMaterials]);
 
@@ -452,7 +460,11 @@ export default function Materials() {
       const matTypes = m.types?.length ? m.types : (m.type ? [m.type] : []);
       if (!matTypes.includes(compFilter)) return false;
     }
-    if (indexFilter !== "All") {
+    if (indexFilter === "Favorites") {
+      if (!m.is_favorite) return false;
+    } else if (indexFilter === "Recently Added") {
+      // pass — handled by sort below
+    } else if (indexFilter !== "All") {
       const range = ALPHA_RANGES.find((r) => r.label === indexFilter);
       if (range) {
         const first = m.name[0]?.toLowerCase() ?? "";
@@ -461,6 +473,10 @@ export default function Materials() {
     }
     return true;
   });
+
+  const displayed = indexFilter === "Recently Added"
+    ? [...filtered].sort((a, b) => b.id - a.id).slice(0, 30)
+    : filtered;
 
   const handleDelete = (id: number, name: string) => {
     Alert.alert("Delete Material", `Remove "${name}"?`, [
@@ -483,8 +499,68 @@ export default function Materials() {
     await supabase.from("materials").update({ is_favorite: newVal }).eq("id", item.id);
   };
 
+  const parseCSV = (text: string): Record<string, string>[] => {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+    return lines.slice(1).map((line) => {
+      const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => { obj[h] = values[i] ?? ""; });
+      return obj;
+    }).filter((row) => row.name?.trim());
+  };
+
+  const handlePickCSV = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["text/csv", "text/comma-separated-values", "text/plain", "*/*"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const text = await fetch(result.assets[0].uri).then((r) => r.text());
+      const rows = parseCSV(text);
+      if (!rows.length) {
+        Alert.alert("No data", "Could not parse any materials. Make sure the first row has a 'name' column.");
+        return;
+      }
+      setCsvPreview(rows);
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Failed to read file");
+    }
+  };
+
+  const handleImportCSV = async () => {
+    if (!csvPreview) return;
+    setCsvImporting(true);
+    const VALID_TYPES = ["Top", "Mid", "Base", "Solvent", "Other"];
+    try {
+      for (const row of csvPreview) {
+        const typeVal = VALID_TYPES.find((t) => t.toLowerCase() === (row.type ?? "").toLowerCase()) ?? null;
+        await supabase.from("materials").insert([{
+          name: row.name.trim(),
+          description: row.description?.trim() || null,
+          type: typeVal,
+          types: typeVal ? [typeVal] : null,
+          cas_number: row.cas_number?.trim() || null,
+          ifra_limit: row.ifra_limit?.trim() || null,
+          stock_g: row.stock_g ? parseFloat(row.stock_g) : null,
+          user_id: user?.id,
+        }]);
+      }
+      setCsvImportVisible(false);
+      setCsvPreview(null);
+      fetchMaterials();
+      Alert.alert("Imported!", `${csvPreview.length} material${csvPreview.length !== 1 ? "s" : ""} added to your Organ.`);
+    } catch (e: any) {
+      Alert.alert("Import failed", e.message ?? "Something went wrong");
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
   const compOptions = ["All", ...TYPE_OPTIONS];
-  const indexOptions = ["All", ...ALPHA_RANGES.map((r) => r.label)];
+  const indexOptions = ["All", "Favorites", "Recently Added", ...ALPHA_RANGES.map((r) => r.label)];
   const compActive = compFilter !== "All";
   const indexActive = indexFilter !== "All";
 
@@ -544,7 +620,7 @@ export default function Materials() {
               </Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={s.importBtn}>
+          <TouchableOpacity style={s.importBtn} onPress={() => { setCsvPreview(null); setCsvImportVisible(true); }}>
             <Text style={s.importBtnText}>Import .CSV</Text>
           </TouchableOpacity>
         </View>
@@ -554,7 +630,7 @@ export default function Materials() {
           <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
         ) : (
           <FlatList
-            data={filtered}
+            data={displayed}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 }}
             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -585,8 +661,64 @@ export default function Materials() {
               </TouchableOpacity>
               <Text style={s.bannerHeading}>IFRA Compliance Coming Soon:</Text>
               <Text style={s.bannerBody}>
-                Always double-check your formulas against IFRA guidelines.{"\n"}Our full IFRA assistant will arrive in future updates.
+                Always double-check your formulas against{"\n"}IFRA guidelines.{"\n"}Our full IFRA assistant will arrive in future updates.
               </Text>
+            </View>
+          </View>
+        </Modal>
+
+        {/* CSV Import modal */}
+        <Modal visible={csvImportVisible} transparent animationType="fade" onRequestClose={() => setCsvImportVisible(false)}>
+          <View style={s.bannerOverlay}>
+            <View style={s.bannerCard}>
+              <TouchableOpacity style={s.bannerClose} onPress={() => setCsvImportVisible(false)}>
+                <Text style={s.bannerCloseText}>✕</Text>
+              </TouchableOpacity>
+              <Text style={s.bannerHeading}>Import .CSV</Text>
+              {!csvPreview ? (
+                <>
+                  <Text style={s.bannerBody}>
+                    Expected columns (first row = headers):{"\n\n"}
+                    <Text style={{ color: "#C6FF00", fontFamily: "monospace" }}>
+                      name, type, cas_number,{"\n"}ifra_limit, stock_g, description
+                    </Text>
+                    {"\n\n"}Type must be: Top, Mid, Base, Solvent, or Other.
+                  </Text>
+                  <TouchableOpacity
+                    style={[mo.saveBtn, { alignSelf: "center", marginTop: 20 }]}
+                    onPress={handlePickCSV}
+                  >
+                    <Text style={mo.saveBtnText}>Choose File</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={[s.bannerBody, { marginBottom: 12 }]}>
+                    {csvPreview.length} material{csvPreview.length !== 1 ? "s" : ""} ready to import:
+                  </Text>
+                  <ScrollView style={{ maxHeight: 180 }}>
+                    {csvPreview.map((row, i) => (
+                      <Text key={i} style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginBottom: 4 }}>
+                        • {row.name}{row.type ? ` (${row.type})` : ""}
+                      </Text>
+                    ))}
+                  </ScrollView>
+                  <View style={{ flexDirection: "row", gap: 12, marginTop: 20 }}>
+                    <TouchableOpacity style={[mo.moreBtn, { flex: 1, alignItems: "center" }]} onPress={() => setCsvPreview(null)}>
+                      <Text style={mo.moreBtnText}>Back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[mo.saveBtn, { flex: 1, alignItems: "center" }]}
+                      onPress={handleImportCSV}
+                      disabled={csvImporting}
+                    >
+                      {csvImporting
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={mo.saveBtnText}>Import All</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </View>
           </View>
         </Modal>
@@ -599,6 +731,7 @@ export default function Materials() {
           selected={compFilter}
           onSelect={setCompFilter}
           onClose={() => setCompDropVisible(false)}
+          icons={SYMBOL_ICONS}
         />
         <DropdownModal
           visible={indexDropVisible}
@@ -939,18 +1072,20 @@ const mo = StyleSheet.create({
 
   chipsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    flexWrap: "nowrap",
+    gap: 6,
     marginBottom: 16,
   },
   chip: {
-    paddingHorizontal: 14, paddingVertical: 9,
+    flex: 1,
+    paddingHorizontal: 6, paddingVertical: 9,
     borderRadius: 20, borderWidth: 1,
     borderColor: "rgba(0,0,0,0.25)",
     backgroundColor: "rgba(255,255,255,0.35)",
+    alignItems: "center",
   },
   chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  chipText: { fontSize: 13, color: "#13131a" },
+  chipText: { fontSize: 12, color: "#13131a", textAlign: "center" },
   chipTextActive: { color: "#C6FF00", fontWeight: "600" },
 
   threeRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
@@ -988,8 +1123,10 @@ const mo = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 28,
     paddingVertical: 13,
+    borderWidth: 1.5,
+    borderColor: "#fff",
   },
-  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
+  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });
 
 const ms = StyleSheet.create({

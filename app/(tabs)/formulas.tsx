@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  Modal, ScrollView, ActivityIndicator, StyleSheet,
+  Modal, ScrollView, ActivityIndicator, StyleSheet, Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -266,7 +266,9 @@ export default function Formulas() {
                 <Text style={s.secureBody}>
                   If you share a formula externally, SPILS cannot guarantee its privacy. You are responsible for any use outside the app.
                 </Text>
-                <Text style={s.secureFooter}>For any questions about your data, contact info@spils.app</Text>
+                <Text style={s.secureFooter}>For any questions about your data, contact{" "}
+                  <Text style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL("mailto:info@spils.app")}>info@spils.app</Text>
+                </Text>
               </ScrollView>
             </View>
           </View>

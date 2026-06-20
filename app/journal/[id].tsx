@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Modal, StyleSheet, Image,
@@ -314,6 +314,8 @@ export default function JournalDetail() {
   const [loading, setLoading] = useState(true);
   const [editVisible, setEditVisible] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
+  const scrollRef = useRef<any>(null);
+  const scrollY = useRef(0);
 
   const fetchEntry = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -370,6 +372,7 @@ export default function JournalDetail() {
   const [inspirationSaving, setInspirationSaving] = useState(false);
 
   const pickInspirationPhoto = () => {
+    const savedY = scrollY.current;
     Alert.alert("Inspiration Photo", "Choose an option", [
       {
         text: "Take Photo",
@@ -377,7 +380,7 @@ export default function JournalDetail() {
           const perm = await ImagePicker.requestCameraPermissionsAsync();
           if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
           const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
-          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
+          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0], savedY);
         },
       },
       {
@@ -386,20 +389,21 @@ export default function JournalDetail() {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
           const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
-          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
+          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0], savedY);
         },
       },
       { text: "Cancel", style: "cancel" },
     ]);
   };
 
-  const saveInspirationPhoto = async (asset: ImagePicker.ImagePickerAsset) => {
+  const saveInspirationPhoto = async (asset: ImagePicker.ImagePickerAsset, savedY: number) => {
     if (!entry) return;
     setInspirationSaving(true);
     const imageData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
     await (supabase as any).from("journal_entries").update({ inspiration_image_url: imageData }).eq("id", entry.id);
     setInspirationSaving(false);
     fetchEntry(false);
+    requestAnimationFrame(() => { scrollRef.current?.scrollTo({ y: savedY, animated: false }); });
   };
 
   const handleShare = async () => {
@@ -442,7 +446,7 @@ export default function JournalDetail() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
         {/* Page title */}
         <Text style={d.pageTitle}>Journal</Text>
 

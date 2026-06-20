@@ -4,6 +4,7 @@ import {
   ActivityIndicator, StyleSheet, Alert, Image,
   KeyboardAvoidingView, Platform, PanResponder, Modal, Share, Linking,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -113,6 +114,8 @@ function NoteInput({ placeholder, tags, inputVal, onChangeInput, onAdd, onRemove
 
 export default function JournalNew() {
   const { user } = useAuth();
+  const scrollRef = useRef<any>(null);
+  const scrollY = useRef(0);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -162,6 +165,7 @@ export default function JournalNew() {
   // ─── Image Picker ──────────────────────────────────────────────────────────
 
   const pickPhoto = () => {
+    const savedY = scrollY.current;
     Alert.alert("Upload Photo", "Choose an option", [
       {
         text: "Take Photo",
@@ -172,6 +176,7 @@ export default function JournalNew() {
           if (!result.canceled && result.assets[0]) {
             setBottleImage(result.assets[0].uri);
             if (result.assets[0].base64) runVisionAI(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            requestAnimationFrame(() => { scrollRef.current?.scrollToPosition(0, savedY, false); });
           }
         },
       },
@@ -184,6 +189,7 @@ export default function JournalNew() {
           if (!result.canceled && result.assets[0]) {
             setBottleImage(result.assets[0].uri);
             if (result.assets[0].base64) runVisionAI(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            requestAnimationFrame(() => { scrollRef.current?.scrollToPosition(0, savedY, false); });
           }
         },
       },
@@ -192,6 +198,7 @@ export default function JournalNew() {
   };
 
   const pickInspirationPhoto = () => {
+    const savedY = scrollY.current;
     Alert.alert("Inspiration Photo", "Choose an option", [
       {
         text: "Take Photo",
@@ -199,7 +206,10 @@ export default function JournalNew() {
           const perm = await ImagePicker.requestCameraPermissionsAsync();
           if (!perm.granted) return;
           const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7 });
-          if (!result.canceled && result.assets[0]) setInspirationImage(result.assets[0].uri);
+          if (!result.canceled && result.assets[0]) {
+            setInspirationImage(result.assets[0].uri);
+            requestAnimationFrame(() => { scrollRef.current?.scrollToPosition(0, savedY, false); });
+          }
         },
       },
       {
@@ -208,7 +218,10 @@ export default function JournalNew() {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!perm.granted) return;
           const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7 });
-          if (!result.canceled && result.assets[0]) setInspirationImage(result.assets[0].uri);
+          if (!result.canceled && result.assets[0]) {
+            setInspirationImage(result.assets[0].uri);
+            requestAnimationFrame(() => { scrollRef.current?.scrollToPosition(0, savedY, false); });
+          }
         },
       },
       { text: "Cancel", style: "cancel" },
@@ -379,8 +392,8 @@ export default function JournalNew() {
   return (
     <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <>
+          <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={20} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
 
             {/* Top nav */}
             <View style={s.topNav}>
@@ -522,8 +535,8 @@ export default function JournalNew() {
                     <TouchableOpacity key={i} style={[s.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
                   ))}
                 </View>
-                <TouchableOpacity style={s.addBtn} onPress={() => { if (!colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
-                  <Text style={s.addBtnText}>Add</Text>
+                <TouchableOpacity style={[s.addBtn, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
+                  <Text style={s.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -563,21 +576,23 @@ export default function JournalNew() {
                 multiline
               />
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
-          {/* Bottom action bar */}
-          <View style={s.bottomBar}>
-            <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
-              <Text style={s.moreBtnText}>More</Text>
-            </TouchableOpacity>
-            <View style={s.fabBtn}>
-              <Text style={s.fabBtnText}>+</Text>
+          {/* Bottom action bar — lifted above keyboard */}
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+            <View style={s.bottomBar}>
+              <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
+                <Text style={s.moreBtnText}>More</Text>
+              </TouchableOpacity>
+              <View style={s.fabBtn}>
+                <Text style={s.fabBtnText}>+</Text>
+              </View>
+              <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </>
 
         {/* More Bottom Sheet */}
         <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={closeMore}>

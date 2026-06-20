@@ -485,8 +485,8 @@ export default function CollectionNew() {
                     <TouchableOpacity key={i} style={[s.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
                   ))}
                 </View>
-                <TouchableOpacity style={s.addBtn} onPress={() => { if (!colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
-                  <Text style={s.addBtnText}>Add</Text>
+                <TouchableOpacity style={[s.addBtn, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
+                  <Text style={s.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
                 </TouchableOpacity>
               </View>
 

@@ -10,6 +10,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 import GradientScreen from "@/components/GradientScreen";
 import { GlassRow } from "@/components/GlassCard";
 
@@ -158,20 +159,26 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
   const [tab, setTab] = useState<MoodTab>("image");
   const [noteText, setNoteText] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string>("image/jpeg");
   const [imageCaption, setImageCaption] = useState("");
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [audioName, setAudioName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (visible) { setTab("image"); setNoteText(""); setImageUri(null); setImageCaption(""); setAudioUri(null); setAudioName(null); }
+    if (visible) { setTab("image"); setNoteText(""); setImageUri(null); setImageMimeType("image/jpeg"); setImageCaption(""); setAudioUri(null); setAudioName(null); }
   }, [visible]);
 
   const pickImage = async (source: "camera" | "library") => {
+    const opts = { mediaTypes: ["images", "videos"] as any, allowsEditing: false, quality: 0.75 };
     const result = source === "camera"
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.75 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.75 });
-    if (!result.canceled && result.assets[0]) setImageUri(result.assets[0].uri);
+      ? await ImagePicker.launchCameraAsync(opts)
+      : await ImagePicker.launchImageLibraryAsync(opts);
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+      setImageMimeType(asset.mimeType ?? (asset.type === "video" ? "video/mp4" : "image/jpeg"));
+    }
   };
 
   const handleImageTap = () => Alert.alert("Upload Image/Video", "Choose source", [
@@ -202,13 +209,16 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
         });
         if (error) throw error;
       } else if (tab === "image") {
-        const fileName = `formula_${formulaId}/${Date.now()}-photo.jpg`;
+        const isVideo = imageMimeType.startsWith("video/");
+        const ext = imageMimeType.split("/")[1] || (isVideo ? "mp4" : "jpg");
+        const slug = isVideo ? "video" : "photo";
+        const fileName = `formula_${formulaId}/${Date.now()}-${slug}.${ext}`;
         const response = await fetch(imageUri!);
         const blob = await response.blob();
-        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, blob, { contentType: "image/jpeg" });
+        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, blob, { contentType: imageMimeType });
         if (uploadError) throw uploadError;
         const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
-          formula_id: formulaId, file_url: fileName, media_type: "image", caption: imageCaption.trim() || null,
+          formula_id: formulaId, file_url: fileName, media_type: isVideo ? "video" : "image", caption: imageCaption.trim() || null,
         });
         if (insertError) throw insertError;
       } else if (tab === "audio") {
@@ -347,6 +357,7 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
 export default function FormulaDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const formulaId = parseInt(id ?? "0");
+  const { user } = useAuth();
 
   const [formula, setFormula] = useState<Formula | null>(null);
   const [lines, setLines] = useState<FormulaLine[]>([]);
@@ -396,7 +407,7 @@ export default function FormulaDetail() {
   useEffect(() => {
     if (!inlineSearch.trim() || inlineSelected) { setInlineResults([]); return; }
     const timer = setTimeout(async () => {
-      const { data } = await supabase.from("materials").select("id,name,type,cas_number").ilike("name", `%${inlineSearch}%`).limit(15);
+      const { data } = await supabase.from("materials").select("id,name,type,cas_number").eq("user_id", user?.id).ilike("name", `%${inlineSearch}%`).limit(15);
       setInlineResults((data as Material[]) ?? []);
     }, 250);
     return () => clearTimeout(timer);
@@ -444,14 +455,31 @@ export default function FormulaDetail() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleInlineAdd = async () => {
-    if (!inlineSelected) return;
+    const matName = inlineSelected?.name ?? inlineSearch.trim();
+    if (!matName) return;
     setInlineAdding(true);
-    await supabase.from("formula_lines").insert([{
-      formula_id: formulaId, material_id: inlineSelected.id, amount_g: parseFloat(inlineAmount) || 0,
-    }]);
-    setInlineSearch(""); setInlineSelected(null); setInlineAmount("0.000"); setInlineResults([]);
-    setInlineAdding(false);
-    fetchData();
+    try {
+      let materialId = inlineSelected?.id ?? null;
+      if (!materialId) {
+        // New material — auto-add to Organ
+        const { data: mat, error: matErr } = await supabase
+          .from("materials")
+          .insert([{ name: matName, user_id: user?.id }])
+          .select("id")
+          .single();
+        if (matErr || !mat) throw matErr ?? new Error("Failed to create material");
+        materialId = mat.id;
+      }
+      await supabase.from("formula_lines").insert([{
+        formula_id: formulaId, material_id: materialId, amount_g: parseFloat(inlineAmount) || 0,
+      }]);
+      setInlineSearch(""); setInlineSelected(null); setInlineAmount("0.000"); setInlineResults([]);
+      fetchData();
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Failed to add material");
+    } finally {
+      setInlineAdding(false);
+    }
   };
 
   const handleDeleteLine = (lineId: number) => {
@@ -723,9 +751,9 @@ export default function FormulaDetail() {
               keyboardType="decimal-pad"
             />
             <TouchableOpacity
-              style={[s.addBtn, (!inlineSelected || inlineAdding) && { opacity: 0.45 }]}
+              style={[s.addBtn, ((!inlineSelected && !inlineSearch.trim()) || inlineAdding) && { opacity: 0.45 }]}
               onPress={handleInlineAdd}
-              disabled={!inlineSelected || inlineAdding}
+              disabled={(!inlineSelected && !inlineSearch.trim()) || inlineAdding}
             >
               {inlineAdding
                 ? <ActivityIndicator color="#fff" size="small" />
@@ -734,7 +762,7 @@ export default function FormulaDetail() {
             </TouchableOpacity>
           </View>
           {/* Search dropdown */}
-          {inlineResults.length > 0 && !inlineSelected ? (
+          {inlineSearch.trim() && !inlineSelected ? (
             <View style={s.inlineDropdown}>
               {inlineResults.slice(0, 8).map((item) => (
                 <TouchableOpacity
@@ -746,6 +774,14 @@ export default function FormulaDetail() {
                   {item.type ? <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text> : null}
                 </TouchableOpacity>
               ))}
+              {!inlineResults.some((r) => r.name.toLowerCase() === inlineSearch.toLowerCase()) && (
+                <TouchableOpacity
+                  style={[s.inlineDropdownRow, inlineResults.length > 0 && { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.1)" }]}
+                  onPress={() => { setInlineResults([]); }}
+                >
+                  <Text style={{ color: "#C6FF00", fontSize: 14, fontWeight: "600" }}>+ Add "{inlineSearch}" as new material</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : null}
           {inlineSelected ? (
@@ -754,6 +790,10 @@ export default function FormulaDetail() {
               <TouchableOpacity onPress={() => { setInlineSelected(null); setInlineSearch(""); }} style={{ marginLeft: 10 }}>
                 <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Clear</Text>
               </TouchableOpacity>
+            </View>
+          ) : !inlineSelected && inlineSearch.trim() && inlineResults.length === 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
+              <Text style={{ color: "#C6FF00", fontSize: 13 }}>★ "{inlineSearch}" will be added to your Organ</Text>
             </View>
           ) : null}
         </View>
@@ -1025,7 +1065,7 @@ const s = StyleSheet.create({
   formulaDesc: { color: "rgba(0,0,0,0.55)", fontSize: 14, lineHeight: 20 },
 
   panel: { backgroundColor: "rgba(255,255,255,0.35)", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 16, padding: 16 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   sectionTitle: { color: "#13131a", fontWeight: "600", fontSize: 16 },
 
   addBtn: { backgroundColor: "#13131a", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },

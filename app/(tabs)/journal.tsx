@@ -471,13 +471,24 @@ export default function Journal() {
     fetchSotdEntries();
   };
 
-  const handleSotdDelete = async () => {
+  const handleSotdDelete = () => {
     if (!sotdSelected) return;
-    setSotdActionSaving(true);
-    await (supabase as any).from("scent_of_day").delete().eq("id", sotdSelected.id);
-    setSotdActionSaving(false);
-    setSotdSelected(null);
-    fetchSotdEntries();
+    Alert.alert(
+      "Delete Entry",
+      "Are you sure you want to delete this entry?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete", style: "destructive", onPress: async () => {
+            setSotdActionSaving(true);
+            await (supabase as any).from("scent_of_day").delete().eq("id", sotdSelected.id);
+            setSotdActionSaving(false);
+            setSotdSelected(null);
+            fetchSotdEntries();
+          },
+        },
+      ]
+    );
   };
 
   const fetchEntries = useCallback(async () => {
@@ -487,11 +498,22 @@ export default function Journal() {
       .select("*, perfumes:perfume_id (name)")
       .order("entry_date", { ascending: false })
       .order("created_at", { ascending: false });
-    setEntries(data ?? []);
+    if (data) setEntries(data);
     setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { fetchEntries(); fetchSotdEntries(); }, [fetchEntries, fetchSotdEntries]));
+
+  // Real-time subscription — keeps calendar dots live without any user action
+  useEffect(() => {
+    const channel = (supabase as any)
+      .channel("journal-entries-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "journal_entries" }, () => {
+        fetchEntries();
+      })
+      .subscribe();
+    return () => { (supabase as any).removeChannel(channel); };
+  }, [fetchEntries]);
 
   const activeFilterCount =
     filters.seasons.length +
@@ -542,7 +564,7 @@ export default function Journal() {
           </View>
         </View>
 
-        {loading ? (
+        {loading && entries.length === 0 ? (
           <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
         ) : view === "landing" ? (
           <View style={s.heroWrap}>
