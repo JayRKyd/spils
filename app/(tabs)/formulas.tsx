@@ -183,7 +183,7 @@ export default function Formulas() {
         {/* Top nav */}
         <View style={s.topNav}>
           <Text style={s.logo}>SP/LS.</Text>
-          <TouchableOpacity style={s.profileCircle}>
+          <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>
         </View>

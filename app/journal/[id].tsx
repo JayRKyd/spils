@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Modal, StyleSheet, Image,
-  Linking, Share,
+  Linking, Share, PanResponder, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -47,6 +48,14 @@ interface JournalEntry {
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
+const FRAGRANCE_FAMILIES = [
+  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Aquatic",
+  "Aromatic", "Aromatic Fougère", "Chypre", "Citrus", "Citrus Woods",
+  "Floral", "Fresh", "Fougère", "Fruity", "Gourmand", "Green",
+  "Leather", "Mossy Woods", "Musky", "Oriental", "Oriental Floral",
+  "Oriental Woody", "Spicy", "Umami", "Woody", "Woody Aromatic",
+  "Woody Green", "Woody Spicy",
+];
 
 // ─── Edit Modal Styles (hoisted so TagInput + F can reference em) ────────────
 
@@ -68,7 +77,59 @@ const em = StyleSheet.create({
   publicRow: { marginTop: 20, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
   publicLabel: { color: "#13131a", fontSize: 15, fontWeight: "600" },
   publicSub: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginTop: 2 },
+  colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
+  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
+  addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" as const },
+  addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" as const },
+  chooser: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13 },
+  chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
+  chooserFilled: { color: "#13131a", fontSize: 14 },
+  chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
+  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
+  sliderFill: { position: "absolute" as const, left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(19,19,26,0.25)" },
+  sliderThumb: { position: "absolute" as const, width: 34, height: 34, borderRadius: 17, backgroundColor: "#13131a", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 });
+
+// ─── Slider ───────────────────────────────────────────────────────────────────
+
+function clamp(v: number) { return Math.min(1, Math.max(0, v)); }
+
+function SliderRow({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  const containerRef = useRef<View>(null);
+  const info = useRef({ x: 0, width: 1 });
+
+  const measure = () => {
+    containerRef.current?.measureInWindow((x, _y, width) => {
+      if (width > 0) info.current = { x, width };
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        measure();
+        onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10));
+      },
+      onPanResponderMove: (evt) => {
+        onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10));
+      },
+    })
+  ).current;
+
+  const pct = value / 10;
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={em.label}>{label}  <Text style={{ color: "#13131a", fontWeight: "700" }}>{value}</Text></Text>
+      <View ref={containerRef} onLayout={measure} style={em.sliderTrack} {...panResponder.panHandlers}>
+        <View style={[em.sliderFill, { width: `${pct * 100}%` as any }]} />
+        <View style={[em.sliderThumb, { left: `${pct * 100}%` as any }]} />
+      </View>
+    </View>
+  );
+}
 
 // ─── Edit Modal Components ────────────────────────────────────────────────────
 
@@ -117,6 +178,12 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [rating, setRating] = useState("");
   const [seasons, setSeasons] = useState<string[]>([]);
   const [isPublic, setIsPublic] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const [colors, setColors] = useState<string[]>([]);
+  const [selectedColor, setSelectedColor] = useState("#a78bfa");
+  const [genderPickerVisible, setGenderPickerVisible] = useState(false);
+  const [familyPickerVisible, setFamilyPickerVisible] = useState(false);
+  const [pendingFamily, setPendingFamily] = useState("");
   const [entryDate, setEntryDate] = useState("");
   const [notesTop, setNotesTop] = useState<string[]>([]);
   const [notesHeart, setNotesHeart] = useState<string[]>([]);
@@ -124,9 +191,9 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [accords, setAccords] = useState<string[]>([]);
   const [musicUrl, setMusicUrl] = useState("");
   const [dryDown, setDryDown] = useState("");
-  const [projection, setProjection] = useState("");
-  const [sillage, setSillage] = useState("");
-  const [longevity, setLongevity] = useState("");
+  const [projection, setProjection] = useState(5);
+  const [sillage, setSillage] = useState(5);
+  const [longevity, setLongevity] = useState(5);
   const [topInput, setTopInput] = useState("");
   const [heartInput, setHeartInput] = useState("");
   const [baseInput, setBaseInput] = useState("");
@@ -151,9 +218,11 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setAccords(entry.accords ?? []);
     setMusicUrl(entry.music_url ?? "");
     setDryDown(entry.dry_down ?? "");
-    setProjection(entry.projection ?? "");
-    setSillage(entry.sillage ?? "");
-    setLongevity(entry.longevity ?? "");
+    setProjection(entry.projection ? parseFloat(entry.projection) || 5 : 5);
+    setSillage(entry.sillage ? parseFloat(entry.sillage) || 5 : 5);
+    setLongevity(entry.longevity ? parseFloat(entry.longevity) || 5 : 5);
+    setColors(entry.colors ?? []);
+    setSelectedColor("#a78bfa");
     setTopInput(""); setHeartInput(""); setBaseInput(""); setAccordInput("");
   }, [visible, entry]);
 
@@ -176,9 +245,10 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       accords: accords.length ? accords : null,
       music_url: musicUrl.trim() || null,
       dry_down: dryDown.trim() || null,
-      projection: projection.trim() || null,
-      sillage: sillage.trim() || null,
-      longevity: longevity.trim() || null,
+      projection: String(projection),
+      sillage: String(sillage),
+      longevity: String(longevity),
+      colors: colors.length ? colors : null,
     }).eq("id", entry.id);
     setSaving(false);
     onSaved();
@@ -188,6 +258,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setSeasons((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
 
   return (
+    <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
@@ -199,7 +270,8 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 20, paddingBottom: 300 }} keyboardShouldPersistTaps="handled">
             <Text style={em.label}>Title</Text>
             <F placeholder="Perfume name…" value={title} onChangeText={setTitle} />
 
@@ -210,7 +282,10 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             <F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
 
             <Text style={em.label}>Gender</Text>
-            <F placeholder="Unisex, Feminine…" value={gender} onChangeText={setGender} />
+            <TouchableOpacity style={em.chooser} onPress={() => setGenderPickerVisible(true)}>
+              <Text style={gender ? em.chooserFilled : em.chooserEmpty}>{gender || "Select gender"}</Text>
+              <Text style={em.chevron}>▾</Text>
+            </TouchableOpacity>
 
             <View style={{ flexDirection: "row", gap: 10 }}>
               <View style={{ flex: 1 }}>
@@ -236,7 +311,28 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             </View>
 
             <Text style={em.label}>Fragrance Family</Text>
-            <TagInput tags={accords} inputVal={accordInput} placeholder="Add accord…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+              <TouchableOpacity style={em.chooser} onPress={() => setFamilyPickerVisible(true)}>
+                <Text style={pendingFamily ? em.chooserFilled : em.chooserEmpty}>{pendingFamily || "Choose family"}</Text>
+                <Text style={em.chevron}>▾</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[em.addBtn, (!pendingFamily || accords.includes(pendingFamily)) && { opacity: 0.4 }]}
+                onPress={() => { if (pendingFamily && !accords.includes(pendingFamily)) { setAccords((p) => [...p, pendingFamily]); setPendingFamily(""); } }}
+                disabled={!pendingFamily || accords.includes(pendingFamily)}
+              >
+                <Text style={em.addBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+            {accords.length > 0 && (
+              <View style={em.tagRow}>
+                {accords.map((f, i) => (
+                  <TouchableOpacity key={i} style={em.tag} onPress={() => setAccords((p) => p.filter((_, j) => j !== i))}>
+                    <Text style={em.tagText}>{f} ×</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <Text style={em.label}>Top Notes</Text>
             <TagInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
@@ -247,38 +343,90 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             <Text style={em.label}>Base Notes</Text>
             <TagInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
 
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Projection</Text>
-                <F placeholder="1–10" value={projection} onChangeText={setProjection} keyboardType="decimal-pad" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Sillage</Text>
-                <F placeholder="1–10" value={sillage} onChangeText={setSillage} keyboardType="decimal-pad" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Longevity</Text>
-                <F placeholder="1–10" value={longevity} onChangeText={setLongevity} keyboardType="decimal-pad" />
-              </View>
-            </View>
+            <SliderRow label="Projection" value={projection} onChange={setProjection} />
+            <SliderRow label="Sillage" value={sillage} onChange={setSillage} />
+            <SliderRow label="Longevity" value={longevity} onChange={setLongevity} />
 
             <Text style={em.label}>Dry Down</Text>
-            <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} />
+            <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+
+            <Text style={em.label}>Color(s)</Text>
+            <View style={em.colorWheelWrap}>
+              <ColorPicker
+                color={selectedColor}
+                onColorChange={setSelectedColor}
+                thumbSize={28}
+                sliderSize={28}
+                noSnap={true}
+                row={false}
+                swatches={false}
+                discrete={false}
+              />
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                {colors.map((c, i) => (
+                  <TouchableOpacity key={i} style={[em.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
+                ))}
+              </View>
+              <TouchableOpacity style={[em.addBtn, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
+                <Text style={em.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
+              </TouchableOpacity>
+            </View>
 
             <Text style={em.label}>Music URL</Text>
-            <F placeholder="Spotify / YouTube link…" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" />
+            <F placeholder="Spotify / YouTube link…" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
 
             <Text style={em.label}>Notes</Text>
-            <F placeholder="Your thoughts…" value={description} onChangeText={setDescription} multiline style={{ height: 120, textAlignVertical: "top" }} />
+            <F placeholder="Your thoughts…" value={description} onChangeText={setDescription} multiline style={{ height: 120, textAlignVertical: "top" }} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
 
             <TouchableOpacity style={em.publicRow} onPress={() => setIsPublic((v) => !v)}>
               <Text style={em.publicLabel}>{isPublic ? "🌐 Public" : "🔒 Private"}</Text>
               <Text style={em.publicSub}>Tap to toggle visibility</Text>
             </TouchableOpacity>
           </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </LinearGradient>
     </Modal>
+
+    {/* Gender Picker */}
+    <Modal visible={genderPickerVisible} transparent animationType="slide" onRequestClose={() => setGenderPickerVisible(false)}>
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" }}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setGenderPickerVisible(false)} />
+        <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 10 }}>
+          <View style={{ width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 }} />
+          {["Female", "Male", "Unisex"].map((g) => (
+            <TouchableOpacity key={g} style={[{ borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" }, gender === g && { backgroundColor: "#13131a", borderColor: "#13131a" }]}
+              onPress={() => { setGender(g); setGenderPickerVisible(false); }}>
+              <Text style={[{ color: "#13131a", fontSize: 15, fontWeight: "500" }, gender === g && { color: "#fff" }]}>{g}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </Modal>
+
+    {/* Family Picker */}
+    <Modal visible={familyPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setFamilyPickerVisible(false)}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#0e0e16" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" }}>
+          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>Select Family</Text>
+          <TouchableOpacity onPress={() => setFamilyPickerVisible(false)}>
+            <Text style={{ color: "#a78bfa", fontSize: 15 }}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView>
+          {FRAGRANCE_FAMILIES.map((f) => (
+            <TouchableOpacity key={f} style={{ paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)", flexDirection: "row", justifyContent: "space-between" }}
+              onPress={() => { setPendingFamily(f); setFamilyPickerVisible(false); }}>
+              <Text style={{ color: "#fff", fontSize: 16 }}>{f}</Text>
+              {pendingFamily === f ? <Text style={{ color: "#a78bfa" }}>✓</Text> : null}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+    </>
   );
 }
 

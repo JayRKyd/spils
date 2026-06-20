@@ -125,7 +125,7 @@ export default function JournalNew() {
   const [priceText, setPriceText] = useState("");
   const [rating, setRating] = useState("");
   const [seasons, setSeasons] = useState<string[]>([]);
-  const [entryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [entryDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
 
   const [families, setFamilies] = useState<string[]>([]);
   const [pendingFamily, setPendingFamily] = useState("");

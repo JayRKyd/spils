@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, Alert, StyleSheet, Share, Linking,
@@ -171,7 +171,7 @@ function MaterialModal({
               </TouchableOpacity>
               <Text style={mo.logo}>SP/LS.</Text>
             </View>
-            <TouchableOpacity style={mo.profileCircle}>
+            <TouchableOpacity style={mo.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
               <Text style={mo.profileIcon}>👤</Text>
             </TouchableOpacity>
           </View>
@@ -575,9 +575,9 @@ export default function Materials() {
         {/* Top nav */}
         <View style={s.topNav}>
           <Text style={s.logo}>SP/LS.</Text>
-          <View style={s.profileCircle}>
-            <Text style={s.profileIcon}>⚪</Text>
-          </View>
+          <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <Text style={s.profileIcon}>👤</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Page title */}

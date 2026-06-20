@@ -158,7 +158,7 @@ export default function ProfileScreen() {
         <Text style={s.sectionLabel}>YOUR ACTIVITY</Text>
         <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
           <StatCard label="Perfumes" value={stats.perfumes} onPress={() => router.push("/(tabs)/collection" as any)} />
-          <StatCard label="Formulas" value={stats.formulas} onPress={() => router.push("/(tabs)/formulas" as any)} />
+          <StatCard label="Lab" value={stats.formulas} onPress={() => router.push("/(tabs)/formulas" as any)} />
           <StatCard label="Journal" value={stats.journal} onPress={() => router.push("/(tabs)/journal" as any)} />
         </View>
 

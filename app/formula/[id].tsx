@@ -573,6 +573,9 @@ export default function FormulaDetail() {
       {/* Nav */}
       <View style={s.navBar}>
         <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>← Lab</Text></TouchableOpacity>
+        <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
+          <Text style={s.profileIcon}>👤</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
@@ -1058,6 +1061,8 @@ const mb = StyleSheet.create({
 const s = StyleSheet.create({
   navBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   back: { color: "#13131a", fontSize: 16, fontWeight: "600" },
+  profileBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  profileIcon: { fontSize: 16 },
   deleteBtn: { color: "#f87171", fontSize: 16 },
 
   formulaName: { color: "#13131a", fontSize: 26, fontWeight: "700", marginBottom: 4 },

@@ -53,6 +53,7 @@ function timeAgo(d: string) {
 
 function TypeBadge({ type }: { type: ListingType }) {
   const c = TYPE_STYLE[type];
+  if (!c) return null;
   return (
     <View style={{ backgroundColor: c.bg, borderWidth: 1, borderColor: c.border, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
       <Text style={{ color: c.text, fontSize: 12, fontWeight: "600" }}>{type}</Text>

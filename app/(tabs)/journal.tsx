@@ -49,6 +49,7 @@ interface ScentOfDayEntry {
   id: string;
   perfume_name: string;
   entry_date: string;
+  gender?: string | null;
 }
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
@@ -189,6 +190,12 @@ const fm = StyleSheet.create({
   visBtnText: { color: "rgba(255,255,255,0.65)", fontSize: 13 },
   applyBtn: { backgroundColor: "#13131a", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 8 },
   applyText: { color: "#E5F772", fontWeight: "700", fontSize: 15 },
+  genderLabel: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: "600", letterSpacing: 0.8, textTransform: "uppercase", marginHorizontal: 20, marginBottom: 8 },
+  genderRow: { flexDirection: "row", gap: 8, marginHorizontal: 20, marginBottom: 16 },
+  genderChip: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.07)", alignItems: "center" },
+  genderChipActive: { backgroundColor: "#a78bfa", borderColor: "#a78bfa" },
+  genderChipText: { color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: "600" },
+  genderChipTextActive: { color: "#fff" },
 });
 
 // ─── Entry Card ──────────────────────────────────────────────────────────────
@@ -438,6 +445,7 @@ export default function Journal() {
   const [sotdSelected, setSotdSelected] = useState<ScentOfDayEntry | null>(null);
   const [sotdEditValue, setSotdEditValue] = useState("");
   const [sotdActionSaving, setSotdActionSaving] = useState(false);
+  const [sotdEditGender, setSotdEditGender] = useState("");
 
   const handleSotdSave = async () => {
     if (!sotdInput.trim()) return;
@@ -465,7 +473,7 @@ export default function Journal() {
   const handleSotdEdit = async () => {
     if (!sotdSelected || !sotdEditValue.trim()) return;
     setSotdActionSaving(true);
-    await (supabase as any).from("scent_of_day").update({ perfume_name: sotdEditValue.trim() }).eq("id", sotdSelected.id);
+    await (supabase as any).from("scent_of_day").update({ perfume_name: sotdEditValue.trim(), gender: sotdEditGender || null }).eq("id", sotdSelected.id);
     setSotdActionSaving(false);
     setSotdSelected(null);
     fetchSotdEntries();
@@ -613,7 +621,7 @@ export default function Journal() {
                   <View style={s.sotdRow}>
                     <Text style={s.sotdRowName} numberOfLines={1}>{item.perfume_name}</Text>
                     <View style={s.sotdActions}>
-                      <TouchableOpacity onPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); }}>
+                      <TouchableOpacity onPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); setSotdEditGender(item.gender ?? ""); }}>
                         <Text style={s.sotdActionBtn}>EDIT</Text>
                       </TouchableOpacity>
                       <Text style={s.sotdRowDate}>{date}</Text>
@@ -676,7 +684,20 @@ export default function Journal() {
                   onChangeText={setSotdEditValue}
                   placeholder="Perfume name"
                   placeholderTextColor="rgba(255,255,255,0.3)"
+                  autoFocus={false}
                 />
+                <Text style={fm.genderLabel}>Gender</Text>
+                <View style={fm.genderRow}>
+                  {["Female", "Male", "Unisex"].map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[fm.genderChip, sotdEditGender === g && fm.genderChipActive]}
+                      onPress={() => setSotdEditGender(sotdEditGender === g ? "" : g)}
+                    >
+                      <Text style={[fm.genderChipText, sotdEditGender === g && fm.genderChipTextActive]}>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
                 <TouchableOpacity
                   style={[s.sotdModalBtn, { backgroundColor: "#E5F772", marginBottom: 10 }, (!sotdEditValue.trim() || sotdActionSaving) && { opacity: 0.4 }]}
                   onPress={handleSotdEdit}
