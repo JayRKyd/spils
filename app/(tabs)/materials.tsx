@@ -357,8 +357,7 @@ function MaterialCard({
   onToggleFavorite: () => void;
 }) {
   const isLowStock = item.stock_g != null && item.stock_g <= LOW_STOCK_THRESHOLD;
-  const primaryType = item.types?.[0] ?? item.type;
-  const symbol = primaryType ? SYMBOL_ICONS[primaryType] : "·";
+  const allTypes = item.types?.length ? item.types : (item.type ? [item.type] : []);
   const casIfra = [
     item.cas_number ? `CAS ${item.cas_number}` : null,
     item.ifra_limit ? `IFRA ${item.ifra_limit}` : null,
@@ -370,7 +369,7 @@ function MaterialCard({
       {/* Top row: symbol + name + heart */}
       <View style={cd.topRow}>
         <View style={cd.nameRow}>
-          {symbol !== "·" ? <Text style={cd.symbol}>{symbol}</Text> : null}
+          {allTypes.map((t) => SYMBOL_ICONS[t] ? <Text key={t} style={cd.symbol}>{SYMBOL_ICONS[t]}</Text> : null)}
           <Text style={cd.name} numberOfLines={1}>{item.name}</Text>
         </View>
         <TouchableOpacity

@@ -51,7 +51,7 @@ const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 const GENDER_OPTIONS = ["Female", "Male", "Unisex"];
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
-const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Toilet", "Cologne", "Oil"];
+const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Cologne", "Oil"];
 const STATUS_OPTIONS = ["Favorite", "Wishlist", "Sell/Trade"];
 
 const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
@@ -77,6 +77,15 @@ const em = StyleSheet.create({
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
   addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" as const },
   addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" as const },
+  chooser: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 4 },
+  chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
+  chooserFilled: { color: "#13131a", fontSize: 14 },
+  chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
+  inlineList: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, marginBottom: 10, overflow: "hidden" as const },
+  inlineRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.07)" },
+  inlineRowActive: { backgroundColor: "#13131a" },
+  inlineRowText: { color: "#13131a", fontSize: 14 },
+  inlineRowTextActive: { color: "#E5F772", fontWeight: "600" as const },
 });
 
 // ─── Edit Modal Components (module-level to avoid remount on re-render) ────────
@@ -149,6 +158,8 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
   const [inspirationImage, setInspirationImage] = useState<string | null>(null);
   const [colors, setColors] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
+  const [concentrationOpen, setConcentrationOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -205,7 +216,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
-    await supabase.from("perfumes").update({
+    const { error } = await supabase.from("perfumes").update({
       name: name.trim() || perfume.name,
       brand: brand.trim() || null,
       perfumer: perfumer.trim() || null,
@@ -232,6 +243,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       notes: notes.trim() || null,
     }).eq("id", perfume.id);
     setSaving(false);
+    if (error) { Alert.alert("Save failed", error.message); return; }
     onSaved();
   };
 
@@ -308,22 +320,36 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             </View>
 
             <Text style={em.label}>Concentration</Text>
-            <View style={em.chipRow}>
-              {CONCENTRATION_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[em.chip, concentration === opt && em.chipActive]} onPress={() => setConcentration(concentration === opt ? "" : opt)}>
-                  <Text style={[em.chipText, concentration === opt && em.chipTextActive]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <TouchableOpacity style={em.chooser} onPress={() => setConcentrationOpen((v) => !v)}>
+              <Text style={concentration ? em.chooserFilled : em.chooserEmpty}>{concentration || "Select concentration"}</Text>
+              <Text style={em.chevron}>{concentrationOpen ? "▴" : "▾"}</Text>
+            </TouchableOpacity>
+            {concentrationOpen && (
+              <View style={em.inlineList}>
+                {CONCENTRATION_OPTIONS.map((opt) => (
+                  <TouchableOpacity key={opt} style={[em.inlineRow, concentration === opt && em.inlineRowActive]} onPress={() => { setConcentration(opt); setConcentrationOpen(false); }}>
+                    <Text style={[em.inlineRowText, concentration === opt && em.inlineRowTextActive]}>{opt}</Text>
+                    {concentration === opt ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <Text style={em.label}>Category</Text>
-            <View style={em.chipRow}>
-              {CATEGORY_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[em.chip, category === opt && em.chipActive]} onPress={() => setCategory(category === opt ? "" : opt)}>
-                  <Text style={[em.chipText, category === opt && em.chipTextActive]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <TouchableOpacity style={em.chooser} onPress={() => setCategoryOpen((v) => !v)}>
+              <Text style={category ? em.chooserFilled : em.chooserEmpty}>{category || "Select category"}</Text>
+              <Text style={em.chevron}>{categoryOpen ? "▴" : "▾"}</Text>
+            </TouchableOpacity>
+            {categoryOpen && (
+              <View style={em.inlineList}>
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <TouchableOpacity key={opt} style={[em.inlineRow, category === opt && em.inlineRowActive]} onPress={() => { setCategory(opt); setCategoryOpen(false); }}>
+                    <Text style={[em.inlineRowText, category === opt && em.inlineRowTextActive]}>{opt}</Text>
+                    {category === opt ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <Text style={em.label}>Status</Text>
             <View style={em.chipRow}>

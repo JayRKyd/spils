@@ -380,6 +380,7 @@ export default function JournalNew() {
       music_url: musicUrl.trim() || null,
       music_source: musicUrl.trim() ? detectSource(musicUrl.trim()) : null,
       image_url: bottleBase64 ?? null,
+      inspiration_image_url: inspirationImage ?? null,
       is_wishlisted: isWishlisted,
     }]);
     setSaving(false);
@@ -542,7 +543,7 @@ export default function JournalNew() {
 
               {/* Music */}
               <SH text="Music" />
-              <TextInput style={s.field} placeholder="URL..." placeholderTextColor="rgba(19,19,26,0.4)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" />
+              <TextInput style={s.field} placeholder="URL..." placeholderTextColor="rgba(19,19,26,0.4)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd(true), 150)} />
 
               {/* Notes */}
               <SH text="Notes" />
@@ -553,6 +554,7 @@ export default function JournalNew() {
                 value={description}
                 onChangeText={setDescription}
                 multiline
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd(true), 150)}
               />
 
               {/* Scent Somm AI */}

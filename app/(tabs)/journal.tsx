@@ -368,11 +368,11 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
                 onPress={() => { if (cell.current) setSelectedDate(isSelected ? null : cell.key); }}
                 activeOpacity={cell.current ? 0.7 : 1}
               >
-                <View style={[cal.dayCircle, isToday && cal.cellSelected, hasEntries && !isToday && cal.cellToday]}>
+                <View style={[cal.dayCircle, isSelected && cal.cellSelected, hasEntries && !isSelected && cal.cellToday]}>
                   <Text style={[
                     cal.cellText,
                     !cell.current && cal.cellTextDim,
-                    isToday && cal.cellTextSelected,
+                    isSelected && cal.cellTextSelected,
                   ]}>
                     {cell.day}
                   </Text>
@@ -755,7 +755,7 @@ const s = StyleSheet.create({
   sotdRowName: { color: "#13131a", fontWeight: "600", fontSize: 14, flex: 1, marginRight: 8 },
   sotdRowDate: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginLeft: 8 },
   sotdActions: { flexDirection: "row", alignItems: "center", gap: 4 },
-  sotdActionBtn: { color: "#7c3aed", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+  sotdActionBtn: { color: "#13131a", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
   sotdActionSep: { color: "rgba(19,19,26,0.3)", fontSize: 11 },
   sotdEditInput: { color: "#fff", fontSize: 15, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 20, marginBottom: 16 },
   sotdModalBtn: { marginHorizontal: 20, borderRadius: 14, paddingVertical: 14, alignItems: "center" },

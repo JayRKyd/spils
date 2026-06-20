@@ -139,6 +139,8 @@ export default function Formulas() {
   const [formulas, setFormulas] = useState<Formula[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [sortOpen, setSortOpen] = useState(false);
   const { openAdd } = useLocalSearchParams<{ openAdd?: string }>();
   const [ifraVisible, setIfraVisible] = useState(false);
   const [secureVisible, setSecureVisible] = useState(false);
@@ -161,10 +163,15 @@ export default function Formulas() {
 
   useEffect(() => { fetchFormulas(); }, [fetchFormulas]);
 
-  const filtered = formulas.filter((f) =>
-    f.name.toLowerCase().includes(search.toLowerCase()) ||
-    (f.description?.toLowerCase().includes(search.toLowerCase()) ?? false)
-  );
+  const filtered = formulas.filter((f) => {
+    const matchesSearch =
+      f.name.toLowerCase().includes(search.toLowerCase()) ||
+      (f.description?.toLowerCase().includes(search.toLowerCase()) ?? false);
+    if (!matchesSearch) return false;
+    if (activeFilter === "All") return true;
+    if (activeFilter === "Favorites") return !!f.is_favorite;
+    return getStatus(f) === activeFilter;
+  });
 
   const handleToggleFavorite = async (formula: Formula) => {
     const newVal = !formula.is_favorite;
@@ -218,8 +225,8 @@ export default function Formulas() {
               <Text style={s.ifraPillText}>IFRA</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity>
-            <Text style={s.sortText}>Sort</Text>
+          <TouchableOpacity onPress={() => setSortOpen(true)}>
+            <Text style={[s.sortText, activeFilter !== "All" && s.sortTextActive]}>{activeFilter === "All" ? "Sort" : activeFilter}</Text>
           </TouchableOpacity>
         </View>
 
@@ -234,7 +241,7 @@ export default function Formulas() {
             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             ListEmptyComponent={
               <Text style={s.empty}>
-                {search ? "No projects match your search." : "No projects yet. Tap + to create one."}
+                {search ? "No projects match your search." : activeFilter !== "All" ? `No ${activeFilter.toLowerCase()} formulas.` : "No projects yet. Tap + to create one."}
               </Text>
             }
             renderItem={({ item }) => (
@@ -245,6 +252,25 @@ export default function Formulas() {
             )}
           />
         )}
+
+        {/* Sort picker */}
+        <Modal visible={sortOpen} transparent animationType="slide" onRequestClose={() => setSortOpen(false)}>
+          <View style={s.pickerBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill as any} onPress={() => setSortOpen(false)} />
+            <View style={s.pickerSheet}>
+              <View style={s.pickerHandle} />
+              {["All", "Favorites", "Draft", "In Progress", "Final"].map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={s.pickerBtn}
+                  onPress={() => { setActiveFilter(opt); setSortOpen(false); }}
+                >
+                  <Text style={[s.pickerBtnText, activeFilter === opt && s.pickerBtnTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </Modal>
 
         {/* Secure modal */}
         <Modal visible={secureVisible} transparent animationType="fade" onRequestClose={() => setSecureVisible(false)}>
@@ -358,7 +384,13 @@ const s = StyleSheet.create({
   },
   ifraPillText: { fontSize: 12, fontWeight: "700", color: "#fff" },
   sortText: { fontSize: 14, fontWeight: "600", color: "#13131a" },
-
+  sortTextActive: { fontWeight: "700", textDecorationLine: "underline" },
+  pickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  pickerSheet: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
+  pickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(0,0,0,0.15)", alignSelf: "center", marginBottom: 16 },
+  pickerBtn: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
+  pickerBtnText: { color: "#13131a", fontSize: 15 },
+  pickerBtnTextActive: { fontWeight: "700", color: "#ec8fb5" },
   empty: {
     color: "rgba(0,0,0,0.45)",
     textAlign: "center",

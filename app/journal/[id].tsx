@@ -85,6 +85,16 @@ const em = StyleSheet.create({
   chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
   chooserFilled: { color: "#13131a", fontSize: 14 },
   chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
+  inlineList: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, marginBottom: 10, overflow: "hidden" as const },
+  inlineRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.07)" },
+  inlineRowActive: { backgroundColor: "#13131a" },
+  inlineRowText: { color: "#13131a", fontSize: 14 },
+  inlineRowTextActive: { color: "#E5F772", fontWeight: "600" as const },
+  photoUpload: { width: "100%", height: 320, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" as const },
+  uploadIcon: { fontSize: 32, marginBottom: 10, opacity: 0.4 },
+  uploadLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
+  aiStatusBar: { position: "absolute" as const, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.25)", paddingVertical: 6, paddingHorizontal: 12 },
+  aiStatusText: { color: "#fff", fontSize: 12, textAlign: "center" as const },
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
   sliderFill: { position: "absolute" as const, left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(19,19,26,0.25)" },
   sliderThumb: { position: "absolute" as const, width: 34, height: 34, borderRadius: 17, backgroundColor: "#13131a", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
@@ -181,8 +191,8 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const scrollRef = useRef<ScrollView>(null);
   const [colors, setColors] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
-  const [genderPickerVisible, setGenderPickerVisible] = useState(false);
-  const [familyPickerVisible, setFamilyPickerVisible] = useState(false);
+  const [genderOpen, setGenderOpen] = useState(false);
+  const [familyOpen, setFamilyOpen] = useState(false);
   const [pendingFamily, setPendingFamily] = useState("");
   const [entryDate, setEntryDate] = useState("");
   const [notesTop, setNotesTop] = useState<string[]>([]);
@@ -199,6 +209,8 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [baseInput, setBaseInput] = useState("");
   const [accordInput, setAccordInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [bottleImage, setBottleImage] = useState<string | null>(null);
+  const [inspirationImage, setInspirationImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -223,6 +235,8 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setLongevity(entry.longevity ? parseFloat(entry.longevity) || 5 : 5);
     setColors(entry.colors ?? []);
     setSelectedColor("#a78bfa");
+    setBottleImage(entry.image_url ?? null);
+    setInspirationImage(entry.inspiration_image_url ?? null);
     setTopInput(""); setHeartInput(""); setBaseInput(""); setAccordInput("");
   }, [visible, entry]);
 
@@ -249,16 +263,53 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       sillage: String(sillage),
       longevity: String(longevity),
       colors: colors.length ? colors : null,
+      image_url: bottleImage ?? null,
+      inspiration_image_url: inspirationImage ?? null,
     }).eq("id", entry.id);
     setSaving(false);
     onSaved();
+  };
+
+  const pickBottlePhoto = () => {
+    Alert.alert("Upload Photo", "Choose an option", [
+      { text: "Take Photo", onPress: async () => {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
+        const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+        if (!result.canceled && result.assets[0]) setBottleImage(result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : result.assets[0].uri);
+      }},
+      { text: "Choose from Library", onPress: async () => {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+        if (!result.canceled && result.assets[0]) setBottleImage(result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : result.assets[0].uri);
+      }},
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const pickInspirationPhotoEdit = () => {
+    Alert.alert("Inspiration Photo", "Choose an option", [
+      { text: "Take Photo", onPress: async () => {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) return;
+        const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+        if (!result.canceled && result.assets[0]) setInspirationImage(result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : result.assets[0].uri);
+      }},
+      { text: "Choose from Library", onPress: async () => {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) return;
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+        if (!result.canceled && result.assets[0]) setInspirationImage(result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : result.assets[0].uri);
+      }},
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const toggleSeason = (s: string) =>
     setSeasons((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
 
   return (
-    <>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
@@ -272,6 +323,20 @@ function EditModal({ visible, entry, onClose, onSaved }: {
 
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 20, paddingBottom: 300 }} keyboardShouldPersistTaps="handled">
+            {/* Bottle photo */}
+            <TouchableOpacity style={em.photoUpload} onPress={pickBottlePhoto} activeOpacity={0.85}>
+              {bottleImage && <Image source={{ uri: bottleImage }} style={[StyleSheet.absoluteFill as any, { borderRadius: 18 }]} resizeMode="contain" />}
+              {!bottleImage && (
+                <>
+                  <Text style={em.uploadIcon}>📷</Text>
+                  <Text style={em.uploadLabel}>Tap to capture or upload</Text>
+                </>
+              )}
+              {bottleImage && (
+                <View style={em.aiStatusBar}><Text style={em.aiStatusText}>Tap to change</Text></View>
+              )}
+            </TouchableOpacity>
+
             <Text style={em.label}>Title</Text>
             <F placeholder="Perfume name…" value={title} onChangeText={setTitle} />
 
@@ -282,10 +347,20 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             <F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
 
             <Text style={em.label}>Gender</Text>
-            <TouchableOpacity style={em.chooser} onPress={() => setGenderPickerVisible(true)}>
+            <TouchableOpacity style={em.chooser} onPress={() => setGenderOpen((v) => !v)}>
               <Text style={gender ? em.chooserFilled : em.chooserEmpty}>{gender || "Select gender"}</Text>
-              <Text style={em.chevron}>▾</Text>
+              <Text style={em.chevron}>{genderOpen ? "▴" : "▾"}</Text>
             </TouchableOpacity>
+            {genderOpen && (
+              <View style={em.inlineList}>
+                {["Female", "Male", "Unisex"].map((g) => (
+                  <TouchableOpacity key={g} style={[em.inlineRow, gender === g && em.inlineRowActive]} onPress={() => { setGender(g); setGenderOpen(false); }}>
+                    <Text style={[em.inlineRowText, gender === g && em.inlineRowTextActive]}>{g}</Text>
+                    {gender === g ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <View style={{ flexDirection: "row", gap: 10 }}>
               <View style={{ flex: 1 }}>
@@ -312,18 +387,28 @@ function EditModal({ visible, entry, onClose, onSaved }: {
 
             <Text style={em.label}>Fragrance Family</Text>
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-              <TouchableOpacity style={em.chooser} onPress={() => setFamilyPickerVisible(true)}>
+              <TouchableOpacity style={em.chooser} onPress={() => setFamilyOpen((v) => !v)}>
                 <Text style={pendingFamily ? em.chooserFilled : em.chooserEmpty}>{pendingFamily || "Choose family"}</Text>
-                <Text style={em.chevron}>▾</Text>
+                <Text style={em.chevron}>{familyOpen ? "▴" : "▾"}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[em.addBtn, (!pendingFamily || accords.includes(pendingFamily)) && { opacity: 0.4 }]}
-                onPress={() => { if (pendingFamily && !accords.includes(pendingFamily)) { setAccords((p) => [...p, pendingFamily]); setPendingFamily(""); } }}
+                onPress={() => { if (pendingFamily && !accords.includes(pendingFamily)) { setAccords((p) => [...p, pendingFamily]); setPendingFamily(""); setFamilyOpen(false); } }}
                 disabled={!pendingFamily || accords.includes(pendingFamily)}
               >
                 <Text style={em.addBtnText}>Add</Text>
               </TouchableOpacity>
             </View>
+            {familyOpen && (
+              <View style={em.inlineList}>
+                {FRAGRANCE_FAMILIES.map((f) => (
+                  <TouchableOpacity key={f} style={[em.inlineRow, pendingFamily === f && em.inlineRowActive]} onPress={() => { setPendingFamily(f); setFamilyOpen(false); }}>
+                    <Text style={[em.inlineRowText, pendingFamily === f && em.inlineRowTextActive]}>{f}</Text>
+                    {pendingFamily === f ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
             {accords.length > 0 && (
               <View style={em.tagRow}>
                 {accords.map((f, i) => (
@@ -349,6 +434,16 @@ function EditModal({ visible, entry, onClose, onSaved }: {
 
             <Text style={em.label}>Dry Down</Text>
             <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+
+            {/* Inspiration photo */}
+            <Text style={em.label}>Inspiration</Text>
+            <TouchableOpacity style={em.photoUpload} onPress={pickInspirationPhotoEdit} activeOpacity={0.85}>
+              {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill as any, { borderRadius: 18 }]} resizeMode="contain" />}
+              {!inspirationImage && <Text style={em.uploadLabel}>Upload Inspiration Photo</Text>}
+              {inspirationImage && (
+                <View style={em.aiStatusBar}><Text style={em.aiStatusText}>Tap to change</Text></View>
+              )}
+            </TouchableOpacity>
 
             <Text style={em.label}>Color(s)</Text>
             <View style={em.colorWheelWrap}>
@@ -389,44 +484,6 @@ function EditModal({ visible, entry, onClose, onSaved }: {
         </SafeAreaView>
       </LinearGradient>
     </Modal>
-
-    {/* Gender Picker */}
-    <Modal visible={genderPickerVisible} transparent animationType="slide" onRequestClose={() => setGenderPickerVisible(false)}>
-      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" }}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setGenderPickerVisible(false)} />
-        <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 10 }}>
-          <View style={{ width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 }} />
-          {["Female", "Male", "Unisex"].map((g) => (
-            <TouchableOpacity key={g} style={[{ borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" }, gender === g && { backgroundColor: "#13131a", borderColor: "#13131a" }]}
-              onPress={() => { setGender(g); setGenderPickerVisible(false); }}>
-              <Text style={[{ color: "#13131a", fontSize: 15, fontWeight: "500" }, gender === g && { color: "#fff" }]}>{g}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </Modal>
-
-    {/* Family Picker */}
-    <Modal visible={familyPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setFamilyPickerVisible(false)}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#0e0e16" }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" }}>
-          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>Select Family</Text>
-          <TouchableOpacity onPress={() => setFamilyPickerVisible(false)}>
-            <Text style={{ color: "#a78bfa", fontSize: 15 }}>Done</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView>
-          {FRAGRANCE_FAMILIES.map((f) => (
-            <TouchableOpacity key={f} style={{ paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)", flexDirection: "row", justifyContent: "space-between" }}
-              onPress={() => { setPendingFamily(f); setFamilyPickerVisible(false); }}>
-              <Text style={{ color: "#fff", fontSize: 16 }}>{f}</Text>
-              {pendingFamily === f ? <Text style={{ color: "#a78bfa" }}>✓</Text> : null}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-    </>
   );
 }
 

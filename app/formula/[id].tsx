@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { Video, ResizeMode } from "expo-av";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "@/lib/supabase";
@@ -213,20 +214,18 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
         const ext = imageMimeType.split("/")[1] || (isVideo ? "mp4" : "jpg");
         const slug = isVideo ? "video" : "photo";
         const fileName = `formula_${formulaId}/${Date.now()}-${slug}.${ext}`;
-        const response = await fetch(imageUri!);
-        const blob = await response.blob();
-        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, blob, { contentType: imageMimeType });
+        const arrayBuffer = await fetch(imageUri!).then((r) => r.arrayBuffer());
+        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: imageMimeType });
         if (uploadError) throw uploadError;
         const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
-          formula_id: formulaId, file_url: fileName, media_type: isVideo ? "video" : "image", caption: imageCaption.trim() || null,
+          formula_id: formulaId, file_url: fileName, media_type: isVideo ? "video" : "image", caption: null,
         });
         if (insertError) throw insertError;
       } else if (tab === "audio") {
         const ext = audioName?.split(".").pop() ?? "mp3";
         const fileName = `formula_${formulaId}/${Date.now()}-audio.${ext}`;
-        const response = await fetch(audioUri!);
-        const blob = await response.blob();
-        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, blob, { contentType: `audio/${ext}` });
+        const arrayBuffer = await fetch(audioUri!).then((r) => r.arrayBuffer());
+        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: `audio/${ext}` });
         if (uploadError) throw uploadError;
         const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
           formula_id: formulaId, file_url: fileName, media_type: "audio", caption: audioName ?? null,
@@ -282,18 +281,6 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
                     </View>
                   )}
                 </TouchableOpacity>
-                {imageUri && (
-                  <>
-                    <Text style={mb.fieldLabel}>Caption (optional)</Text>
-                    <TextInput
-                      style={mb.input}
-                      placeholder="Add a caption..."
-                      placeholderTextColor="rgba(0,0,0,0.35)"
-                      value={imageCaption}
-                      onChangeText={setImageCaption}
-                    />
-                  </>
-                )}
               </>
             )}
 
@@ -651,18 +638,23 @@ export default function FormulaDetail() {
 
                   {/* Images — 2 per row */}
                   {(() => {
-                    const images = moodItems.filter((i) => (i.media_type === "image" || i.media_type === "audio") && i.display_url);
-                    if (!images.length) return null;
+                    const mediaItems = moodItems.filter((i) => (i.media_type === "image" || i.media_type === "video" || i.media_type === "audio") && i.display_url);
+                    if (!mediaItems.length) return null;
                     return (
-                      <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-                        {images.slice(0, 2).map((item) => (
-                          <View key={item.id} style={[s.imageCard, { flex: 1 }]}>
-                            <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                            {item.caption ? (
-                              <View style={s.imageCaptionBar}>
-                                <Text style={s.imageCaptionText} numberOfLines={2}>{item.caption}</Text>
-                              </View>
-                            ) : null}
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
+                        {mediaItems.map((item) => (
+                          <View key={item.id} style={[s.imageCard, { width: "47%" }]}>
+                            {item.media_type === "video" ? (
+                              <Video
+                                source={{ uri: item.display_url! }}
+                                style={{ width: "100%", height: "100%" }}
+                                resizeMode={ResizeMode.COVER}
+                                useNativeControls
+                                isLooping={false}
+                              />
+                            ) : (
+                              <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                            )}
                             <TouchableOpacity style={s.imageDeleteBtn} onPress={() => handleDeleteMoodItem(item.id)}>
                               <BlurView intensity={40} tint="dark" style={s.imageDeleteBlur}>
                                 <Text style={{ color: "#f87171", fontSize: 14, fontWeight: "700" }}>×</Text>
@@ -773,16 +765,16 @@ export default function FormulaDetail() {
                   style={s.inlineDropdownRow}
                   onPress={() => { setInlineSelected(item); setInlineSearch(item.name); setInlineResults([]); }}
                 >
-                  <Text style={{ color: "#fff", fontSize: 14 }}>{item.name}</Text>
-                  {item.type ? <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text> : null}
+                  <Text style={{ color: "#13131a", fontSize: 14 }}>{item.name}</Text>
+                  {item.type ? <Text style={{ color: "rgba(0,0,0,0.45)", fontSize: 12 }}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text> : null}
                 </TouchableOpacity>
               ))}
               {!inlineResults.some((r) => r.name.toLowerCase() === inlineSearch.toLowerCase()) && (
                 <TouchableOpacity
-                  style={[s.inlineDropdownRow, inlineResults.length > 0 && { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.1)" }]}
+                  style={[s.inlineDropdownRow, inlineResults.length > 0 && { borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" }]}
                   onPress={() => { setInlineResults([]); }}
                 >
-                  <Text style={{ color: "#C6FF00", fontSize: 14, fontWeight: "600" }}>+ Add "{inlineSearch}" as new material</Text>
+                  <Text style={{ color: "#22a55b", fontSize: 14, fontWeight: "600" }}>+ Add "{inlineSearch}" as new material</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -796,7 +788,7 @@ export default function FormulaDetail() {
             </View>
           ) : !inlineSelected && inlineSearch.trim() && inlineResults.length === 0 ? (
             <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
-              <Text style={{ color: "#C6FF00", fontSize: 13 }}>★ "{inlineSearch}" will be added to your Organ</Text>
+              <Text style={{ color: "#ec8fb5", fontSize: 13 }}>★ "{inlineSearch}" will be added to your Organ</Text>
             </View>
           ) : null}
         </View>
