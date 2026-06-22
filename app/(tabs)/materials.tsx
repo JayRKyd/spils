@@ -30,7 +30,7 @@ type Material = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SYMBOL_ICONS: Record<string, string> = {
-  Top: "▲", Mid: "■", Base: "●", Solvent: "★", Other: "✴",
+  Top: "▲", Mid: "■", Base: "●", Solvent: "★", Other: "✱",
 };
 
 const TYPE_OPTIONS = ["Top", "Mid", "Base", "Solvent", "Other"] as const;

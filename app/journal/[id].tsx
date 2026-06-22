@@ -10,6 +10,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,10 @@ const em = StyleSheet.create({
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   tagText: { color: "#13131a", fontSize: 13 },
+  organDropdown: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: 4, marginBottom: 4, overflow: "hidden" },
+  organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)" },
+  organDropdownText: { color: "#13131a", fontSize: 14 },
+  organDropdownHint: { color: "rgba(0,0,0,0.3)", fontSize: 11 },
   publicRow: { marginTop: 20, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
   publicLabel: { color: "#13131a", fontSize: 15, fontWeight: "600" },
   publicSub: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginTop: 2 },
@@ -151,6 +156,26 @@ function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove 
   tags: string[]; inputVal: string; placeholder: string;
   onChangeInput: (v: string) => void; onAdd: (v: string) => void; onRemove: (i: number) => void;
 }) {
+  const { user } = useAuth();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!inputVal.trim() || !user?.id) { setSuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.from("materials")
+        .select("name")
+        .eq("user_id", user.id)
+        .ilike("name", `%${inputVal}%`)
+        .limit(8);
+      setSuggestions(
+        (data ?? []).map((m: any) => m.name as string).filter((n) => !tags.includes(n))
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [inputVal, user?.id, tags]);
+
+  const addSuggestion = (name: string) => { onAdd(name); onChangeInput(""); setSuggestions([]); };
+
   return (
     <View style={{ marginBottom: 4 }}>
       <TextInput
@@ -159,10 +184,20 @@ function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove 
         placeholderTextColor="rgba(19,19,26,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
-        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); onChangeInput(""); } }}
+        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); onChangeInput(""); setSuggestions([]); } }}
         returnKeyType="done"
         blurOnSubmit={false}
       />
+      {suggestions.length > 0 && (
+        <View style={em.organDropdown}>
+          {suggestions.map((name) => (
+            <TouchableOpacity key={name} style={em.organDropdownRow} onPress={() => addSuggestion(name)}>
+              <Text style={em.organDropdownText}>{name}</Text>
+              <Text style={em.organDropdownHint}>Organ</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       {tags.length > 0 && (
         <View style={em.tagRow}>
           {tags.map((t, i) => (

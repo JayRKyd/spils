@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, StyleSheet, Alert, Image,
@@ -85,6 +85,26 @@ function NoteInput({ placeholder, tags, inputVal, onChangeInput, onAdd, onRemove
   placeholder: string; tags: string[]; inputVal: string;
   onChangeInput: (v: string) => void; onAdd: (v: string) => void; onRemove: (i: number) => void;
 }) {
+  const { user } = useAuth();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!inputVal.trim() || !user?.id) { setSuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.from("materials")
+        .select("name")
+        .eq("user_id", user.id)
+        .ilike("name", `%${inputVal}%`)
+        .limit(8);
+      setSuggestions(
+        (data ?? []).map((m: any) => m.name as string).filter((n) => !tags.includes(n))
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [inputVal, user?.id, tags]);
+
+  const addSuggestion = (name: string) => { onAdd(name); onChangeInput(""); setSuggestions([]); };
+
   return (
     <View style={{ marginBottom: 10 }}>
       <TextInput
@@ -93,10 +113,20 @@ function NoteInput({ placeholder, tags, inputVal, onChangeInput, onAdd, onRemove
         placeholderTextColor="rgba(19,19,26,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
-        onSubmitEditing={() => { if (inputVal.trim()) onAdd(inputVal.trim()); }}
+        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); setSuggestions([]); } }}
         returnKeyType="done"
         blurOnSubmit={false}
       />
+      {suggestions.length > 0 && (
+        <View style={s.organDropdown}>
+          {suggestions.map((name) => (
+            <TouchableOpacity key={name} style={s.organDropdownRow} onPress={() => addSuggestion(name)}>
+              <Text style={s.organDropdownText}>{name}</Text>
+              <Text style={s.organDropdownHint}>Organ</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       {tags.length > 0 && (
         <View style={s.tagRow}>
           {tags.map((t, i) => (
@@ -783,6 +813,11 @@ const s = StyleSheet.create({
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
   tagText: { color: "#13131a", fontSize: 13 },
+
+  organDropdown: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: 4, marginBottom: 4, overflow: "hidden" },
+  organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)" },
+  organDropdownText: { color: "#13131a", fontSize: 14 },
+  organDropdownHint: { color: "rgba(0,0,0,0.3)", fontSize: 11 },
 
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
   sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },
