@@ -22,9 +22,9 @@ interface Formula {
 }
 
 interface FormulaVersion {
-  id: number;
+  id: string;
   formula_id: number;
-  version_number: string;
+  version_num: number;
   created_at: string;
 }
 
@@ -118,12 +118,17 @@ function FormulaCard({ formula, onToggleFavorite }: {
         versionsLoading
           ? <ActivityIndicator size="small" color="#999" style={{ marginTop: 8 }} />
           : versions.map((v) => (
-            <View key={v.id} style={c.versionPill}>
+            <TouchableOpacity
+              key={v.id}
+              style={c.versionPill}
+              activeOpacity={0.75}
+              onPress={() => router.push(`/formula/version/${v.id}` as any)}
+            >
               <Text style={c.versionName} numberOfLines={1}>
-                {formula.name} <Text style={c.versionTag}>[version {v.version_number}]</Text>
+                {formula.name} <Text style={c.versionTag}>[version {v.version_num}]</Text>
               </Text>
               <Text style={c.versionDate}>{formatDate(v.created_at)}</Text>
-            </View>
+            </TouchableOpacity>
           ))
       )}
     </View>

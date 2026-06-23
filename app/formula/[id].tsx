@@ -549,11 +549,22 @@ export default function FormulaDetail() {
   const handleSaveVersion = async () => {
     setMoreVisible(false);
     const { data: versions } = await supabase
-      .from("formula_versions").select("version_number").eq("formula_id", formulaId)
-      .order("created_at", { ascending: false }).limit(1);
-    const lastNum = parseFloat((versions as any)?.[0]?.version_number ?? "0");
-    const nextNum = (lastNum + 1).toFixed(1);
-    const { error } = await supabase.from("formula_versions").insert([{ formula_id: formulaId, version_number: nextNum }]);
+      .from("formula_versions").select("version_num").eq("formula_id", formulaId)
+      .order("version_num", { ascending: false }).limit(1);
+    const lastNum = (versions as any)?.[0]?.version_num ?? 0;
+    const nextNum = lastNum + 1;
+    const snapshot = {
+      bottle_ml: bottleSizeMl,
+      concentration_pct: concPercent,
+      diluent,
+      lines: lines.map((l) => ({ material_id: l.material_id, amount_g: l.amount_g, name: l.material?.name ?? null })),
+    };
+    const { error } = await supabase.from("formula_versions").insert([{
+      formula_id: formulaId,
+      version_num: nextNum,
+      notes: JSON.stringify(snapshot),
+      created_by: user?.id,
+    }]);
     if (error) { Alert.alert("Error", error.message); return; }
     Alert.alert("Version Saved", `Version ${nextNum} saved.`);
   };
