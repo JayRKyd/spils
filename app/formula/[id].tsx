@@ -10,6 +10,8 @@ import * as DocumentPicker from "expo-document-picker";
 import { Video, ResizeMode } from "expo-av";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
+import * as FileSystem from "expo-file-system";
+import { decode } from "base64-arraybuffer";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import GradientScreen from "@/components/GradientScreen";
@@ -214,7 +216,8 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
         const ext = imageMimeType.split("/")[1] || (isVideo ? "mp4" : "jpg");
         const slug = isVideo ? "video" : "photo";
         const fileName = `formula_${formulaId}/${Date.now()}-${slug}.${ext}`;
-        const arrayBuffer = await fetch(imageUri!).then((r) => r.arrayBuffer());
+        const base64 = await FileSystem.readAsStringAsync(imageUri!, { encoding: FileSystem.EncodingType.Base64 });
+        const arrayBuffer = decode(base64);
         const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: imageMimeType });
         if (uploadError) throw uploadError;
         const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
@@ -224,7 +227,8 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
       } else if (tab === "audio") {
         const ext = audioName?.split(".").pop() ?? "mp3";
         const fileName = `formula_${formulaId}/${Date.now()}-audio.${ext}`;
-        const arrayBuffer = await fetch(audioUri!).then((r) => r.arrayBuffer());
+        const base64 = await FileSystem.readAsStringAsync(audioUri!, { encoding: FileSystem.EncodingType.Base64 });
+        const arrayBuffer = decode(base64);
         const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: `audio/${ext}` });
         if (uploadError) throw uploadError;
         const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
@@ -376,6 +380,8 @@ export default function FormulaDetail() {
   // Modal visibility
   const [addMoodVisible, setAddMoodVisible] = useState(false);
   const [moodCollapsed, setMoodCollapsed] = useState(false);
+  const [moreVisible, setMoreVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const totalG = useMemo(() => lines.reduce((sum, l) => sum + safeNum(l.amount_g), 0), [lines]);
   const targetConcentrateG = useMemo(() => +(bottleSizeMl * (concPercent / 100)).toFixed(3), [bottleSizeMl, concPercent]);
@@ -527,6 +533,48 @@ export default function FormulaDetail() {
     setLines(normalized);
   };
 
+  const handleSave = async () => {
+    if (!formula) return;
+    setSaving(true);
+    const name = editingName ? (nameVal.trim() || formula.name) : formula.name;
+    const description = editingDesc ? (descVal.trim() || null) : formula.description;
+    const { error } = await supabase.from("formulas").update({ name, description }).eq("id", formulaId);
+    setSaving(false);
+    if (error) { Alert.alert("Save failed", error.message); return; }
+    setFormula((f) => f ? { ...f, name, description } : f);
+    setEditingName(false);
+    setEditingDesc(false);
+  };
+
+  const handleSaveVersion = async () => {
+    setMoreVisible(false);
+    const { data: versions } = await supabase
+      .from("formula_versions").select("version_number").eq("formula_id", formulaId)
+      .order("created_at", { ascending: false }).limit(1);
+    const lastNum = parseFloat((versions as any)?.[0]?.version_number ?? "0");
+    const nextNum = (lastNum + 1).toFixed(1);
+    const { error } = await supabase.from("formula_versions").insert([{ formula_id: formulaId, version_number: nextNum }]);
+    if (error) { Alert.alert("Error", error.message); return; }
+    Alert.alert("Version Saved", `Version ${nextNum} saved.`);
+  };
+
+  const handleDuplicate = async () => {
+    setMoreVisible(false);
+    const { data: newF, error } = await supabase.from("formulas")
+      .insert([{ name: `${formula!.name} (Copy)`, description: formula!.description, notes: formula!.notes, date_created: new Date().toISOString() }])
+      .select("id").single();
+    if (error || !newF) { Alert.alert("Error", "Could not duplicate formula."); return; }
+    if (lines.length) {
+      await supabase.from("formula_lines").insert(
+        lines.map((l) => ({ formula_id: (newF as any).id, material_id: l.material_id, amount_g: l.amount_g }))
+      );
+    }
+    Alert.alert("Duplicated", `"${formula!.name} (Copy)" created.`, [
+      { text: "Open Copy", onPress: () => router.replace(`/formula/${(newF as any).id}` as any) },
+      { text: "Stay Here", style: "cancel" },
+    ]);
+  };
+
   const handleShare = async () => {
     if (!formula) return;
     const ingList = lines.slice().sort((a, b) => b.amount_g - a.amount_g)
@@ -565,7 +613,7 @@ export default function FormulaDetail() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
 
         {/* Header — inline editable */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
@@ -733,14 +781,14 @@ export default function FormulaDetail() {
             <TextInput
               style={[s.searchBarInline, { flex: 1 }]}
               placeholder="Type to search materials..."
-              placeholderTextColor="rgba(255,255,255,0.35)"
+              placeholderTextColor="rgba(0,0,0,0.35)"
               value={inlineSearch}
               onChangeText={(v) => { setInlineSearch(v); setInlineSelected(null); }}
             />
             <TextInput
               style={s.amountInline}
               placeholder="0.000"
-              placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholderTextColor="rgba(0,0,0,0.35)"
               value={inlineAmount}
               onChangeText={setInlineAmount}
               keyboardType="decimal-pad"
@@ -908,6 +956,42 @@ export default function FormulaDetail() {
         onClose={() => setAddMoodVisible(false)}
         onAdded={() => { setAddMoodVisible(false); fetchMoodItems(); }}
       />
+
+      {/* Persistent bottom bar */}
+      <View style={s.bottomBar}>
+        <TouchableOpacity style={s.bottomBarMore} onPress={() => setMoreVisible(true)}>
+          <Text style={s.bottomBarMoreText}>More</Text>
+        </TouchableOpacity>
+        <View style={s.bottomBarDivider} />
+        <TouchableOpacity style={s.bottomBarSave} onPress={handleSave} disabled={saving}>
+          {saving
+            ? <ActivityIndicator color="#13131a" size="small" />
+            : <Text style={s.bottomBarSaveText}>Save</Text>
+          }
+        </TouchableOpacity>
+      </View>
+
+      {/* More sheet */}
+      <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={() => setMoreVisible(false)}>
+        <View style={s.moreBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill as any} onPress={() => setMoreVisible(false)} />
+          <View style={s.moreSheet}>
+            <View style={s.moreHandle} />
+            <TouchableOpacity style={s.moreBtn} onPress={() => { setMoreVisible(false); handleShare(); }}>
+              <Text style={s.moreBtnText}>Share Formula</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.moreBtn} onPress={handleSaveVersion}>
+              <Text style={s.moreBtnText}>Save Version</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.moreBtn} onPress={handleDuplicate}>
+              <Text style={s.moreBtnText}>Duplicate Formula</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.moreBtn, s.moreBtnDanger]} onPress={() => { setMoreVisible(false); handleDeleteFormula(); }}>
+              <Text style={[s.moreBtnText, { color: "#e53535" }]}>Delete Formula</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </GradientScreen>
   );
 }
@@ -1133,4 +1217,20 @@ const s = StyleSheet.create({
   input: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 15, marginBottom: 14 },
   saveBtn: { backgroundColor: "#a78bfa", borderRadius: 12, paddingVertical: 15, alignItems: "center" },
   saveBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+
+  // Bottom bar
+  bottomBar: { flexDirection: "row", backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)", paddingBottom: 28, paddingTop: 4 },
+  bottomBarMore: { flex: 1, alignItems: "center", paddingVertical: 14 },
+  bottomBarMoreText: { color: "#13131a", fontSize: 15, fontWeight: "600" },
+  bottomBarDivider: { width: 1, backgroundColor: "rgba(0,0,0,0.1)", marginVertical: 8 },
+  bottomBarSave: { flex: 1, alignItems: "center", paddingVertical: 14 },
+  bottomBarSaveText: { color: "#ec8fb5", fontSize: 15, fontWeight: "700" },
+
+  // More sheet
+  moreBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
+  moreSheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 44, gap: 10 },
+  moreHandle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
+  moreBtnDanger: { borderColor: "rgba(220,50,50,0.2)" },
+  moreBtnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },
 });
