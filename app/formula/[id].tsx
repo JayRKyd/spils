@@ -1226,7 +1226,7 @@ const s = StyleSheet.create({
   modalSaveBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
 
   // Bottom bar
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)", backgroundColor: "#fff" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" },
   moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12 },
   moreBtnText: { color: "#13131a", fontSize: 14 },
   saveBtn: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
