@@ -216,7 +216,7 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
         const ext = imageMimeType.split("/")[1] || (isVideo ? "mp4" : "jpg");
         const slug = isVideo ? "video" : "photo";
         const fileName = `formula_${formulaId}/${Date.now()}-${slug}.${ext}`;
-        const base64 = await FileSystem.readAsStringAsync(imageUri!, { encoding: FileSystem.EncodingType.Base64 });
+        const base64 = await FileSystem.readAsStringAsync(imageUri!, { encoding: "base64" });
         const arrayBuffer = decode(base64);
         const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: imageMimeType });
         if (uploadError) throw uploadError;
@@ -227,7 +227,7 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
       } else if (tab === "audio") {
         const ext = audioName?.split(".").pop() ?? "mp3";
         const fileName = `formula_${formulaId}/${Date.now()}-audio.${ext}`;
-        const base64 = await FileSystem.readAsStringAsync(audioUri!, { encoding: FileSystem.EncodingType.Base64 });
+        const base64 = await FileSystem.readAsStringAsync(audioUri!, { encoding: "base64" });
         const arrayBuffer = decode(base64);
         const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: `audio/${ext}` });
         if (uploadError) throw uploadError;

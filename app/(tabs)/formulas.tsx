@@ -101,14 +101,12 @@ function FormulaCard({ formula, onToggleFavorite }: {
           <Text style={c.statusText}>{status}</Text>
           <Text style={c.sep}>  |  </Text>
           <Text style={c.meta}>{formula.material_count ?? 0} Materials</Text>
-          {(formula.material_count ?? 0) > 0 && (
-            <>
-              <Text style={c.sep}>  |  </Text>
-              <TouchableOpacity onPress={toggleVersions}>
-                <Text style={c.versionsLink}>Versions.</Text>
-              </TouchableOpacity>
-            </>
-          )}
+          <>
+            <Text style={c.sep}>  |  </Text>
+            <TouchableOpacity onPress={toggleVersions}>
+              <Text style={c.versionsLink}>Versions.</Text>
+            </TouchableOpacity>
+          </>
         </View>
         <Text style={c.date}>{date}</Text>
       </View>
