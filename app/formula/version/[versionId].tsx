@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StyleSheet,
+  ActivityIndicator, StyleSheet, Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
+import { Video, ResizeMode } from "expo-av";
 import { supabase } from "@/lib/supabase";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MOOD_BUCKET = "moodboard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,11 +37,33 @@ interface VersionRow {
   formulas?: { name: string; description: string | null } | null;
 }
 
+interface MoodItem {
+  id: string;
+  file_url: string;
+  media_type: "image" | "note" | "audio" | "video";
+  caption: string | null;
+  display_url?: string | null;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function extractStoragePath(fileUrl: string): string | null {
+  const v = (fileUrl ?? "").trim();
+  if (!v || v === "EMPTY") return null;
+  if (!v.startsWith("http")) return v.replace(/^\/+/, "");
+  const idx = v.indexOf("/moodboard/");
+  if (idx === -1) return null;
+  return decodeURIComponent(v.slice(idx + "/moodboard/".length).split("?")[0]);
+}
+
+async function resolveSignedUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from(MOOD_BUCKET).createSignedUrl(path, 86400);
+  return data?.signedUrl ?? null;
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -46,10 +73,13 @@ export default function FormulaVersionDetail() {
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState<VersionRow | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [moodItems, setMoodItems] = useState<MoodItem[]>([]);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+
+      // Load version row
       const { data, error } = await supabase
         .from("formula_versions")
         .select("*, formulas(name, description)")
@@ -58,15 +88,36 @@ export default function FormulaVersionDetail() {
       if (error || !data) { setLoading(false); return; }
       const row = data as VersionRow;
       setVersion(row);
+
       if (row.notes) {
         try { setSnapshot(JSON.parse(row.notes)); } catch { /* non-JSON notes */ }
       }
+
+      // Load mood board items for this formula
+      const { data: moodData } = await supabase
+        .from("formula_moodboard_assets")
+        .select("*")
+        .eq("formula_id", row.formula_id)
+        .order("created_at", { ascending: false });
+
+      const raw = (moodData ?? []) as MoodItem[];
+      const resolved: MoodItem[] = [];
+      for (const item of raw) {
+        if (item.media_type === "note") { resolved.push({ ...item, display_url: null }); continue; }
+        const path = extractStoragePath(item.file_url);
+        if (!path) { resolved.push({ ...item, display_url: item.file_url || null }); continue; }
+        resolved.push({ ...item, display_url: await resolveSignedUrl(path) });
+      }
+      setMoodItems(resolved);
+
       setLoading(false);
     };
     load();
   }, [versionId]);
 
   const totalG = snapshot?.lines?.reduce((s, l) => s + l.amount_g, 0) ?? 0;
+  const noteItems = moodItems.filter((i) => i.media_type === "note");
+  const mediaItems = moodItems.filter((i) => i.media_type !== "note" && i.display_url);
 
   return (
     <LinearGradient colors={["#FFD4E6", "#F5AEC8", "#EC8FB5"]} style={{ flex: 1 }}>
@@ -100,7 +151,46 @@ export default function FormulaVersionDetail() {
               <Text style={s.savedOn}>Saved {formatDate(version.created_at)}</Text>
             </View>
 
-            {/* Parameters */}
+            {/* Mood Board */}
+            {moodItems.length > 0 && (
+              <View style={s.section}>
+                <Text style={s.sectionTitle}>MOOD BOARD</Text>
+
+                {/* Notes */}
+                {noteItems.map((item) => (
+                  <View key={item.id} style={s.noteCard}>
+                    <Text style={s.noteText}>{item.caption}</Text>
+                  </View>
+                ))}
+
+                {/* Images / Videos */}
+                {mediaItems.length > 0 && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: noteItems.length > 0 ? 10 : 0 }}>
+                    {mediaItems.map((item) => (
+                      <View key={item.id} style={s.imageCard}>
+                        {item.media_type === "video" ? (
+                          <Video
+                            source={{ uri: item.display_url! }}
+                            style={{ width: "100%", height: "100%" }}
+                            resizeMode={ResizeMode.COVER}
+                            useNativeControls
+                            isLooping={false}
+                          />
+                        ) : (
+                          <Image
+                            source={{ uri: item.display_url! }}
+                            style={{ width: "100%", height: "100%" }}
+                            resizeMode="cover"
+                          />
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Parameters + Ingredients */}
             {snapshot ? (
               <>
                 <View style={s.section}>
@@ -121,7 +211,6 @@ export default function FormulaVersionDetail() {
                   </View>
                 </View>
 
-                {/* Ingredients */}
                 <View style={s.section}>
                   <Text style={s.sectionTitle}>INGREDIENTS</Text>
                   <Text style={s.totalG}>{totalG.toFixed(3)}g total</Text>
@@ -179,6 +268,9 @@ const s = StyleSheet.create({
   savedOn: { fontSize: 12, color: "rgba(19,19,26,0.45)", marginTop: 4 },
   section: { backgroundColor: "rgba(255,255,255,0.45)", borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)" },
   sectionTitle: { fontSize: 11, fontWeight: "700", color: "rgba(19,19,26,0.5)", letterSpacing: 1, marginBottom: 12 },
+  noteCard: { backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 14, padding: 12, marginBottom: 8 },
+  noteText: { fontSize: 14, color: "#13131a", lineHeight: 20 },
+  imageCard: { width: "47%", aspectRatio: 1, borderRadius: 14, overflow: "hidden", backgroundColor: "rgba(0,0,0,0.08)" },
   paramRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   paramCard: { flex: 1, backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 14, padding: 12, alignItems: "center" },
   diluentCard: { backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 14, padding: 12, alignItems: "center" },
