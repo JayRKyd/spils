@@ -516,7 +516,13 @@ export default function Journal() {
   useEffect(() => {
     const channel = (supabase as any)
       .channel("journal-entries-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "journal_entries" }, () => {
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "journal_entries" }, (payload: any) => {
+        setEntries((prev) => prev.filter((e) => e.id !== payload.old?.id));
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "journal_entries" }, () => {
+        fetchEntries();
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "journal_entries" }, () => {
         fetchEntries();
       })
       .subscribe();
