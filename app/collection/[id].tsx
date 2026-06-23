@@ -396,7 +396,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             {/* Inspiration Photo */}
             <Text style={em.label}>Inspiration Photo</Text>
             <TouchableOpacity onPress={pickInspirationPhoto} activeOpacity={0.8}
-              style={{ height: 180, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
+              style={{ height: 320, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
               {inspirationImage ? (
                 <Image source={{ uri: inspirationImage }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
               ) : (
