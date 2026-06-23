@@ -77,7 +77,7 @@ const em = StyleSheet.create({
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
   addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" as const },
   addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" as const },
-  chooser: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 4 },
+  chooser: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1.5, borderColor: "rgba(0,0,0,0.3)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 4 },
   chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
   chooserFilled: { color: "#13131a", fontSize: 14 },
   chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
@@ -475,8 +475,6 @@ export default function CollectionDetail() {
   const [loading, setLoading] = useState(true);
   const [editVisible, setEditVisible] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
-  const [inspirationSaving, setInspirationSaving] = useState(false);
-
   const fetchPerfume = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     const { data } = await supabase.from("perfumes").select("*").eq("id", id).single();
@@ -501,39 +499,6 @@ export default function CollectionDetail() {
     try {
       await Share.share({ message: `${perfume.name}${perfume.brand ? ` — ${perfume.brand}` : ""}${perfume.notes ? `\n${perfume.notes}` : ""}`.trim() });
     } catch {}
-  };
-
-  const pickInspirationPhoto = () => {
-    Alert.alert("Inspiration Photo", "Choose an option", [
-      {
-        text: "Take Photo",
-        onPress: async () => {
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"] as any, allowsEditing: false, quality: 0.7, base64: true });
-          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
-        },
-      },
-      {
-        text: "Choose from Library",
-        onPress: async () => {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] as any, allowsEditing: false, quality: 0.7, base64: true });
-          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0]);
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
-  const saveInspirationPhoto = async (asset: ImagePicker.ImagePickerAsset) => {
-    if (!perfume) return;
-    setInspirationSaving(true);
-    const imageData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
-    await supabase.from("perfumes").update({ inspiration_image_url: imageData }).eq("id", perfume.id);
-    setInspirationSaving(false);
-    fetchPerfume(false);
   };
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -616,23 +581,12 @@ export default function CollectionDetail() {
           <Row label="Longevity" value={perfume.longevity ?? "—"} />
           <Row label="Dry Down" value={perfume.dry_down ?? "—"} />
 
-          {/* Inspiration photo */}
-          <TouchableOpacity style={d.inspirationInCard} onPress={pickInspirationPhoto} activeOpacity={0.8}>
-            {perfume.inspiration_image_url ? (
+          {/* Inspiration photo — view only, edit via modal */}
+          {perfume.inspiration_image_url ? (
+            <View style={d.inspirationInCard}>
               <Image source={{ uri: perfume.inspiration_image_url }} style={{ width: "100%", height: "100%", borderRadius: 14 }} resizeMode="contain" />
-            ) : null}
-            {inspirationSaving ? (
-              <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.6)", borderRadius: 14 }]}>
-                <ActivityIndicator color="#13131a" />
-              </View>
-            ) : !perfume.inspiration_image_url ? (
-              <Text style={d.photoPlaceholder}>Upload Inspiration Photo</Text>
-            ) : (
-              <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            </View>
+          ) : null}
 
           {/* Colors */}
           <View style={d.row}>

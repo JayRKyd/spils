@@ -970,15 +970,11 @@ export default function FormulaDetail() {
 
       {/* Persistent bottom bar */}
       <View style={s.bottomBar}>
-        <TouchableOpacity style={s.bottomBarMore} onPress={() => setMoreVisible(true)}>
-          <Text style={s.bottomBarMoreText}>More</Text>
+        <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
+          <Text style={s.moreBtnText}>More</Text>
         </TouchableOpacity>
-        <View style={s.bottomBarDivider} />
-        <TouchableOpacity style={s.bottomBarSave} onPress={handleSave} disabled={saving}>
-          {saving
-            ? <ActivityIndicator color="#13131a" size="small" />
-            : <Text style={s.bottomBarSaveText}>Save</Text>
-          }
+        <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+          {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
         </TouchableOpacity>
       </View>
 
@@ -988,17 +984,17 @@ export default function FormulaDetail() {
           <TouchableOpacity style={StyleSheet.absoluteFill as any} onPress={() => setMoreVisible(false)} />
           <View style={s.moreSheet}>
             <View style={s.moreHandle} />
-            <TouchableOpacity style={s.moreBtn} onPress={() => { setMoreVisible(false); handleShare(); }}>
-              <Text style={s.moreBtnText}>Share Formula</Text>
+            <TouchableOpacity style={s.sheetBtn} onPress={() => { setMoreVisible(false); handleShare(); }}>
+              <Text style={s.sheetBtnText}>Share Formula</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.moreBtn} onPress={handleSaveVersion}>
-              <Text style={s.moreBtnText}>Save Version</Text>
+            <TouchableOpacity style={s.sheetBtn} onPress={handleSaveVersion}>
+              <Text style={s.sheetBtnText}>Save Version</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.moreBtn} onPress={handleDuplicate}>
-              <Text style={s.moreBtnText}>Duplicate Formula</Text>
+            <TouchableOpacity style={s.sheetBtn} onPress={handleDuplicate}>
+              <Text style={s.sheetBtnText}>Duplicate Formula</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.moreBtn, s.moreBtnDanger]} onPress={() => { setMoreVisible(false); handleDeleteFormula(); }}>
-              <Text style={[s.moreBtnText, { color: "#e53535" }]}>Delete Formula</Text>
+            <TouchableOpacity style={[s.sheetBtn, s.sheetBtnDanger]} onPress={() => { setMoreVisible(false); handleDeleteFormula(); }}>
+              <Text style={[s.sheetBtnText, { color: "#e53535" }]}>Delete Formula</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1226,22 +1222,21 @@ const s = StyleSheet.create({
   modalClose: { color: "rgba(255,255,255,0.5)", fontSize: 16 },
   fieldLabel: { color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 6, marginTop: 4 },
   input: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 15, marginBottom: 14 },
-  saveBtn: { backgroundColor: "#a78bfa", borderRadius: 12, paddingVertical: 15, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  modalSaveBtn: { backgroundColor: "#a78bfa", borderRadius: 12, paddingVertical: 15, alignItems: "center" as const },
+  modalSaveBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
 
   // Bottom bar
-  bottomBar: { flexDirection: "row", backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)", paddingBottom: 28, paddingTop: 4 },
-  bottomBarMore: { flex: 1, alignItems: "center", paddingVertical: 14 },
-  bottomBarMoreText: { color: "#13131a", fontSize: 15, fontWeight: "600" },
-  bottomBarDivider: { width: 1, backgroundColor: "rgba(0,0,0,0.1)", marginVertical: 8 },
-  bottomBarSave: { flex: 1, alignItems: "center", paddingVertical: 14 },
-  bottomBarSaveText: { color: "#ec8fb5", fontSize: 15, fontWeight: "700" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)", backgroundColor: "#fff" },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12 },
+  moreBtnText: { color: "#13131a", fontSize: 14 },
+  saveBtn: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
+  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 
   // More sheet
   moreBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
   moreSheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 44, gap: 10 },
   moreHandle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
-  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
-  moreBtnDanger: { borderColor: "rgba(220,50,50,0.2)" },
-  moreBtnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },
+  sheetBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 100, paddingVertical: 16, alignItems: "center" as const },
+  sheetBtnDanger: { borderColor: "rgba(220,50,50,0.2)" },
+  sheetBtnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
 });
