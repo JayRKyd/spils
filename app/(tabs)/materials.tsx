@@ -624,6 +624,23 @@ export default function Materials() {
           </TouchableOpacity>
         </View>
 
+        {/* Low stock alert banner */}
+        {!loading && (() => {
+          const lowItems = materials.filter((m) => m.stock_g != null && m.stock_g <= LOW_STOCK_THRESHOLD);
+          if (!lowItems.length) return null;
+          return (
+            <View style={s.lowStockBanner}>
+              <Text style={s.lowStockIcon}>⚠</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.lowStockTitle}>{lowItems.length} material{lowItems.length > 1 ? "s" : ""} running low</Text>
+                <Text style={s.lowStockNames} numberOfLines={1}>
+                  {lowItems.map((m) => `${m.name} (${m.stock_g}g)`).join("  ·  ")}
+                </Text>
+              </View>
+            </View>
+          );
+        })()}
+
         {/* List */}
         {loading ? (
           <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
@@ -835,6 +852,11 @@ const s = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.12)",
   },
   importBtnText: { fontSize: 13, fontWeight: "600", color: "#13131a" },
+
+  lowStockBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginBottom: 8, backgroundColor: "#fff3cd", borderRadius: 12, borderWidth: 1, borderColor: "#f5c542", paddingHorizontal: 14, paddingVertical: 10 },
+  lowStockIcon: { fontSize: 18, color: "#b45309" },
+  lowStockTitle: { fontSize: 13, fontWeight: "700", color: "#92400e" },
+  lowStockNames: { fontSize: 11, color: "#b45309", marginTop: 2 },
 
   empty: {
     color: "rgba(0,0,0,0.45)",

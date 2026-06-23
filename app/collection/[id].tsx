@@ -393,9 +393,6 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <Text style={em.label}>Music</Text>
             <F placeholder="Hallelujah by Jeff Buckley…" value={music} onChangeText={setMusic} />
 
-            <Text style={em.label}>Notes</Text>
-            <F placeholder="Your thoughts…" value={notes} onChangeText={setNotes} multiline style={{ height: 120, textAlignVertical: "top" }} />
-
             {/* Inspiration Photo */}
             <Text style={em.label}>Inspiration Photo</Text>
             <TouchableOpacity onPress={pickInspirationPhoto} activeOpacity={0.8}
@@ -436,6 +433,9 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                 <Text style={em.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
               </TouchableOpacity>
             </View>
+
+            <Text style={em.label}>Notes</Text>
+            <F placeholder="Your thoughts…" value={notes} onChangeText={setNotes} multiline style={{ height: 120, textAlignVertical: "top" }} />
           </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
