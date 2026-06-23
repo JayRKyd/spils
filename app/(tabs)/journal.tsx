@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
@@ -432,6 +432,8 @@ const cal = StyleSheet.create({
 
 export default function Journal() {
   const { user } = useAuth();
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -500,13 +502,15 @@ export default function Journal() {
   };
 
   const fetchEntries = useCallback(async () => {
+    if (!userRef.current?.id) return;
     setLoading(true);
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("journal_entries")
       .select("*, perfumes:perfume_id (name)")
+      .eq("user_id", userRef.current.id)
       .order("entry_date", { ascending: false })
       .order("created_at", { ascending: false });
-    if (data) setEntries(data);
+    if (!error && data) setEntries(data);
     setLoading(false);
   }, []);
 
