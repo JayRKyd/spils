@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet,
-  Image, KeyboardAvoidingView, Platform, Alert,
+  Image, KeyboardAvoidingView, Platform, Alert, AppState, AppStateStatus,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -510,39 +510,50 @@ export default function Journal() {
       .eq("user_id", userRef.current.id)
       .order("entry_date", { ascending: false })
       .order("created_at", { ascending: false });
+    if (error) console.error("fetchEntries error:", error.message);
     if (!error && data) setEntries(data);
     setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { fetchEntries(); fetchSotdEntries(); }, [fetchEntries, fetchSotdEntries]));
 
-  // Real-time subscription — keeps calendar dots live without any user action
+  // Refetch when app comes back to foreground (covers the case where useFocusEffect
+  // doesn't re-fire after returning from journal/new via router.back())
   useEffect(() => {
+    const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
+      if (state === "active") {
+        fetchEntries();
+        fetchSotdEntries();
+      }
+    });
+    return () => sub.remove();
+  }, [fetchEntries, fetchSotdEntries]);
+
+  // Real-time subscription — keeps calendar dots live without any user action.
+  // We use a full refetch on INSERT/UPDATE (instead of relying on payload.new)
+  // because Supabase Realtime with RLS doesn't populate payload.new reliably.
+  useEffect(() => {
+    if (!userRef.current?.id) return;
+    const uid = userRef.current.id;
     const channel = (supabase as any)
-      .channel("journal-entries-live")
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "journal_entries" }, (payload: any) => {
-        setEntries((prev) => prev.filter((e) => e.id !== payload.old?.id));
-      })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "journal_entries" }, async (payload: any) => {
-        if (!payload.new?.id || !userRef.current?.id) return;
-        const { data } = await (supabase as any)
-          .from("journal_entries")
-          .select("*, perfumes:perfume_id (name)")
-          .eq("id", payload.new.id)
-          .eq("user_id", userRef.current.id)
-          .single();
-        if (data) setEntries((prev) => prev.some((e) => e.id === data.id) ? prev : [data, ...prev]);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "journal_entries" }, async (payload: any) => {
-        if (!payload.new?.id || !userRef.current?.id) return;
-        const { data } = await (supabase as any)
-          .from("journal_entries")
-          .select("*, perfumes:perfume_id (name)")
-          .eq("id", payload.new.id)
-          .eq("user_id", userRef.current.id)
-          .single();
-        if (data) setEntries((prev) => prev.map((e) => e.id === data.id ? data : e));
-      })
+      .channel(`journal-entries-live-${uid}`)
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "journal_entries", filter: `user_id=eq.${uid}` },
+        (payload: any) => {
+          setEntries((prev) => prev.filter((e) => e.id !== payload.old?.id));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "journal_entries", filter: `user_id=eq.${uid}` },
+        () => { fetchEntries(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "journal_entries", filter: `user_id=eq.${uid}` },
+        () => { fetchEntries(); }
+      )
       .subscribe();
     return () => { (supabase as any).removeChannel(channel); };
   }, [fetchEntries]);
