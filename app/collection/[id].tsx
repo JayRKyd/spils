@@ -625,10 +625,6 @@ export default function CollectionDetail() {
           </Text>
         </View>
 
-        {/* Centered Edit button */}
-        <TouchableOpacity style={d.editPill} onPress={() => setEditVisible(true)}>
-          <Text style={d.editPillText}>Edit</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* Bottom Bar */}
@@ -637,7 +633,7 @@ export default function CollectionDetail() {
           <Text style={d.moreBtnText}>More</Text>
         </TouchableOpacity>
         <TouchableOpacity style={d.saveBottomBtn} onPress={() => setEditVisible(true)}>
-          <Text style={d.saveBottomBtnText}>Save</Text>
+          <Text style={d.saveBottomBtnText}>Edit</Text>
         </TouchableOpacity>
       </View>
 
