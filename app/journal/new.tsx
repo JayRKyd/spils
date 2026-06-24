@@ -573,7 +573,7 @@ export default function JournalNew() {
 
               {/* Music */}
               <SH text="Music" />
-              <TextInput style={s.field} placeholder="URL..." placeholderTextColor="rgba(19,19,26,0.4)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd(true), 150)} />
+              <TextInput style={s.field} placeholder="URL..." placeholderTextColor="rgba(19,19,26,0.4)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" />
 
               {/* Notes */}
               <SH text="Notes" />
@@ -584,7 +584,6 @@ export default function JournalNew() {
                 value={description}
                 onChangeText={setDescription}
                 multiline
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd(true), 150)}
               />
 
               {/* Scent Somm AI */}

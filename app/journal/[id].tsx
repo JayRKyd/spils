@@ -61,10 +61,13 @@ const FRAGRANCE_FAMILIES = [
 // ─── Edit Modal Styles (hoisted so TagInput + F can reference em) ────────────
 
 const em = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
+  header: { alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
   headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
-  cancel: { color: "rgba(19,19,26,0.5)", fontSize: 16 },
-  saveBtn: { color: "#13131a", fontSize: 16, fontWeight: "700" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" },
+  cancelBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12 },
+  cancelBtnText: { color: "#13131a", fontSize: 14 },
+  savePill: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
+  savePillText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
   label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
   input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
@@ -101,8 +104,8 @@ const em = StyleSheet.create({
   aiStatusBar: { position: "absolute" as const, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.25)", paddingVertical: 6, paddingHorizontal: 12 },
   aiStatusText: { color: "#fff", fontSize: 12, textAlign: "center" as const },
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
-  sliderFill: { position: "absolute" as const, left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(19,19,26,0.25)" },
-  sliderThumb: { position: "absolute" as const, width: 34, height: 34, borderRadius: 17, backgroundColor: "#13131a", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  sliderFill: { position: "absolute" as const, left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },
+  sliderThumb: { position: "absolute" as const, width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 });
 
 // ─── Slider ───────────────────────────────────────────────────────────────────
@@ -152,9 +155,10 @@ function F({ style, ...props }: React.ComponentProps<typeof TextInput>) {
   return <TextInput style={[em.input, style]} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />;
 }
 
-function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove }: {
+function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove, onScrollRequest }: {
   tags: string[]; inputVal: string; placeholder: string;
   onChangeInput: (v: string) => void; onAdd: (v: string) => void; onRemove: (i: number) => void;
+  onScrollRequest?: () => void;
 }) {
   const { user } = useAuth();
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -184,7 +188,11 @@ function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove 
         placeholderTextColor="rgba(19,19,26,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
-        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); onChangeInput(""); setSuggestions([]); } }}
+        onFocus={() => onScrollRequest?.()}
+        onSubmitEditing={() => {
+          if (inputVal.trim()) { onAdd(inputVal.trim()); onChangeInput(""); setSuggestions([]); }
+          setTimeout(() => onScrollRequest?.(), 100);
+        }}
         returnKeyType="done"
         blurOnSubmit={false}
       />
@@ -349,11 +357,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={em.header}>
-            <TouchableOpacity onPress={onClose}><Text style={em.cancel}>Cancel</Text></TouchableOpacity>
             <Text style={em.headerTitle}>Edit Entry</Text>
-            <TouchableOpacity onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.saveBtn}>Save</Text>}
-            </TouchableOpacity>
           </View>
 
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -455,13 +459,13 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             )}
 
             <Text style={em.label}>Top Notes</Text>
-            <TagInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+            <TagInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
 
             <Text style={em.label}>Middle Notes</Text>
-            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
 
             <Text style={em.label}>Base Notes</Text>
-            <TagInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
+            <TagInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
 
             <SliderRow label="Projection" value={projection} onChange={setProjection} />
             <SliderRow label="Sillage" value={sillage} onChange={setSillage} />
@@ -516,6 +520,14 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             </TouchableOpacity>
           </ScrollView>
           </KeyboardAvoidingView>
+          <View style={em.bottomBar}>
+            <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
+              <Text style={em.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[em.savePill, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={em.savePillText}>Save</Text>}
+            </TouchableOpacity>
+          </View>
         </SafeAreaView>
       </LinearGradient>
     </Modal>
@@ -609,42 +621,6 @@ export default function JournalDetail() {
     }
   };
 
-  const [inspirationSaving, setInspirationSaving] = useState(false);
-
-  const pickInspirationPhoto = () => {
-    const savedY = scrollY.current;
-    Alert.alert("Inspiration Photo", "Choose an option", [
-      {
-        text: "Take Photo",
-        onPress: async () => {
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) { Alert.alert("Permission needed", "Allow camera access."); return; }
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
-          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0], savedY);
-        },
-      },
-      {
-        text: "Choose from Library",
-        onPress: async () => {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
-          if (!result.canceled && result.assets[0]) saveInspirationPhoto(result.assets[0], savedY);
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
-  const saveInspirationPhoto = async (asset: ImagePicker.ImagePickerAsset, savedY: number) => {
-    if (!entry) return;
-    setInspirationSaving(true);
-    const imageData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
-    await (supabase as any).from("journal_entries").update({ inspiration_image_url: imageData }).eq("id", entry.id);
-    setInspirationSaving(false);
-    fetchEntry(false);
-    requestAnimationFrame(() => { scrollRef.current?.scrollTo({ y: savedY, animated: false }); });
-  };
 
   const handleShare = async () => {
     if (!entry) return;
@@ -728,23 +704,12 @@ export default function JournalDetail() {
           <Row label="Longevity" value={entry.longevity ?? "—"} />
           <Row label="Dry Down" value={entry.dry_down ?? "—"} />
 
-          {/* Inspiration photo box inside the card */}
-          <TouchableOpacity style={d.inspirationInCard} onPress={pickInspirationPhoto} activeOpacity={0.8}>
-            {entry.inspiration_image_url ? (
+          {/* Inspiration photo — view only, edit via modal */}
+          {entry.inspiration_image_url ? (
+            <View style={d.inspirationInCard}>
               <Image source={{ uri: entry.inspiration_image_url }} style={{ width: "100%", height: "100%", borderRadius: 14 }} resizeMode="contain" />
-            ) : null}
-            {inspirationSaving ? (
-              <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.6)", borderRadius: 14 }]}>
-                <ActivityIndicator color="#13131a" />
-              </View>
-            ) : !entry.inspiration_image_url ? (
-              <Text style={d.photoPlaceholder}>Tap to upload inspiration photo</Text>
-            ) : (
-              <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            </View>
+          ) : null}
 
           {/* Colors row */}
           <View style={d.row}>
@@ -781,10 +746,6 @@ export default function JournalDetail() {
             {entry.description || "No notes added."}
           </Text>
         </View>
-        {/* Centered Edit button */}
-        <TouchableOpacity style={d.editPill} onPress={() => setEditVisible(true)}>
-          <Text style={d.editPillText}>Edit</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* Bottom Bar */}
@@ -793,7 +754,7 @@ export default function JournalDetail() {
           <Text style={d.moreBtnText}>More</Text>
         </TouchableOpacity>
         <TouchableOpacity style={d.saveBottomBtn} onPress={() => setEditVisible(true)}>
-          <Text style={d.saveBottomBtnText}>Save</Text>
+          <Text style={d.saveBottomBtnText}>Edit</Text>
         </TouchableOpacity>
       </View>
 

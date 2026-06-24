@@ -523,11 +523,25 @@ export default function Journal() {
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "journal_entries" }, (payload: any) => {
         setEntries((prev) => prev.filter((e) => e.id !== payload.old?.id));
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "journal_entries" }, () => {
-        fetchEntries();
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "journal_entries" }, async (payload: any) => {
+        if (!payload.new?.id || !userRef.current?.id) return;
+        const { data } = await (supabase as any)
+          .from("journal_entries")
+          .select("*, perfumes:perfume_id (name)")
+          .eq("id", payload.new.id)
+          .eq("user_id", userRef.current.id)
+          .single();
+        if (data) setEntries((prev) => prev.some((e) => e.id === data.id) ? prev : [data, ...prev]);
       })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "journal_entries" }, () => {
-        fetchEntries();
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "journal_entries" }, async (payload: any) => {
+        if (!payload.new?.id || !userRef.current?.id) return;
+        const { data } = await (supabase as any)
+          .from("journal_entries")
+          .select("*, perfumes:perfume_id (name)")
+          .eq("id", payload.new.id)
+          .eq("user_id", userRef.current.id)
+          .single();
+        if (data) setEntries((prev) => prev.map((e) => e.id === data.id ? data : e));
       })
       .subscribe();
     return () => { (supabase as any).removeChannel(channel); };
@@ -582,16 +596,17 @@ export default function Journal() {
           </View>
         </View>
 
-        {loading && entries.length === 0 ? (
+        {/* Hero image — always mounted so it's decoded and ready instantly */}
+        <View style={[s.heroWrap, view !== "landing" && { display: "none" }]}>
+          <Image
+            source={require("../../assets/magnific__create-a-modern-fashion-editorial-with-this-refere__42180.png")}
+            style={s.heroImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {view !== "landing" && (loading && entries.length === 0 ? (
           <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
-        ) : view === "landing" ? (
-          <View style={s.heroWrap}>
-            <Image
-              source={require("../../assets/magnific__create-a-modern-fashion-editorial-with-this-refere__42180.png")}
-              style={s.heroImage}
-              resizeMode="cover"
-            />
-          </View>
         ) : view === "calendar" ? (
           <View style={{ flex: 1, paddingHorizontal: 16 }}>
             <CalendarView entries={entries} onSelectEntry={(e) => router.push(`/journal/${e.id}` as any)} />
@@ -664,7 +679,7 @@ export default function Journal() {
             renderItem={({ item }) => <EntryCard entry={item} />}
             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
           />
-        )}
+        ))}
 
         <FilterModal
           visible={filterVisible}

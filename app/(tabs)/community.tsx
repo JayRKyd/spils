@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { router, useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
@@ -275,6 +276,7 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
   const [commentText, setCommentText] = useState("");
   const [commentPosting, setCommentPosting] = useState(false);
   const commentInputRef = useRef<any>(null);
+  const [commentFocused, setCommentFocused] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const pickPhoto = async () => {
@@ -298,6 +300,16 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
   }, [categoryFilter]);
 
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
+
+  useEffect(() => {
+    const channel = (supabase as any)
+      .channel(`forum-threads-live-${categoryFilter ?? "all"}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "forum_threads" }, () => {
+        fetchThreads();
+      })
+      .subscribe();
+    return () => { (supabase as any).removeChannel(channel); };
+  }, [fetchThreads, categoryFilter]);
 
   const openThread = async (thread: ForumThread) => {
     if (expandedId === thread.id) {
@@ -481,8 +493,12 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
                 {expanded ? (
                   <View style={{ marginTop: 14 }}>
                     {/* Comment CTA pill */}
-                    <TouchableOpacity style={ft.commentBtn} onPress={() => commentInputRef.current?.focus()} activeOpacity={0.8}>
-                      <Text style={ft.commentBtnText}>Comment</Text>
+                    <TouchableOpacity
+                      style={[ft.commentBtn, commentFocused && ft.commentBtnActive]}
+                      onPress={() => { setCommentFocused(true); commentInputRef.current?.focus(); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[ft.commentBtnText, commentFocused && ft.commentBtnTextActive]}>Comment</Text>
                     </TouchableOpacity>
 
                     {/* Comment input */}
@@ -495,6 +511,8 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
                         value={commentText}
                         onChangeText={setCommentText}
                         multiline
+                        onFocus={() => setCommentFocused(true)}
+                        onBlur={() => setCommentFocused(false)}
                       />
                       <View style={{ alignItems: "flex-end", marginTop: 6 }}>
                         <TouchableOpacity
@@ -600,8 +618,10 @@ const ft = StyleSheet.create({
   authorLink: { color: "rgba(255,255,255,0.9)", fontSize: 12, textDecorationLine: "underline" },
   editLink: { color: "rgba(255,255,255,0.8)", fontSize: 13 },
   editSep: { color: "rgba(255,255,255,0.35)", fontSize: 13 },
-  commentBtn: { alignSelf: "flex-start", backgroundColor: "#C6FF00", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
-  commentBtnText: { color: "#1a1a10", fontSize: 13, fontWeight: "700" },
+  commentBtn: { alignSelf: "flex-start", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.7)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
+  commentBtnActive: { backgroundColor: "#C6FF00", borderColor: "#C6FF00" },
+  commentBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  commentBtnTextActive: { color: "#1a1a10" },
   postPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
   postPillText: { color: "#fff", fontSize: 13, fontWeight: "500" },
   commentsLabel: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: "700", letterSpacing: 0.5, marginTop: 16, marginBottom: 10 },
@@ -1121,7 +1141,6 @@ const MENU = [
 type SectionKey = typeof MENU[number]["key"];
 
 const AVATARS = [
-  { letter: "J", bg: "#E85A3A" },
   { letter: "C", bg: "#4A9BE8" },
   { letter: "L", bg: "#4AE892" },
   { letter: "S", bg: "#E8C84A" },
@@ -1134,7 +1153,13 @@ function CommunityWrapper({ children, onBack }: { children: React.ReactNode; onB
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top nav — always SP/LS. + profile */}
         <View style={ls.topNav}>
-          <Text style={ls.logo}>SP/LS.</Text>
+          {onBack ? (
+            <TouchableOpacity onPress={onBack} style={{ paddingRight: 8 }}>
+              <Text style={ls.backBtn}>← Back</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={ls.logo}>SP/LS.</Text>
+          )}
           <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={ls.iconBtnText}>👤</Text>
           </TouchableOpacity>
@@ -1151,22 +1176,6 @@ function CommunityWrapper({ children, onBack }: { children: React.ReactNode; onB
           {children}
         </View>
 
-        {/* Bottom bar — always visible, ← goes back when in a section */}
-        <View style={ls.bottomBar}>
-          <TouchableOpacity style={[ls.circleBtn, !onBack && { opacity: 0.35 }]} onPress={onBack} disabled={!onBack}>
-            <Text style={ls.circleBtnIcon}>←</Text>
-          </TouchableOpacity>
-          <View style={ls.avatarRow}>
-            {AVATARS.map((a, i) => (
-              <View key={i} style={[ls.avatar, { backgroundColor: a.bg }]}>
-                <Text style={ls.avatarLetter}>{a.letter}</Text>
-              </View>
-            ))}
-          </View>
-          <TouchableOpacity style={ls.circleBtn}>
-            <Text style={ls.circleBtnIcon}>+</Text>
-          </TouchableOpacity>
-        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -1180,6 +1189,7 @@ export default function Community() {
   useFocusEffect(
     useCallback(() => {
       setSection(null);
+      setComingSoonVisible(true);
     }, [])
   );
 
@@ -1239,11 +1249,14 @@ export default function Community() {
           onPress={() => setComingSoonVisible(false)}
           activeOpacity={1}
         >
-          <View style={ls.csCard}>
-            <Text style={ls.csTitle}>Welcome to the SPILS© Community!</Text>
+          <BlurView intensity={60} tint="light" style={ls.csCard}>
+            <TouchableOpacity style={ls.csClose} onPress={() => setComingSoonVisible(false)}>
+              <Text style={ls.csCloseText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={ls.csTitle}>Welcome to the Spils Community</Text>
             <View style={ls.csBetaPill}><Text style={ls.csBetaText}>BETA</Text></View>
-            <Text style={ls.csSub}>Full Version Coming Soon</Text>
-          </View>
+            <Text style={ls.csSub}>This is the Beta Version. Full version coming soon!</Text>
+          </BlurView>
         </TouchableOpacity>
       </Modal>
     </CommunityWrapper>
@@ -1255,6 +1268,7 @@ export default function Community() {
 const ls = StyleSheet.create({
   topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   logo: { color: "#C6FF00", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
+  backBtn: { color: "#fff", fontSize: 15, fontWeight: "600" },
   iconBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.55)", alignItems: "center", justifyContent: "center" },
   iconBtnText: { color: "#fff", fontSize: 20, fontWeight: "300", lineHeight: 24, marginTop: -1 },
 
@@ -1275,7 +1289,9 @@ const ls = StyleSheet.create({
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   avatarLetter: { color: "#fff", fontSize: 13, fontWeight: "700" },
 
-  csCard: { width: "100%", borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 20, backgroundColor: "rgba(255,255,255,0.18)", paddingVertical: 36, paddingHorizontal: 24, alignItems: "center", gap: 16 },
+  csCard: { width: "100%", borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 20, overflow: "hidden", paddingVertical: 36, paddingHorizontal: 24, alignItems: "center", gap: 16 },
+  csClose: { position: "absolute" as const, top: 12, right: 12, width: 28, height: 28, alignItems: "center", justifyContent: "center" },
+  csCloseText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   csTitle: { color: "#fff", fontSize: 16, fontWeight: "700", textAlign: "center" },
   csBetaPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 5 },
   csBetaText: { color: "#fff", fontSize: 12, fontWeight: "700", letterSpacing: 1 },

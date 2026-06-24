@@ -62,23 +62,25 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           })}
         </BlurView>
 
-        {/* Plus — standalone frosted circle on the right */}
-        <TouchableOpacity
-          onPress={() => {
-            const current = state.routes[state.index]?.name;
-            const ts = String(Date.now());
-            if (current === "materials") navigation.navigate("materials", { openAdd: ts } as any);
-            else if (current === "formulas") navigation.navigate("formulas", { openAdd: ts } as any);
-            else if (current === "collection") router.push("/collection/new" as any);
-            else router.push("/journal/new" as any);
-          }}
-          activeOpacity={0.75}
-        >
-          <BlurView intensity={80} tint="light" style={tb.soloBtn}>
-            <View style={tb.pillOverlay} />
-            <Text style={tb.plusIcon}>+</Text>
-          </BlurView>
-        </TouchableOpacity>
+        {/* Plus — standalone frosted circle on the right (hidden on community tab) */}
+        {state.routes[state.index]?.name !== "community" && (
+          <TouchableOpacity
+            onPress={() => {
+              const current = state.routes[state.index]?.name;
+              const ts = String(Date.now());
+              if (current === "materials") navigation.navigate("materials", { openAdd: ts } as any);
+              else if (current === "formulas") navigation.navigate("formulas", { openAdd: ts } as any);
+              else if (current === "collection") router.push("/collection/new" as any);
+              else router.push("/journal/new" as any);
+            }}
+            activeOpacity={0.75}
+          >
+            <BlurView intensity={80} tint="light" style={tb.soloBtn}>
+              <View style={tb.pillOverlay} />
+              <Text style={tb.plusIcon}>+</Text>
+            </BlurView>
+          </TouchableOpacity>
+        )}
 
       </View>
     </View>
