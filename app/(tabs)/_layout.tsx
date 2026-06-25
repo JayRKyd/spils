@@ -4,11 +4,25 @@ import { Text, View, TouchableOpacity, StyleSheet } from "react-native";
 import { BlurView } from "expo-blur";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path, Line, Rect } from "react-native-svg";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.75 }}>{emoji}</Text>;
+}
+
+function HomeLeftIcon({ focused }: { focused: boolean }) {
+  return (
+    <Svg viewBox="0 0 24.25 24.25" width={20} height={20} style={{ opacity: focused ? 1 : 0.75 }}>
+      <Path
+        d="M12.15,2.86c4.77,0,8.63,3.86,8.63,8.63s-3.86,8.63-8.63,8.63S3.52,16.26,3.52,11.49,7.38,2.86,12.15,2.86M12.15,2.36C7.11,2.36,3.02,6.45,3.02,11.49s4.1,9.13,9.13,9.13,9.13-4.1,9.13-9.13S17.18,2.36,12.15,2.36h0Z"
+        fill="#fff"
+      />
+      <Line x1={15.16} y1={8.84} x2={9.85} y2={14.14} stroke="#fff" strokeWidth={0.5} strokeMiterlimit={10} />
+      <Rect x={0.12} y={0.12} width={24} height={24} fill="none" />
+    </Svg>
+  );
 }
 
 // ─── Custom Floating Bar ──────────────────────────────────────────────────────
@@ -171,7 +185,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: "Home", tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} /> }}
+        options={{ title: "Home", tabBarIcon: ({ focused }) => <HomeLeftIcon focused={focused} /> }}
       />
       <Tabs.Screen
         name="journal"
