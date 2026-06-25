@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet, Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
@@ -148,8 +148,13 @@ export default function Formulas() {
   const { openAdd } = useLocalSearchParams<{ openAdd?: string }>();
   const [ifraVisible, setIfraVisible] = useState(false);
   const [secureVisible, setSecureVisible] = useState(false);
+  const [focusKey, setFocusKey] = useState(0);
 
   useEffect(() => { if (openAdd) router.push("/formula/new" as any); }, [openAdd]);
+
+  useFocusEffect(useCallback(() => {
+    setFocusKey((k) => k + 1);
+  }, []));
 
   const fetchFormulas = useCallback(async () => {
     setLoading(true);
@@ -250,6 +255,7 @@ export default function Formulas() {
             }
             renderItem={({ item }) => (
               <FormulaCard
+                key={`${item.id}-${focusKey}`}
                 formula={item}
                 onToggleFavorite={() => handleToggleFavorite(item)}
               />
