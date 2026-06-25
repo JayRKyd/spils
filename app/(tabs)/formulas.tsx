@@ -153,10 +153,6 @@ export default function Formulas() {
 
   useEffect(() => { if (openAdd) router.push("/formula/new" as any); }, [openAdd]);
 
-  useFocusEffect(useCallback(() => {
-    setFocusKey((k) => k + 1);
-  }, []));
-
   const fetchFormulas = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
@@ -172,6 +168,11 @@ export default function Formulas() {
   }, []);
 
   useEffect(() => { fetchFormulas(); }, [fetchFormulas]);
+
+  useFocusEffect(useCallback(() => {
+    setFocusKey((k) => k + 1);
+    fetchFormulas();
+  }, [fetchFormulas]));
 
   const filtered = formulas.filter((f) => {
     const matchesSearch =
