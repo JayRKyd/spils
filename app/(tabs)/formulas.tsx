@@ -25,6 +25,7 @@ interface FormulaVersion {
   id: string;
   formula_id: number;
   version_num: number;
+  label: string | null;
   created_at: string;
 }
 
@@ -123,7 +124,7 @@ function FormulaCard({ formula, onToggleFavorite }: {
               onPress={() => router.push(`/formula/version/${v.id}` as any)}
             >
               <Text style={c.versionName} numberOfLines={1}>
-                {formula.name} <Text style={c.versionTag}>[version {v.version_num}]</Text>
+                {v.label ?? `Version ${v.version_num}`}
               </Text>
               <Text style={c.versionDate}>{formatDate(v.created_at)}</Text>
             </TouchableOpacity>
