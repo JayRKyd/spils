@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet, Linking, Alert, Share, Image,
@@ -1158,7 +1159,7 @@ function CommunityWrapper({ children, onBack }: { children: React.ReactNode; onB
               <Text style={ls.backBtn}>← Back</Text>
             </TouchableOpacity>
           ) : (
-            <Text style={ls.logo}>SP/LS.</Text>
+            <SpilsLogo height={22} color="#edff8d" />
           )}
           <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={ls.iconBtnText}>👤</Text>

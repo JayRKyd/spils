@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { SpilsLogo } from "../../components/SpilsLogo";
 import { useLocalSearchParams, router } from "expo-router";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
@@ -169,7 +170,7 @@ function MaterialModal({
               <TouchableOpacity style={mo.backBtn} onPress={onClose}>
                 <Text style={mo.backIcon}>‹</Text>
               </TouchableOpacity>
-              <Text style={mo.logo}>SP/LS.</Text>
+              <SpilsLogo height={22} />
             </View>
             <TouchableOpacity style={mo.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
               <Text style={mo.profileIcon}>👤</Text>
@@ -573,7 +574,7 @@ export default function Materials() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top nav */}
         <View style={s.topNav}>
-          <Text style={s.logo}>SP/LS.</Text>
+          <SpilsLogo height={22} />
           <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>

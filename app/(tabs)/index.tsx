@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image, useWindowDimensions } from "react-native";
+import { SpilsLogo } from "../../components/SpilsLogo";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
@@ -13,12 +14,13 @@ const NAV_ITEMS = [
 
 export default function Home() {
   const { user } = useAuth();
+  const { width, height } = useWindowDimensions();
 
   return (
     <View style={s.container}>
       <Image
-        source={require("../../assets/floating.jpg")}
-        style={StyleSheet.absoluteFill as any}
+        source={require("../../assets/new_float_too.png")}
+        style={{ position: "absolute", width, height }}
         resizeMode="cover"
       />
       <View style={[StyleSheet.absoluteFill as any, s.overlay]} />
@@ -26,7 +28,7 @@ export default function Home() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top bar */}
         <View style={s.topBar}>
-          <Text style={s.logo}>SP/LS.</Text>
+          <SpilsLogo height={22} color="#edff8d" />
           <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>

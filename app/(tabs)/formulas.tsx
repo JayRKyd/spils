@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet, Linking,
@@ -198,7 +199,7 @@ export default function Formulas() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top nav */}
         <View style={s.topNav}>
-          <Text style={s.logo}>SP/LS.</Text>
+          <SpilsLogo height={22} />
           <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>

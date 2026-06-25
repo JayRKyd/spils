@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet,
@@ -572,7 +573,7 @@ export default function Journal() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top nav */}
         <View style={s.topNav}>
-          <Text style={s.logoText}>SP/LS.</Text>
+          <SpilsLogo height={22} />
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile" as any)} style={s.profileBtn}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>
@@ -610,7 +611,7 @@ export default function Journal() {
         {/* Hero image — always mounted so it's decoded and ready instantly */}
         <View style={[s.heroWrap, view !== "landing" && { display: "none" }]}>
           <Image
-            source={require("../../assets/magnific__create-a-modern-fashion-editorial-with-this-refere__42180.png")}
+            source={require("../../assets/bedroom scene_02_resized.png")}
             style={s.heroImage}
             resizeMode="cover"
           />

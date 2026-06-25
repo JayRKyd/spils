@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image,
   Modal, ScrollView, ActivityIndicator, StyleSheet, useWindowDimensions,
@@ -125,7 +126,7 @@ export default function Collection() {
 
         {/* Top nav */}
         <View style={s.topNav}>
-          <Text style={s.logo}>SP/LS.</Text>
+          <SpilsLogo height={22} />
           <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>
