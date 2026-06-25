@@ -67,6 +67,47 @@ async function resolveSignedUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+// ─── Editable Line Row ────────────────────────────────────────────────────────
+
+function EditableLine({ line, pct, onUpdate }: { line: SnapshotLine; pct: string; onUpdate: (g: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(line.amount_g.toFixed(3));
+
+  const commit = () => {
+    const n = parseFloat(val);
+    if (Number.isFinite(n) && n >= 0) onUpdate(n);
+    else setVal(line.amount_g.toFixed(3));
+    setEditing(false);
+  };
+
+  return (
+    <View style={s.lineRow}>
+      <Text style={s.lineName} numberOfLines={1}>
+        {line.name ?? `Material #${line.material_id}`}
+      </Text>
+      <View style={s.lineRight}>
+        {editing ? (
+          <TextInput
+            style={s.lineInput}
+            value={val}
+            onChangeText={setVal}
+            keyboardType="decimal-pad"
+            onBlur={commit}
+            onSubmitEditing={commit}
+            autoFocus
+            selectTextOnFocus
+          />
+        ) : (
+          <TouchableOpacity onPress={() => { setVal(line.amount_g.toFixed(3)); setEditing(true); }}>
+            <Text style={s.lineAmt}>{line.amount_g.toFixed(3)}g</Text>
+          </TouchableOpacity>
+        )}
+        <Text style={s.linePct}>{pct}%</Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FormulaVersionDetail() {
@@ -77,6 +118,7 @@ export default function FormulaVersionDetail() {
   const [moodItems, setMoodItems] = useState<MoodItem[]>([]);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelVal, setLabelVal] = useState("");
+  const [saving, setSaving] = useState(false);
   const labelRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -131,6 +173,24 @@ export default function FormulaVersionDetail() {
     };
     load();
   }, [versionId]);
+
+  const updateLineAmount = (index: number, amount_g: number) => {
+    setSnapshot((prev) => {
+      if (!prev) return prev;
+      const lines = prev.lines.map((l, i) => i === index ? { ...l, amount_g } : l);
+      return { ...prev, lines };
+    });
+  };
+
+  const handleSave = async () => {
+    if (!version || !snapshot) return;
+    setSaving(true);
+    await supabase.from("formula_versions")
+      .update({ notes: JSON.stringify(snapshot) })
+      .eq("id", versionId);
+    setSaving(false);
+    router.back();
+  };
 
   const totalG = snapshot?.lines?.reduce((s, l) => s + l.amount_g, 0) ?? 0;
   const noteItems = moodItems.filter((i) => i.media_type === "note");
@@ -258,20 +318,18 @@ export default function FormulaVersionDetail() {
                   {snapshot.lines.length === 0 ? (
                     <Text style={s.empty}>No ingredients in this version.</Text>
                   ) : (
-                    [...snapshot.lines]
-                      .sort((a, b) => b.amount_g - a.amount_g)
-                      .map((line, i) => {
+                    snapshot.lines
+                      .map((line, i) => ({ line, originalIndex: i }))
+                      .sort((a, b) => b.line.amount_g - a.line.amount_g)
+                      .map(({ line, originalIndex }) => {
                         const pct = totalG > 0 ? ((line.amount_g / totalG) * 100).toFixed(1) : "0.0";
                         return (
-                          <View key={i} style={s.lineRow}>
-                            <Text style={s.lineName} numberOfLines={1}>
-                              {line.name ?? `Material #${line.material_id}`}
-                            </Text>
-                            <View style={s.lineRight}>
-                              <Text style={s.lineAmt}>{line.amount_g.toFixed(3)}g</Text>
-                              <Text style={s.linePct}>{pct}%</Text>
-                            </View>
-                          </View>
+                          <EditableLine
+                            key={originalIndex}
+                            line={line}
+                            pct={pct}
+                            onUpdate={(g) => updateLineAmount(originalIndex, g)}
+                          />
                         );
                       })
                   )}
@@ -283,11 +341,21 @@ export default function FormulaVersionDetail() {
               </View>
             )}
 
-            {/* Read-only notice */}
-            <View style={s.readOnlyBanner}>
-              <Text style={s.readOnlyText}>This is a read-only snapshot. Edit the live formula to make changes.</Text>
-            </View>
+            <View style={{ height: 20 }} />
           </ScrollView>
+        )}
+
+        {!loading && version && (
+          <View style={s.bottomBar}>
+            <TouchableOpacity style={s.cancelBtn} onPress={() => router.back()}>
+              <Text style={s.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+              {saving
+                ? <ActivityIndicator color="#13131a" size="small" />
+                : <Text style={s.saveBtnText}>Save</Text>}
+            </TouchableOpacity>
+          </View>
         )}
       </SafeAreaView>
     </LinearGradient>
@@ -325,6 +393,10 @@ const s = StyleSheet.create({
   lineAmt: { fontSize: 14, color: "#13131a", fontWeight: "500" },
   linePct: { fontSize: 12, color: "rgba(19,19,26,0.45)", minWidth: 38, textAlign: "right" },
   empty: { color: "rgba(19,19,26,0.45)", fontSize: 14, textAlign: "center", paddingVertical: 12 },
-  readOnlyBanner: { backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 14, padding: 12, alignItems: "center", marginTop: 4 },
-  readOnlyText: { fontSize: 12, color: "rgba(19,19,26,0.5)", textAlign: "center", lineHeight: 18 },
+  lineInput: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, fontSize: 14, color: "#13131a", width: 72, textAlign: "right", backgroundColor: "rgba(255,255,255,0.7)" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)" },
+  cancelBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.18)", borderRadius: 24, paddingHorizontal: 24, paddingVertical: 12 },
+  cancelBtnText: { color: "#13131a", fontSize: 14, fontWeight: "600" },
+  saveBtn: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 32, paddingVertical: 13 },
+  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 });
