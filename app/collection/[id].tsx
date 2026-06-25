@@ -18,7 +18,7 @@ type Perfume = {
   id: number;
   name: string;
   brand?: string | null;
-  perfumer?: string | null;
+  nose?: string | null;
   gender?: string | null;
   season?: string[] | null;
   year?: number | null;
@@ -59,10 +59,15 @@ const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
 // ─── Edit Modal Styles (hoisted so F + TagInput can reference em) ─────────────
 
 const em = StyleSheet.create({
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
+  header: { alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
   headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
-  cancel: { color: "rgba(19,19,26,0.5)", fontSize: 16 },
-  saveBtn: { color: "#13131a", fontSize: 16, fontWeight: "700" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" },
+  cancelBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 100, paddingHorizontal: 24, paddingVertical: 13 },
+  cancelBtnText: { color: "#13131a", fontSize: 14 },
+  savePill: { backgroundColor: "#C6FF00", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 13 },
+  savePillText: { color: "#13131a", fontSize: 14, fontWeight: "700" },
+  photoUpload: { width: "100%", height: 320, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" as const },
+  uploadLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
   label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
   input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
@@ -165,7 +170,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
     if (!visible) return;
     setName(perfume.name ?? "");
     setBrand(perfume.brand ?? "");
-    setPerfumer(perfume.perfumer ?? "");
+    setPerfumer(perfume.nose ?? "");
     setGender(perfume.gender ?? "");
     setSizeText(perfume.size_ml != null ? String(perfume.size_ml) : "");
     setPriceText(perfume.price != null ? String(perfume.price) : "");
@@ -219,7 +224,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
     const { error } = await supabase.from("perfumes").update({
       name: name.trim() || perfume.name,
       brand: brand.trim() || null,
-      perfumer: perfumer.trim() || null,
+      nose: perfumer.trim() || null,
       gender: gender || null,
       size_ml: sizeText ? parseFloat(sizeText) : null,
       price: priceText ? parseFloat(priceText) : null,
@@ -252,11 +257,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       <LinearGradient colors={TEAL} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={em.header}>
-            <TouchableOpacity onPress={onClose}><Text style={em.cancel}>Cancel</Text></TouchableOpacity>
             <Text style={em.headerTitle}>Edit Entry</Text>
-            <TouchableOpacity onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.saveBtn}>Save</Text>}
-            </TouchableOpacity>
           </View>
 
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
@@ -264,7 +265,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             {/* Photo upload box */}
             <Text style={em.label}>Photo</Text>
             <TouchableOpacity onPress={pickPhoto} activeOpacity={0.8}
-              style={{ height: 180, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
+              style={{ height: 320, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
               {image ? (
                 <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
               ) : (
@@ -438,6 +439,15 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <F placeholder="Your thoughts…" value={notes} onChangeText={setNotes} multiline style={{ height: 120, textAlignVertical: "top" }} />
           </ScrollView>
           </KeyboardAvoidingView>
+
+          <View style={em.bottomBar}>
+            <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
+              <Text style={em.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[em.savePill, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.savePillText}>Save</Text>}
+            </TouchableOpacity>
+          </View>
         </SafeAreaView>
       </LinearGradient>
     </Modal>
@@ -556,7 +566,7 @@ export default function CollectionDetail() {
         {/* ONE big card — all info */}
         <View style={d.card}>
           <Row label="Brand" value={perfume.brand ?? "—"} />
-          <Row label="Perfumer" value={perfume.perfumer ?? "—"} />
+          <Row label="Perfumer" value={perfume.nose ?? "—"} />
           <Row label="Gender" value={perfume.gender ?? "—"} />
           <Row label="Season(s)" value={perfume.season?.length ? perfume.season.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ") : "—"} />
           <Row label="Concentration" value={perfume.concentration ?? "—"} />

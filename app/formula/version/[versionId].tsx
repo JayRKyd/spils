@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StyleSheet, Image,
+  ActivityIndicator, StyleSheet, Image, TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -33,6 +33,7 @@ interface VersionRow {
   formula_id: number;
   version_num: number;
   notes: string | null;
+  label: string | null;
   created_at: string;
   formulas?: { name: string; description: string | null } | null;
 }
@@ -74,6 +75,9 @@ export default function FormulaVersionDetail() {
   const [version, setVersion] = useState<VersionRow | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [moodItems, setMoodItems] = useState<MoodItem[]>([]);
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelVal, setLabelVal] = useState("");
+  const labelRef = useRef<TextInput>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -88,6 +92,7 @@ export default function FormulaVersionDetail() {
       if (error || !data) { setLoading(false); return; }
       const row = data as VersionRow;
       setVersion(row);
+      setLabelVal(row.label ?? `Version ${row.version_num}`);
 
       if (row.notes) {
         try { setSnapshot(JSON.parse(row.notes)); } catch { /* non-JSON notes */ }
@@ -142,9 +147,33 @@ export default function FormulaVersionDetail() {
             {/* Title block */}
             <View style={s.titleBlock}>
               <Text style={s.formulaName}>{version.formulas?.name ?? "Formula"}</Text>
-              <View style={s.versionBadge}>
-                <Text style={s.versionBadgeText}>Version {version.version_num}</Text>
-              </View>
+              <TouchableOpacity
+                style={s.versionBadge}
+                onPress={() => { setEditingLabel(true); setTimeout(() => labelRef.current?.focus(), 50); }}
+                activeOpacity={0.7}
+              >
+                {editingLabel ? (
+                  <TextInput
+                    ref={labelRef}
+                    style={s.versionBadgeInput}
+                    value={labelVal}
+                    onChangeText={setLabelVal}
+                    onBlur={async () => {
+                      setEditingLabel(false);
+                      const trimmed = labelVal.trim();
+                      const saved = trimmed || `Version ${version.version_num}`;
+                      setLabelVal(saved);
+                      await supabase.from("formula_versions").update({ label: trimmed || null }).eq("id", versionId);
+                    }}
+                    onSubmitEditing={() => labelRef.current?.blur()}
+                    returnKeyType="done"
+                    selectTextOnFocus
+                    autoCorrect={false}
+                  />
+                ) : (
+                  <Text style={s.versionBadgeText}>{labelVal}</Text>
+                )}
+              </TouchableOpacity>
               {version.formulas?.description ? (
                 <Text style={s.desc}>{version.formulas.description}</Text>
               ) : null}
@@ -264,6 +293,7 @@ const s = StyleSheet.create({
   formulaName: { fontSize: 26, fontWeight: "800", color: "#13131a", letterSpacing: -0.5, marginBottom: 6 },
   versionBadge: { alignSelf: "flex-start", backgroundColor: "rgba(0,0,0,0.12)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 8 },
   versionBadgeText: { fontSize: 13, fontWeight: "700", color: "#13131a" },
+  versionBadgeInput: { fontSize: 13, fontWeight: "700", color: "#13131a", minWidth: 80, padding: 0, margin: 0 },
   desc: { fontSize: 14, color: "rgba(19,19,26,0.6)", marginBottom: 4, lineHeight: 20 },
   savedOn: { fontSize: 12, color: "rgba(19,19,26,0.45)", marginTop: 4 },
   section: { backgroundColor: "rgba(255,255,255,0.45)", borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)" },

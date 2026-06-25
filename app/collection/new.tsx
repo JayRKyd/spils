@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, StyleSheet, Alert, Image,
@@ -83,6 +83,26 @@ function NoteInput({ placeholder, tags, inputVal, onChangeInput, onAdd, onRemove
   placeholder: string; tags: string[]; inputVal: string;
   onChangeInput: (v: string) => void; onAdd: (v: string) => void; onRemove: (i: number) => void;
 }) {
+  const { user } = useAuth();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!inputVal.trim() || !user?.id) { setSuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.from("materials")
+        .select("name")
+        .eq("user_id", user.id)
+        .ilike("name", `%${inputVal}%`)
+        .limit(8);
+      setSuggestions(
+        (data ?? []).map((m: any) => m.name as string).filter((n) => !tags.includes(n))
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [inputVal, user?.id, tags]);
+
+  const addSuggestion = (name: string) => { onAdd(name); onChangeInput(""); setSuggestions([]); };
+
   return (
     <View style={{ marginBottom: 10 }}>
       <TextInput
@@ -91,10 +111,20 @@ function NoteInput({ placeholder, tags, inputVal, onChangeInput, onAdd, onRemove
         placeholderTextColor="rgba(19,19,26,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
-        onSubmitEditing={() => { if (inputVal.trim()) onAdd(inputVal.trim()); }}
+        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); setSuggestions([]); } }}
         returnKeyType="done"
         blurOnSubmit={false}
       />
+      {suggestions.length > 0 && (
+        <View style={s.organDropdown}>
+          {suggestions.map((name) => (
+            <TouchableOpacity key={name} style={s.organDropdownRow} onPress={() => addSuggestion(name)}>
+              <Text style={s.organDropdownText}>{name}</Text>
+              <Text style={s.organDropdownHint}>Organ</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       {tags.length > 0 && (
         <View style={s.tagRow}>
           {tags.map((t, i) => (
@@ -225,8 +255,11 @@ export default function CollectionNew() {
         onPress: async () => {
           const perm = await ImagePicker.requestCameraPermissionsAsync();
           if (!perm.granted) return;
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7 });
-          if (!result.canceled && result.assets[0]) setInspirationImage(result.assets[0].uri);
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          if (!result.canceled && result.assets[0]) {
+            const asset = result.assets[0];
+            setInspirationImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+          }
         },
       },
       {
@@ -234,8 +267,11 @@ export default function CollectionNew() {
         onPress: async () => {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!perm.granted) return;
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7 });
-          if (!result.canceled && result.assets[0]) setInspirationImage(result.assets[0].uri);
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7, base64: true });
+          if (!result.canceled && result.assets[0]) {
+            const asset = result.assets[0];
+            setInspirationImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+          }
         },
       },
       { text: "Cancel", style: "cancel" },
@@ -317,6 +353,7 @@ export default function CollectionNew() {
       colors: colors.length ? colors : null,
       music: musicUrl.trim() || null,
       image_url: bottleBase64 ?? null,
+      inspiration_image_url: inspirationImage ?? null,
       notes: description.trim() || null,
       is_favorite: tags.includes("Favorites"),
     }]);
@@ -410,7 +447,7 @@ export default function CollectionNew() {
               {/* Fragrance Family */}
               <SH text="Fragrance Family" />
               <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-                <TouchableOpacity style={[s.chooser, { flex: 1 }]} onPress={() => setFamilyPickerVisible(true)}>
+                <TouchableOpacity style={[s.field, s.chooser, { flex: 1 }]} onPress={() => setFamilyPickerVisible(true)}>
                   <Text style={pendingFamily ? s.chooserFilled : s.chooserEmpty}>{pendingFamily || "Choose"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
@@ -764,6 +801,10 @@ const s = StyleSheet.create({
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
   tagText: { color: "#13131a", fontSize: 13 },
+  organDropdown: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: -6, marginBottom: 8, overflow: "hidden" },
+  organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
+  organDropdownText: { color: "#13131a", fontSize: 14 },
+  organDropdownHint: { color: "#0fb8aa", fontSize: 11, fontWeight: "600" },
 
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
   sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },

@@ -10,7 +10,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { Video, ResizeMode } from "expo-av";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { decode } from "base64-arraybuffer";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -541,9 +541,7 @@ export default function FormulaDetail() {
     const { error } = await supabase.from("formulas").update({ name, description }).eq("id", formulaId);
     setSaving(false);
     if (error) { Alert.alert("Save failed", error.message); return; }
-    setFormula((f) => f ? { ...f, name, description } : f);
-    setEditingName(false);
-    setEditingDesc(false);
+    router.replace("/(tabs)/formulas" as any);
   };
 
   const handleSaveVersion = async () => {
