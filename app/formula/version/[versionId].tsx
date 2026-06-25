@@ -95,7 +95,19 @@ export default function FormulaVersionDetail() {
       setLabelVal(row.label ?? `Version ${row.version_num}`);
 
       if (row.notes) {
-        try { setSnapshot(JSON.parse(row.notes)); } catch { /* non-JSON notes */ }
+        try {
+          const parsed: Snapshot = JSON.parse(row.notes);
+          // Backfill names for old snapshots that stored null
+          const missingIds = parsed.lines.filter((l) => !l.name).map((l) => l.material_id);
+          if (missingIds.length) {
+            const { data: mats } = await supabase
+              .from("materials").select("id,name").in("id", missingIds);
+            const nameMap: Record<number, string> = {};
+            (mats ?? []).forEach((m: any) => { nameMap[m.id] = m.name; });
+            parsed.lines = parsed.lines.map((l) => ({ ...l, name: l.name ?? nameMap[l.material_id] ?? null }));
+          }
+          setSnapshot(parsed);
+        } catch { /* non-JSON notes */ }
       }
 
       // Load mood board items for this formula
