@@ -267,7 +267,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <TouchableOpacity onPress={pickPhoto} activeOpacity={0.8}
               style={{ height: 320, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
               {image ? (
-                <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
               ) : (
                 <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Upload Photo</Text>
               )}
