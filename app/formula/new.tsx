@@ -161,6 +161,58 @@ function LocalAddMoodModal({ visible, onClose, onAdd }: {
   );
 }
 
+function PendingLineRow({ line, onDelete, onUpdateAmount }: {
+  line: PendingLine;
+  onDelete: () => void;
+  onUpdateAmount: (amount: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(line.amount);
+
+  const commit = () => {
+    const n = parseFloat(val);
+    const final = Number.isFinite(n) && n >= 0 ? n.toFixed(3) : line.amount;
+    setVal(final);
+    onUpdateAmount(final);
+    setEditing(false);
+  };
+
+  return (
+    <View style={s.tableRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.tableRowName} numberOfLines={1}>{line.name}</Text>
+        {!line.material && (
+          <Text style={{ color: "#c27a00", fontSize: 10 }}>New → Organ</Text>
+        )}
+      </View>
+      <Text style={[s.tableRowType, { width: 52 }]}>
+        {line.material?.type ? SYMBOL_ICONS[line.material.type] ?? "—" : "—"}
+      </Text>
+      <View style={{ width: 68, alignItems: "flex-end" }}>
+        {editing ? (
+          <TextInput
+            style={s.lineAmountInput}
+            value={val}
+            onChangeText={setVal}
+            keyboardType="decimal-pad"
+            onBlur={commit}
+            onSubmitEditing={commit}
+            autoFocus
+            selectTextOnFocus
+          />
+        ) : (
+          <TouchableOpacity onPress={() => { setVal(line.amount); setEditing(true); }}>
+            <Text style={s.tableRowAmount}>{parseFloat(line.amount).toFixed(3)}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <TouchableOpacity style={{ width: 30, alignItems: "center" }} onPress={onDelete}>
+        <Text style={{ color: "#e05555", fontSize: 18, lineHeight: 22 }}>×</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function NewFormula() {
   const { user } = useAuth();
 
@@ -489,23 +541,12 @@ export default function NewFormula() {
                 </View>
               ) : (
                 lines.map((line) => (
-                  <View key={line.tempId} style={s.tableRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.tableRowName} numberOfLines={1}>{line.name}</Text>
-                      {!line.material && (
-                        <Text style={{ color: "#c27a00", fontSize: 10 }}>New → Organ</Text>
-                      )}
-                    </View>
-                    <Text style={[s.tableRowType, { width: 52 }]}>
-                      {line.material?.type ? SYMBOL_ICONS[line.material.type] ?? "—" : "—"}
-                    </Text>
-                    <Text style={[s.tableRowAmount, { width: 68 }]}>
-                      {parseFloat(line.amount).toFixed(3)}
-                    </Text>
-                    <TouchableOpacity style={{ width: 30, alignItems: "center" }} onPress={() => setLines((p) => p.filter((l) => l.tempId !== line.tempId))}>
-                      <Text style={{ color: "#e05555", fontSize: 18, lineHeight: 22 }}>×</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <PendingLineRow
+                    key={line.tempId}
+                    line={line}
+                    onDelete={() => setLines((p) => p.filter((l) => l.tempId !== line.tempId))}
+                    onUpdateAmount={(amt) => setLines((p) => p.map((l) => l.tempId === line.tempId ? { ...l, amount: amt } : l))}
+                  />
                 ))
               )}
               <View style={s.tableTotalRow}>
@@ -664,6 +705,7 @@ const s = StyleSheet.create({
   tableRowName: { color: "#13131a", fontSize: 14, flex: 1 },
   tableRowType: { color: "rgba(0,0,0,0.4)", fontSize: 13 },
   tableRowAmount: { color: "#13131a", fontSize: 14, textAlign: "right" },
+  lineAmountInput: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, fontSize: 14, color: "#13131a", width: 72, textAlign: "right", backgroundColor: "rgba(255,255,255,0.7)" },
   tableTotalRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)", marginTop: 2 },
   tableTotalLabel: { color: "#13131a", fontWeight: "700", fontSize: 14 },
   tableTotalVal: { color: "#13131a", fontWeight: "700", fontSize: 14 },
