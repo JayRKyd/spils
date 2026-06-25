@@ -183,10 +183,13 @@ export default function FormulaVersionDetail() {
   };
 
   const handleSave = async () => {
-    if (!version || !snapshot) return;
+    if (!version) return;
     setSaving(true);
     await supabase.from("formula_versions")
-      .update({ notes: JSON.stringify(snapshot) })
+      .update({
+        label: labelVal.trim() || null,
+        ...(snapshot ? { notes: JSON.stringify(snapshot) } : {}),
+      })
       .eq("id", versionId);
     setSaving(false);
     router.back();
@@ -230,12 +233,9 @@ export default function FormulaVersionDetail() {
                     style={s.versionBadgeInput}
                     value={labelVal}
                     onChangeText={setLabelVal}
-                    onBlur={async () => {
+                    onBlur={() => {
                       setEditingLabel(false);
-                      const trimmed = labelVal.trim();
-                      const saved = trimmed || `Version ${version.version_num}`;
-                      setLabelVal(saved);
-                      await supabase.from("formula_versions").update({ label: trimmed || null }).eq("id", versionId);
+                      if (!labelVal.trim()) setLabelVal(`Version ${version.version_num}`);
                     }}
                     onSubmitEditing={() => labelRef.current?.blur()}
                     returnKeyType="done"
