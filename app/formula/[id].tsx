@@ -988,8 +988,8 @@ export default function FormulaDetail() {
             <TouchableOpacity style={s.sheetBtn} onPress={handleSaveVersion}>
               <Text style={s.sheetBtnText}>Save Version</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.sheetBtn} onPress={handleDuplicate}>
-              <Text style={s.sheetBtnText}>Duplicate Formula</Text>
+            <TouchableOpacity style={s.sheetBtn} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print feature coming soon."); }}>
+              <Text style={s.sheetBtnText}>Print</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.sheetBtn, s.sheetBtnDanger]} onPress={() => { setMoreVisible(false); handleDeleteFormula(); }}>
               <Text style={[s.sheetBtnText, { color: "#e53535" }]}>Delete Formula</Text>
