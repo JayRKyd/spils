@@ -1279,7 +1279,7 @@ const ls = StyleSheet.create({
   betaText: { color: "rgba(255,255,255,0.75)", fontSize: 10, fontWeight: "700", letterSpacing: 1 },
 
   menuItem: { paddingVertical: 5, paddingHorizontal: 14, borderRadius: 50, borderWidth: 1.5, borderColor: "transparent", marginBottom: 0, alignSelf: "flex-start" },
-  menuItemActive: { borderColor: "rgba(255,255,255,0.95)" },
+  menuItemActive: { borderColor: "#edff8d" },
   menuText: { color: "#fff", fontSize: 34, fontWeight: "800", letterSpacing: -0.5 },
   menuTextDim: { opacity: 0.38 },
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Image, useWindowDimensions } from "react-native";
 import { SpilsLogo } from "../../components/SpilsLogo";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
 export default function Home() {
   const { user } = useAuth();
   const { width, height } = useWindowDimensions();
+  const [selected, setSelected] = useState("/(tabs)/journal");
 
   return (
     <View style={s.container}>
@@ -37,8 +39,13 @@ export default function Home() {
         {/* Nav list */}
         <View style={s.navList}>
           {NAV_ITEMS.map(({ label, path }) => (
-            <TouchableOpacity key={path} onPress={() => router.push(path as any)} activeOpacity={0.7}>
-                      <Text style={s.navItem}>{label}</Text>
+            <TouchableOpacity
+              key={path}
+              onPress={() => { setSelected(path); router.push(path as any); }}
+              activeOpacity={0.7}
+              style={selected === path ? s.pill : undefined}
+            >
+              <Text style={s.navItem}>{label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -65,12 +72,13 @@ const s = StyleSheet.create({
 
   navList: { flex: 1, justifyContent: "center", paddingHorizontal: 28, gap: 4 },
 
-  activePill: {
+  pill: {
     alignSelf: "flex-start",
-    borderWidth: 1.5, borderColor: "#fff",
-    borderRadius: 50, paddingHorizontal: 28, paddingVertical: 8, marginBottom: 4,
+    borderWidth: 1.5,
+    borderColor: "#edff8d",
+    borderRadius: 50,
+    paddingHorizontal: 24,
+    paddingVertical: 4,
   },
-  activePillText: { color: "#fff", fontSize: 44, fontWeight: "700" },
-
   navItem: { color: "#fff", fontSize: 44, fontWeight: "700", paddingVertical: 2 },
 });
