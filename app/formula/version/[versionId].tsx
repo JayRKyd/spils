@@ -7,6 +7,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
 import { Video, ResizeMode } from "expo-av";
+import { BlurView } from "expo-blur";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import { decode } from "base64-arraybuffer";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
@@ -83,6 +88,134 @@ async function resolveSignedUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+// ─── Mood Modal ──────────────────────────────────────────────────────────────
+
+const MOOD_TABS = [
+  { key: "image", label: "Image/Video" },
+  { key: "audio", label: "Audio" },
+  { key: "note",  label: "Note" },
+] as const;
+type MoodTab = typeof MOOD_TABS[number]["key"];
+
+function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
+  visible: boolean; formulaId: number; onClose: () => void; onAdded: () => void;
+}) {
+  const [tab, setTab] = useState<MoodTab>("image");
+  const [noteText, setNoteText] = useState("");
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState("image/jpeg");
+  const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [audioName, setAudioName] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible) { setTab("image"); setNoteText(""); setImageUri(null); setImageMimeType("image/jpeg"); setAudioUri(null); setAudioName(null); }
+  }, [visible]);
+
+  const pickImage = async (source: "camera" | "library") => {
+    const opts = { mediaTypes: ["images", "videos"] as any, allowsEditing: false, quality: 0.75 };
+    const result = source === "camera"
+      ? await ImagePicker.launchCameraAsync(opts)
+      : await ImagePicker.launchImageLibraryAsync(opts);
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+      setImageMimeType(asset.mimeType ?? (asset.type === "video" ? "video/mp4" : "image/jpeg"));
+    }
+  };
+
+  const handleSave = async () => {
+    if (tab === "note" && !noteText.trim()) return;
+    if (tab === "image" && !imageUri) return;
+    if (tab === "audio" && !audioUri) return;
+    setSaving(true);
+    try {
+      if (tab === "note") {
+        await supabase.from("formula_moodboard_assets").insert({ formula_id: formulaId, file_url: "EMPTY", media_type: "note", caption: noteText.trim() });
+      } else if (tab === "image") {
+        const isVideo = imageMimeType.startsWith("video/");
+        const ext = imageMimeType.split("/")[1] || (isVideo ? "mp4" : "jpg");
+        const fileName = `formula_${formulaId}/${Date.now()}-${isVideo ? "video" : "photo"}.${ext}`;
+        const base64 = await FileSystem.readAsStringAsync(imageUri!, { encoding: "base64" });
+        const { error: upErr } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, decode(base64), { contentType: imageMimeType });
+        if (upErr) throw upErr;
+        await supabase.from("formula_moodboard_assets").insert({ formula_id: formulaId, file_url: fileName, media_type: isVideo ? "video" : "image", caption: null });
+      } else if (tab === "audio") {
+        const ext = audioName?.split(".").pop() ?? "mp3";
+        const fileName = `formula_${formulaId}/${Date.now()}-audio.${ext}`;
+        const base64 = await FileSystem.readAsStringAsync(audioUri!, { encoding: "base64" });
+        const { error: upErr } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, decode(base64), { contentType: `audio/${ext}` });
+        if (upErr) throw upErr;
+        await supabase.from("formula_moodboard_assets").insert({ formula_id: formulaId, file_url: fileName, media_type: "audio", caption: audioName ?? null });
+      }
+      onAdded();
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Failed to add item");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const canSave = tab === "note" ? noteText.trim().length > 0 : tab === "image" ? !!imageUri : !!audioUri;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <LinearGradient colors={["#FFD4E6", "#F5AEC8", "#EC8FB5"]} style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={mb.header}>
+            <Text style={mb.title}>ADD TO MOOD BOARD</Text>
+            <TouchableOpacity onPress={onClose} style={mb.closeBtn}>
+              <Text style={mb.closeIcon}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={mb.tabRow}>
+            {MOOD_TABS.map(({ key, label }) => (
+              <TouchableOpacity key={key} style={[mb.tab, tab === key && mb.tabActive]} onPress={() => setTab(key)}>
+                <Text style={[mb.tabText, tab === key && mb.tabTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
+            {tab === "image" && (
+              <TouchableOpacity style={mb.photoUpload} onPress={() => Alert.alert("Upload", "Choose source", [
+                { text: "Take Photo", onPress: () => pickImage("camera") },
+                { text: "Choose from Library", onPress: () => pickImage("library") },
+                { text: "Cancel", style: "cancel" },
+              ])} activeOpacity={0.85}>
+                {imageUri
+                  ? <Image source={{ uri: imageUri }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />
+                  : <View style={{ alignItems: "center" }}><Text style={mb.photoIcon}>↑</Text><Text style={mb.photoLabel}>Tap to capture or upload</Text></View>}
+              </TouchableOpacity>
+            )}
+            {tab === "audio" && (
+              <TouchableOpacity style={mb.photoUpload} onPress={async () => {
+                const result = await DocumentPicker.getDocumentAsync({ type: ["audio/*"], copyToCacheDirectory: true });
+                if (!result.canceled && result.assets[0]) { setAudioUri(result.assets[0].uri); setAudioName(result.assets[0].name); }
+              }} activeOpacity={0.85}>
+                {audioUri
+                  ? <View style={{ alignItems: "center" }}><Text style={mb.photoIcon}>♪</Text><Text style={[mb.photoLabel, { fontWeight: "600", color: "#13131a" }]} numberOfLines={1}>{audioName}</Text></View>
+                  : <View style={{ alignItems: "center" }}><Text style={mb.photoIcon}>↑</Text><Text style={mb.photoLabel}>Tap to upload audio</Text></View>}
+              </TouchableOpacity>
+            )}
+            {tab === "note" && (
+              <TextInput style={mb.noteInput} placeholder="Thoughts, inspiration..." placeholderTextColor="rgba(0,0,0,0.35)" value={noteText} onChangeText={setNoteText} multiline autoFocus textAlignVertical="top" />
+            )}
+            {saving && <ActivityIndicator color="#13131a" style={{ marginTop: 16 }} />}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+          <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "transparent" }}>
+            <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+              <TouchableOpacity style={[mb.saveBtn, !canSave && { opacity: 0.4 }]} onPress={handleSave} disabled={!canSave || saving}>
+                <Text style={mb.saveBtnText}>Add to Mood Board</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </SafeAreaView>
+      </LinearGradient>
+    </Modal>
+  );
+}
+
 // ─── Editable Line Row ────────────────────────────────────────────────────────
 
 function EditableLine({ line, pct, onUpdate, onDelete }: {
@@ -145,6 +278,7 @@ export default function FormulaVersionDetail() {
   const [saving, setSaving] = useState(false);
   const [diluentPickerVisible, setDiluentPickerVisible] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
+  const [addMoodVisible, setAddMoodVisible] = useState(false);
 
   // Add ingredient inline
   const [matSearch, setMatSearch] = useState("");
@@ -239,6 +373,21 @@ export default function FormulaVersionDetail() {
     setMatSearch(""); setMatSelected(null); setMatAmount("0.000"); setMatResults([]);
   };
 
+  const handleDeleteMoodItem = (itemId: string) => {
+    Alert.alert("Remove Item", "Remove this mood board item?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: async () => {
+        const item = moodItems.find((i) => i.id === itemId);
+        if (item && item.media_type !== "note") {
+          const path = extractStoragePath(item.file_url);
+          if (path) await supabase.storage.from(MOOD_BUCKET).remove([path]);
+        }
+        await supabase.from("formula_moodboard_assets").delete().eq("id", itemId);
+        setMoodItems((prev) => prev.filter((i) => i.id !== itemId));
+      }},
+    ]);
+  };
+
   const handleDelete = () => {
     setMoreVisible(false);
     Alert.alert("Delete Version", "Delete this version? This cannot be undone.", [
@@ -320,29 +469,43 @@ export default function FormulaVersionDetail() {
             </View>
 
             {/* Mood Board */}
-            {moodItems.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>MOOD BOARD</Text>
-                {noteItems.map((item) => (
-                  <View key={item.id} style={s.noteCard}>
-                    <Text style={s.noteText}>{item.caption}</Text>
-                  </View>
-                ))}
-                {mediaItems.length > 0 && (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: noteItems.length > 0 ? 10 : 0 }}>
-                    {mediaItems.map((item) => (
-                      <View key={item.id} style={s.imageCard}>
-                        {item.media_type === "video" ? (
-                          <Video source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode={ResizeMode.COVER} useNativeControls isLooping={false} />
-                        ) : (
-                          <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                )}
+            <View style={s.section}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <Text style={[s.sectionTitle, { marginBottom: 0 }]}>MOOD BOARD</Text>
+                <TouchableOpacity style={s.addItemBtn} onPress={() => setAddMoodVisible(true)}>
+                  <Text style={s.addItemBtnText}>+ Add Item</Text>
+                </TouchableOpacity>
               </View>
-            )}
+              {moodItems.length === 0 && (
+                <Text style={s.empty}>No mood board items yet.</Text>
+              )}
+              {noteItems.map((item) => (
+                <View key={item.id} style={s.noteCard}>
+                  <Text style={s.noteText}>{item.caption}</Text>
+                  <TouchableOpacity style={s.noteDeleteBtn} onPress={() => handleDeleteMoodItem(item.id)}>
+                    <Text style={{ color: "#f87171", fontSize: 16 }}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {mediaItems.length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: noteItems.length > 0 ? 10 : 0 }}>
+                  {mediaItems.map((item) => (
+                    <View key={item.id} style={s.imageCard}>
+                      {item.media_type === "video" ? (
+                        <Video source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode={ResizeMode.COVER} useNativeControls isLooping={false} />
+                      ) : (
+                        <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                      )}
+                      <TouchableOpacity style={s.imageDeleteBtn} onPress={() => handleDeleteMoodItem(item.id)}>
+                        <BlurView intensity={40} tint="dark" style={s.imageDeleteBlur}>
+                          <Text style={{ color: "#f87171", fontSize: 14, fontWeight: "700" }}>×</Text>
+                        </BlurView>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
 
             {/* Parameters */}
             {snapshot && (
@@ -482,6 +645,28 @@ export default function FormulaVersionDetail() {
           </View>
         </Modal>
 
+        <AddMoodItemModal
+          visible={addMoodVisible}
+          formulaId={version?.formula_id ?? 0}
+          onClose={() => setAddMoodVisible(false)}
+          onAdded={async () => {
+            setAddMoodVisible(false);
+            // Refetch mood items
+            const { data: moodData } = await supabase
+              .from("formula_moodboard_assets").select("*")
+              .eq("formula_id", version!.formula_id).order("created_at", { ascending: false });
+            const raw = (moodData ?? []) as MoodItem[];
+            const resolved: MoodItem[] = [];
+            for (const item of raw) {
+              if (item.media_type === "note") { resolved.push({ ...item, display_url: null }); continue; }
+              const path = extractStoragePath(item.file_url);
+              if (!path) { resolved.push({ ...item, display_url: item.file_url || null }); continue; }
+              resolved.push({ ...item, display_url: await resolveSignedUrl(path) });
+            }
+            setMoodItems(resolved);
+          }}
+        />
+
         {/* Diluent picker */}
         <Modal visible={diluentPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDiluentPickerVisible(false)}>
           <SafeAreaView style={s.pickerModal}>
@@ -526,9 +711,14 @@ const s = StyleSheet.create({
   savedOn: { fontSize: 12, color: "rgba(19,19,26,0.45)", marginTop: 4 },
   section: { backgroundColor: "rgba(255,255,255,0.45)", borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)" },
   sectionTitle: { fontSize: 11, fontWeight: "700", color: "rgba(19,19,26,0.5)", letterSpacing: 1, marginBottom: 12 },
-  noteCard: { backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 14, padding: 12, marginBottom: 8 },
+  addItemBtn: { backgroundColor: "#13131a", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  addItemBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  noteCard: { backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 14, padding: 12, marginBottom: 8, paddingRight: 32, position: "relative" },
   noteText: { fontSize: 14, color: "#13131a", lineHeight: 20 },
-  imageCard: { width: "47%", aspectRatio: 1, borderRadius: 14, overflow: "hidden", backgroundColor: "rgba(0,0,0,0.08)" },
+  noteDeleteBtn: { position: "absolute", top: 10, right: 10 },
+  imageCard: { width: "47%", aspectRatio: 1, borderRadius: 14, overflow: "hidden", backgroundColor: "rgba(0,0,0,0.08)", position: "relative" },
+  imageDeleteBtn: { position: "absolute", top: 6, right: 6 },
+  imageDeleteBlur: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", overflow: "hidden" },
 
   // Parameters
   paramRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
@@ -575,4 +765,22 @@ const s = StyleSheet.create({
   pickerDone: { fontSize: 16, fontWeight: "600", color: "#a78bfa" },
   pickerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
   pickerRowText: { fontSize: 16, color: "#13131a" },
+});
+
+const mb = StyleSheet.create({
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  title: { fontSize: 18, fontWeight: "800", color: "#13131a" },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  closeIcon: { color: "#13131a", fontSize: 14, fontWeight: "600" },
+  tabRow: { flexDirection: "row", paddingHorizontal: 20, gap: 10, marginBottom: 20 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(255,255,255,0.3)" },
+  tabActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
+  tabText: { fontSize: 13, fontWeight: "600", color: "rgba(0,0,0,0.6)" },
+  tabTextActive: { color: "#fff" },
+  photoUpload: { width: "100%", height: 320, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 12, overflow: "hidden" },
+  photoIcon: { fontSize: 32, color: "rgba(19,19,26,0.35)", marginBottom: 10 },
+  photoLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
+  noteInput: { backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, color: "#13131a", minHeight: 180 },
+  saveBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingVertical: 14, alignItems: "center" },
+  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });
