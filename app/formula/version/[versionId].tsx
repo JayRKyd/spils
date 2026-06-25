@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StyleSheet, Image, TextInput, Modal,
+  ActivityIndicator, StyleSheet, Image, TextInput, Modal, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -144,6 +144,7 @@ export default function FormulaVersionDetail() {
   const [labelVal, setLabelVal] = useState("");
   const [saving, setSaving] = useState(false);
   const [diluentPickerVisible, setDiluentPickerVisible] = useState(false);
+  const [moreVisible, setMoreVisible] = useState(false);
 
   // Add ingredient inline
   const [matSearch, setMatSearch] = useState("");
@@ -236,6 +237,19 @@ export default function FormulaVersionDetail() {
     };
     setSnapshot((prev) => prev ? { ...prev, lines: [...prev.lines, newLine] } : prev);
     setMatSearch(""); setMatSelected(null); setMatAmount("0.000"); setMatResults([]);
+  };
+
+  const handleDelete = () => {
+    setMoreVisible(false);
+    Alert.alert("Delete Version", "Delete this version? This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
+          await supabase.from("formula_versions").delete().eq("id", versionId);
+          router.back();
+        },
+      },
+    ]);
   };
 
   const handleSave = async () => {
@@ -441,8 +455,8 @@ export default function FormulaVersionDetail() {
 
         {!loading && version && (
           <View style={s.bottomBar}>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => router.back()}>
-              <Text style={s.cancelBtnText}>Cancel</Text>
+            <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
+              <Text style={s.moreBtnText}>More</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
               {saving
@@ -451,6 +465,22 @@ export default function FormulaVersionDetail() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* More sheet */}
+        <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={() => setMoreVisible(false)}>
+          <View style={s.moreBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill as any} onPress={() => setMoreVisible(false)} />
+            <View style={s.moreSheet}>
+              <View style={s.moreHandle} />
+              <TouchableOpacity style={s.sheetBtn} onPress={() => { setMoreVisible(false); router.back(); }}>
+                <Text style={s.sheetBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.sheetBtn, s.sheetBtnDanger]} onPress={handleDelete}>
+                <Text style={[s.sheetBtnText, { color: "#e53535" }]}>Delete Version</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         {/* Diluent picker */}
         <Modal visible={diluentPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDiluentPickerVisible(false)}>
@@ -527,10 +557,16 @@ const s = StyleSheet.create({
 
   // Bottom bar
   bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.08)" },
-  cancelBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.18)", borderRadius: 24, paddingHorizontal: 24, paddingVertical: 12 },
-  cancelBtnText: { color: "#13131a", fontSize: 14, fontWeight: "600" },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.18)", borderRadius: 24, paddingHorizontal: 24, paddingVertical: 12 },
+  moreBtnText: { color: "#13131a", fontSize: 14, fontWeight: "600" },
   saveBtn: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 32, paddingVertical: 13 },
   saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
+  moreBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
+  moreSheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 44, gap: 10 },
+  moreHandle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center" as const, marginBottom: 12 },
+  sheetBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 100, paddingVertical: 16, alignItems: "center" as const },
+  sheetBtnDanger: { borderColor: "rgba(220,50,50,0.2)" },
+  sheetBtnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
 
   // Diluent picker modal
   pickerModal: { flex: 1, backgroundColor: "#fff" },
