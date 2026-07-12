@@ -257,15 +257,15 @@ function ThreadDetailModal({ thread, visible, onClose }: { thread: ForumThread |
   );
 }
 
-function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?: string; title?: string }) {
+function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPostsOnly }: {
+  categoryFilter?: string; title?: string; myPostsOnly: boolean; setMyPostsOnly: (v: boolean) => void;
+}) {
   const { user } = useAuth();
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [loading, setLoading] = useState(true);
-  const [myPostsOnly, setMyPostsOnly] = useState(false);
   const [newThreadVisible, setNewThreadVisible] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTopic, setNewTopic] = useState("");
-  const [newDate, setNewDate] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -354,7 +354,6 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
     setEditingId(thread.id);
     setNewName(thread.name);
     setNewTopic(thread.category ?? "");
-    setNewDate("");
     setNewDesc(thread.description ?? "");
     setNewPhoto(null);
     setNewThreadVisible(true);
@@ -373,7 +372,7 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
   const closeModal = () => {
     setNewThreadVisible(false);
     setEditingId(null);
-    setNewName(""); setNewTopic(""); setNewDate(""); setNewDesc(""); setNewPhoto(null);
+    setNewName(""); setNewTopic(""); setNewDesc(""); setNewPhoto(null);
   };
 
   const handleCreate = async () => {
@@ -416,10 +415,6 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
           ListHeaderComponent={
             myPostsOnly ? (
               <View style={{ marginTop: 8, marginBottom: 14 }}>
-                <TouchableOpacity onPress={() => setMyPostsOnly(false)} activeOpacity={0.7} style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 10 }}>
-                  <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 16 }}>←</Text>
-                  <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>Back</Text>
-                </TouchableOpacity>
                 <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>My Posts</Text>
               </View>
             ) : (
@@ -579,7 +574,6 @@ function ForumTab({ categoryFilter, title = "General Chat" }: { categoryFilter?:
             <View style={{ marginTop: 24, gap: 12 }}>
               <TextInput style={np.field} placeholder="Title Entry" placeholderTextColor="rgba(255,255,255,0.35)" value={newName} onChangeText={setNewName} />
               <TextInput style={np.field} placeholder="Topic Entry" placeholderTextColor="rgba(255,255,255,0.35)" value={newTopic} onChangeText={setNewTopic} />
-              <TextInput style={np.field} placeholder="Date Entry" placeholderTextColor="rgba(255,255,255,0.35)" value={newDate} onChangeText={setNewDate} />
               <TextInput style={np.field} placeholder="Copy Entry" placeholderTextColor="rgba(255,255,255,0.35)" value={newDesc} onChangeText={setNewDesc} multiline />
 
               <TouchableOpacity style={np.photoBox} onPress={pickPhoto} activeOpacity={0.8}>
@@ -1186,6 +1180,7 @@ export default function Community() {
   const [section, setSection] = useState<SectionKey | null>(null);
   const [highlighted, setHighlighted] = useState<SectionKey>("news");
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
+  const [myPostsOnly, setMyPostsOnly] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -1201,19 +1196,20 @@ export default function Community() {
       return;
     }
     setHighlighted(key);
+    setMyPostsOnly(false);
     setTimeout(() => setSection(key), 150);
   };
 
   // ── Sub-section view ──────────────────────────────────────────────────────
   if (section !== null) {
     return (
-      <CommunityWrapper onBack={() => setSection(null)}>
+      <CommunityWrapper onBack={() => myPostsOnly ? setMyPostsOnly(false) : setSection(null)}>
         <View style={{ flex: 1 }}>
           {section === "news"        && <NewsTab />}
-          {section === "chat"        && <ForumTab title="General Chat" />}
+          {section === "chat"        && <ForumTab title="General Chat" myPostsOnly={myPostsOnly} setMyPostsOnly={setMyPostsOnly} />}
           {section === "support"     && <SupportTab />}
           {section === "marketplace" && <MarketplaceTab />}
-          {section === "formulas"    && <ForumTab categoryFilter="Formula" title="Formula Forum" />}
+          {section === "formulas"    && <ForumTab categoryFilter="Formula" title="Formula Forum" myPostsOnly={myPostsOnly} setMyPostsOnly={setMyPostsOnly} />}
           {section === "directory"   && <DirectoryTab />}
           {section === "glossary"    && <GlossaryTab />}
         </View>

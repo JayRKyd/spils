@@ -26,9 +26,13 @@ interface Stats {
   journal: number;
 }
 
-function StatCard({ label, value, onPress }: { label: string; value: number; onPress?: () => void }) {
+function StatCard({ label, value, onPress, disabled }: { label: string; value: number; onPress?: () => void; disabled?: boolean }) {
   return (
-    <TouchableOpacity style={s.statCard} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
+    <TouchableOpacity
+      style={[s.statCard, disabled && s.disabled]}
+      onPress={disabled ? () => Alert.alert("Coming Soon", "Marketplace isn't available yet.") : onPress}
+      activeOpacity={onPress ? 0.7 : 1}
+    >
       <Text style={s.statValue}>{value}</Text>
       <Text style={s.statLabel}>{label}</Text>
     </TouchableOpacity>
@@ -88,7 +92,7 @@ export default function ProfileScreen() {
     if (!user) return;
     setLoading(true);
     const [{ data: p }, listings, messages, watchlist, perfumes, formulas, journal] = await Promise.all([
-      (supabase as any).from("profiles").select("username,avatar_url,bio,created_at").eq("id", user.id).single(),
+      (supabase as any).from("profiles").select("username,avatar_url,bio,created_at").eq("id", user.id).maybeSingle(),
       (supabase as any).from("marketplace_listings").select("*", { count: "exact", head: true }).eq("user_id", user.id),
       (supabase as any).from("marketplace_messages").select("*", { count: "exact", head: true }).eq("receiver_id", user.id).is("read_at", null),
       (supabase as any).from("marketplace_watchlist").select("*", { count: "exact", head: true }).eq("user_id", user.id),
@@ -96,7 +100,7 @@ export default function ProfileScreen() {
       supabase.from("formulas").select("*", { count: "exact", head: true }),
       (supabase as any).from("journal_entries").select("*", { count: "exact", head: true }),
     ]);
-    setProfile(p);
+    setProfile(p ?? { username: null, avatar_url: null, bio: null, created_at: new Date().toISOString() });
     setStats({
       listings: listings.count ?? 0,
       messages: messages.count ?? 0,
@@ -118,7 +122,12 @@ export default function ProfileScreen() {
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: signOut },
+      {
+        text: "Sign Out", style: "destructive", onPress: async () => {
+          await signOut();
+          router.replace("/(auth)/login" as any);
+        },
+      },
     ]);
   };
 
@@ -173,7 +182,6 @@ export default function ProfileScreen() {
           { label: "My Listings", path: "/profile/listings", icon: "📦" },
           { label: "Messages", path: "/profile/messages", icon: "💬" },
           { label: "Watchlist", path: "/profile/watchlist", icon: "❤️" },
-          { label: "Marketplace", path: "/marketplace", icon: "🛒" },
         ].map(({ label, path, icon }) => (
           <TouchableOpacity key={path} style={s.navRow} onPress={() => router.push(path as any)}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -183,6 +191,17 @@ export default function ProfileScreen() {
             <Text style={s.navChevron}>›</Text>
           </TouchableOpacity>
         ))}
+
+        <TouchableOpacity
+          style={[s.navRow, s.disabled]}
+          onPress={() => Alert.alert("Coming Soon", "Marketplace isn't available yet.")}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Text style={{ fontSize: 18 }}>🛒</Text>
+            <Text style={s.navLabel}>Marketplace</Text>
+          </View>
+          <Text style={s.navChevron}>›</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {profile && (
@@ -211,6 +230,7 @@ const s = StyleSheet.create({
   navRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8 },
   navLabel: { color: "#fff", fontWeight: "500", fontSize: 15 },
   navChevron: { color: "rgba(255,255,255,0.4)", fontSize: 20 },
+  disabled: { opacity: 0.4 },
   modal: { flex: 1, backgroundColor: "#0e0528" },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
   modalTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },

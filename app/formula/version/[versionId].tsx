@@ -494,7 +494,7 @@ export default function FormulaVersionDetail() {
                       {item.media_type === "video" ? (
                         <Video source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode={ResizeMode.COVER} useNativeControls isLooping={false} />
                       ) : (
-                        <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                        <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
                       )}
                       <TouchableOpacity style={s.imageDeleteBtn} onPress={() => handleDeleteMoodItem(item.id)}>
                         <BlurView intensity={40} tint="dark" style={s.imageDeleteBlur}>

@@ -16,6 +16,15 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+async function ensureProfile(userId: string, email: string | undefined) {
+  const { data } = await (supabase as any).from("profiles").select("id,username").eq("id", userId).maybeSingle();
+  if (!data) {
+    await (supabase as any).from("profiles").insert({ id: userId, username: email?.split("@")[0] ?? null });
+  } else if (!data.username && email) {
+    await (supabase as any).from("profiles").update({ username: email.split("@")[0] }).eq("id", userId);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,11 +33,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setIsLoading(false);
+      if (session?.user) ensureProfile(session.user.id, session.user.email);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         setSession(session);
+        if (session?.user) ensureProfile(session.user.id, session.user.email);
       }
     );
 

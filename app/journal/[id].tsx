@@ -367,7 +367,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
               {bottleImage && <Image source={{ uri: bottleImage }} style={[StyleSheet.absoluteFill as any, { borderRadius: 18 }]} resizeMode="contain" />}
               {!bottleImage && (
                 <>
-                  <Text style={em.uploadIcon}>📷</Text>
+                  <Text style={em.uploadIcon}>↑</Text>
                   <Text style={em.uploadLabel}>Tap to capture or upload</Text>
                 </>
               )}
@@ -478,7 +478,12 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             <Text style={em.label}>Inspiration</Text>
             <TouchableOpacity style={em.photoUpload} onPress={pickInspirationPhotoEdit} activeOpacity={0.85}>
               {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill as any, { borderRadius: 18 }]} resizeMode="contain" />}
-              {!inspirationImage && <Text style={em.uploadLabel}>Upload Inspiration Photo</Text>}
+              {!inspirationImage && (
+                <View style={{ alignItems: "center" }}>
+                  <Text style={em.uploadIcon}>↑</Text>
+                  <Text style={em.uploadLabel}>Upload Inspiration Photo</Text>
+                </View>
+              )}
               {inspirationImage && (
                 <View style={em.aiStatusBar}><Text style={em.aiStatusText}>Tap to change</Text></View>
               )}
@@ -763,7 +768,7 @@ export default function JournalDetail() {
           visible={editVisible}
           entry={entry}
           onClose={() => setEditVisible(false)}
-          onSaved={() => { setEditVisible(false); fetchEntry(false); }}
+          onSaved={() => { setEditVisible(false); router.back(); }}
         />
       )}
       {/* More Sheet */}

@@ -406,7 +406,7 @@ export default function CollectionNew() {
                     <View style={[s.corner, s.cornerTR]} />
                     <View style={[s.corner, s.cornerBL]} />
                     <View style={[s.corner, s.cornerBR]} />
-                    <Text style={s.uploadIcon}>📷</Text>
+                    <Text style={s.uploadIcon}>↑</Text>
                     <Text style={s.uploadLabel}>Tap to capture or upload</Text>
                   </>
                 )}
@@ -496,7 +496,12 @@ export default function CollectionNew() {
               <SH text="Inspiration" />
               <TouchableOpacity style={s.photoUpload} onPress={pickInspirationPhoto} activeOpacity={0.85}>
                 {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />}
-                {!inspirationImage && <Text style={s.uploadLabel}>Upload Inspiration Photo</Text>}
+                {!inspirationImage && (
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={s.uploadIcon}>↑</Text>
+                    <Text style={s.uploadLabel}>Upload Inspiration Photo</Text>
+                  </View>
+                )}
                 {inspirationImage && (
                   <View style={s.aiStatusBar}><Text style={s.aiStatusText}>Tap to change</Text></View>
                 )}

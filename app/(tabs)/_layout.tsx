@@ -12,14 +12,14 @@ function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.75 }}>{emoji}</Text>;
 }
 
-function JournalIcon({ focused }: { focused: boolean }) {
+function JournalIcon({ focused, color = "#edff8d" }: { focused: boolean; color?: string }) {
   return (
     <Svg viewBox="0 0 24.25 24.25" width={38} height={38} style={{ opacity: focused ? 1 : 0.75 }}>
       <Rect x={0.12} y={0.12} width={24} height={24} fill="none" />
       <Rect x={3.17} y={3.09} width={17.89} height={17.73} fill="none" />
       <Path
         d="M12.12,3.26C7.31,3.26,3.42,7.15,3.42,11.94s3.89,8.68,8.69,8.68,8.69-3.89,8.69-8.68S16.92,3.26,12.12,3.26ZM14.78,13.22c-.01,1.61-1.45,3.12-3.02,3.14l-2.68.04v-1.27s2.68-.04,2.68-.04c.87-.01,1.75-.98,1.76-1.86l.05-4.56h-2.57s0-1.27,0-1.27h3.83s-.04,5.82-.04,5.82Z"
-        fill={focused ? "#edff8d" : "#fff"}
+        fill={focused ? color : "#fff"}
       />
       <Rect x={3.12} y={1.12} width={18} height={22} fill="none" />
     </Svg>
@@ -40,7 +40,7 @@ function AddRightIcon() {
   );
 }
 
-function CommunityIcon({ focused }: { focused: boolean }) {
+function CommunityIcon({ focused, color = "#edff8d" }: { focused: boolean; color?: string }) {
   return (
     <Svg viewBox="0 0 24.25 24.25" width={38} height={38} style={{ opacity: focused ? 1 : 0.75 }}>
       <Rect x={0.12} y={0.12} width={24} height={24} fill="none" />
@@ -49,13 +49,13 @@ function CommunityIcon({ focused }: { focused: boolean }) {
       <Rect x={11.13} y={3.09} width={17.89} height={17.73} fill="none" />
       <Path
         d="M12.1,3.26C7.3,3.26,3.41,7.15,3.41,11.94s3.89,8.68,8.69,8.68,8.69-3.88,8.69-8.68S16.91,3.26,12.1,3.26ZM10.94,16.43c-2.33-.61-3.8-2.98-3.2-5.4.49-1.97,2.21-3.29,4.13-3.37,2.01-.09,3.81,1.08,4.49,3.03l-1.16.04c-.74-1.58-2.32-2.32-3.93-1.92-1.5.37-2.61,1.77-2.59,3.36.03,1.58,1.18,2.94,2.7,3.26,1.61.34,3.17-.45,3.84-2.05h1.18c-.72,2.39-3.13,3.66-5.45,3.05ZM13.23,12.03c0,.6-.48,1.08-1.08,1.08s-1.08-.48-1.08-1.08.48-1.08,1.08-1.08,1.08.48,1.08,1.08Z"
-        fill={focused ? "#edff8d" : "#fff"}
+        fill={focused ? color : "#fff"}
       />
     </Svg>
   );
 }
 
-function OrganIcon({ focused }: { focused: boolean }) {
+function OrganIcon({ focused, color = "#edff8d" }: { focused: boolean; color?: string }) {
   return (
     <Svg viewBox="0 0 24.25 24.25" width={38} height={38} style={{ opacity: focused ? 1 : 0.75 }}>
       <Rect x={0.12} y={0.12} width={24} height={24} fill="none" />
@@ -63,17 +63,17 @@ function OrganIcon({ focused }: { focused: boolean }) {
       <Rect x={3.12} y={1.12} width={18} height={22} fill="none" />
       <Path
         d="M12.12,3.26C7.32,3.26,3.43,7.15,3.43,11.94s3.89,8.68,8.69,8.68,8.69-3.89,8.69-8.68S16.92,3.26,12.12,3.26ZM12.33,16.59c-2.6,0-4.71-2.11-4.71-4.71s2.11-4.71,4.71-4.71,4.71,2.11,4.71,4.71-2.11,4.71-4.71,4.71Z"
-        fill={focused ? "#edff8d" : "#fff"}
+        fill={focused ? color : "#fff"}
       />
       <Path
         d="M12.33,15.41c-1.91,0-3.45-1.55-3.45-3.45s1.55-3.45,3.45-3.45,3.45,1.55,3.45,3.45-1.55,3.45-3.45,3.45Z"
-        fill={focused ? "#edff8d" : "#fff"}
+        fill={focused ? color : "#fff"}
       />
     </Svg>
   );
 }
 
-function LabIcon({ focused }: { focused: boolean }) {
+function LabIcon({ focused, color = "#edff8d" }: { focused: boolean; color?: string }) {
   return (
     <Svg viewBox="0 0 24.25 24.25" width={38} height={38} style={{ opacity: focused ? 1 : 0.75 }}>
       <Rect x={0.12} y={0.12} width={24} height={24} fill="none" />
@@ -81,13 +81,13 @@ function LabIcon({ focused }: { focused: boolean }) {
       <Rect x={3.12} y={1.12} width={18} height={22} fill="none" />
       <Path
         d="M12.1,3.3C7.32,3.3,3.45,7.17,3.45,11.94s3.87,8.63,8.65,8.63,8.65-3.87,8.65-8.63S16.87,3.3,12.1,3.3ZM11.22,16.34c-1.39-.01-2.34-1.22-2.34-2.52v-6.4s1.25,0,1.25,0v6.51c.01.56.47,1.15,1.08,1.15h4.19s0,1.29,0,1.29l-4.19-.03Z"
-        fill={focused ? "#edff8d" : "#fff"}
+        fill={focused ? color : "#fff"}
       />
     </Svg>
   );
 }
 
-function CollectionIcon({ focused }: { focused: boolean }) {
+function CollectionIcon({ focused, color = "#edff8d" }: { focused: boolean; color?: string }) {
   return (
     <Svg viewBox="0 0 24.25 24.25" width={38} height={38} style={{ opacity: focused ? 1 : 0.75 }}>
       <Rect x={0.12} y={0.12} width={24} height={24} fill="none" />
@@ -95,7 +95,7 @@ function CollectionIcon({ focused }: { focused: boolean }) {
       <Rect x={3.12} y={1.12} width={18} height={22} fill="none" />
       <Path
         d="M12.12,3.26C7.32,3.26,3.43,7.15,3.43,11.94s3.89,8.68,8.69,8.68,8.69-3.88,8.69-8.68S16.92,3.26,12.12,3.26ZM11.72,16.49c-2.48-.32-4.25-2.47-4.1-4.87.15-2.42,2.15-4.35,4.66-4.37,2.09-.01,3.97,1.24,4.46,3.26l-1.31.03c-.5-1.27-1.61-1.97-2.91-2.03-1.88-.09-3.42,1.24-3.6,3.01-.2,1.88,1.12,3.6,3.15,3.74,1.55.11,2.77-.65,3.37-2.02l1.32.02c-.65,2.21-2.75,3.53-5.03,3.23Z"
-        fill={focused ? "#edff8d" : "#fff"}
+        fill={focused ? color : "#fff"}
       />
     </Svg>
   );
@@ -115,6 +115,14 @@ function HomeLeftIcon({ focused }: { focused: boolean }) {
 }
 
 // ─── Custom Floating Bar ──────────────────────────────────────────────────────
+
+const ROUTE_ACTIVE_COLORS: Record<string, string> = {
+  journal: "#F2C842",
+  collection: "#0fb8aa",
+  formulas: "#EC8FB5",
+  materials: "#C6FF00",
+  community: "#F2533A",
+};
 
 function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -149,6 +157,7 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             const index = state.routes.findIndex((r) => r.key === route.key);
             const { options } = descriptors[route.key];
             const focused = state.index === index;
+            const activeColor = ROUTE_ACTIVE_COLORS[route.name] ?? "#edff8d";
             return (
               <TouchableOpacity
                 key={route.key}
@@ -156,7 +165,7 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 onPress={makePress(route, focused)}
                 activeOpacity={0.75}
               >
-                {options.tabBarIcon?.({ focused, color: "#fff", size: 18 })}
+                {options.tabBarIcon?.({ focused, color: activeColor, size: 18 })}
               </TouchableOpacity>
             );
           })}
@@ -267,23 +276,23 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="journal"
-        options={{ title: "Journal", tabBarIcon: ({ focused }) => <JournalIcon focused={focused} /> }}
+        options={{ title: "Journal", tabBarIcon: ({ focused, color }) => <JournalIcon focused={focused} color={color} /> }}
       />
       <Tabs.Screen
         name="collection"
-        options={{ title: "Collection", tabBarIcon: ({ focused }) => <CollectionIcon focused={focused} /> }}
+        options={{ title: "Collection", tabBarIcon: ({ focused, color }) => <CollectionIcon focused={focused} color={color} /> }}
       />
       <Tabs.Screen
         name="formulas"
-        options={{ title: "Lab", tabBarIcon: ({ focused }) => <LabIcon focused={focused} /> }}
+        options={{ title: "Lab", tabBarIcon: ({ focused, color }) => <LabIcon focused={focused} color={color} /> }}
       />
       <Tabs.Screen
         name="materials"
-        options={{ title: "Organ", tabBarIcon: ({ focused }) => <OrganIcon focused={focused} /> }}
+        options={{ title: "Organ", tabBarIcon: ({ focused, color }) => <OrganIcon focused={focused} color={color} /> }}
       />
       <Tabs.Screen
         name="community"
-        options={{ title: "Community", tabBarIcon: ({ focused }) => <CommunityIcon focused={focused} /> }}
+        options={{ title: "Community", tabBarIcon: ({ focused, color }) => <CommunityIcon focused={focused} color={color} /> }}
       />
       <Tabs.Screen
         name="profile"

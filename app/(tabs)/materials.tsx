@@ -585,7 +585,7 @@ export default function Materials() {
 
         {/* Search bar */}
         <View style={s.searchWrap}>
-          <Text style={s.searchIconText}>🔍</Text>
+          <Text style={s.searchIconText}>⌕</Text>
           <TextInput
             style={s.searchInput}
             placeholder="Search by name of CAS..."

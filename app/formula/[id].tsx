@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Share, Image,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -622,7 +623,7 @@ export default function FormulaDetail() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={20}>
 
         {/* Header — inline editable */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
@@ -710,7 +711,7 @@ export default function FormulaDetail() {
                                 isLooping={false}
                               />
                             ) : (
-                              <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                              <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
                             )}
                             <TouchableOpacity style={s.imageDeleteBtn} onPress={() => handleDeleteMoodItem(item.id)}>
                               <BlurView intensity={40} tint="dark" style={s.imageDeleteBlur}>
@@ -880,7 +881,9 @@ export default function FormulaDetail() {
               {!atTarget && lines.length > 0 ? (
                 <Text style={s.tableUnderBy}>  Under by {Math.abs(targetConcentrateG - totalG).toFixed(3)}g</Text>
               ) : null}
-              <Text style={[s.tableTotalVal, { width: 44, textAlign: "right" }]}>100.000%</Text>
+              <Text style={[s.tableTotalVal, { width: 44, textAlign: "right" }]}>
+                {targetConcentrateG > 0 ? `${Math.round((totalG / targetConcentrateG) * 100)}%` : "—"}
+              </Text>
               <View style={{ width: 30 }} />
             </View>
           </GlassRow>
@@ -935,7 +938,7 @@ export default function FormulaDetail() {
           ) : null}
         </View>
 
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Diluent Picker */}
       <Modal visible={diluentPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDiluentPickerVisible(false)}>

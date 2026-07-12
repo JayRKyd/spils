@@ -6,6 +6,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -211,7 +212,7 @@ export default function Formulas() {
 
         {/* Search */}
         <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>🔍</Text>
+          <Text style={s.searchIcon}>⌕</Text>
           <TextInput
             style={s.searchInput}
             placeholder="Search projects..."
@@ -315,7 +316,7 @@ export default function Formulas() {
         {/* IFRA notice modal */}
         <Modal visible={ifraVisible} transparent animationType="fade" onRequestClose={() => setIfraVisible(false)}>
           <View style={s.bannerOverlay}>
-            <View style={s.bannerCard}>
+            <BlurView intensity={60} tint="light" style={s.bannerCard}>
               <TouchableOpacity style={s.bannerClose} onPress={() => setIfraVisible(false)}>
                 <Text style={s.bannerCloseText}>✕</Text>
               </TouchableOpacity>
@@ -323,7 +324,7 @@ export default function Formulas() {
               <Text style={s.bannerBody}>
                 Always double-check your formulas against IFRA guidelines.{"\n"}Our full IFRA assistant will arrive in future updates.
               </Text>
-            </View>
+            </BlurView>
           </View>
         </Modal>
 
@@ -417,8 +418,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
   bannerCard: {
-    backgroundColor: "#13131a",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
     borderRadius: 18,
+    overflow: "hidden",
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 26,

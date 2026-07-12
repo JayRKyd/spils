@@ -16,7 +16,7 @@ const NAV_ITEMS = [
 export default function Home() {
   const { user } = useAuth();
   const { width, height } = useWindowDimensions();
-  const [selected, setSelected] = useState("/(tabs)/journal");
+  const [selected, setSelected] = useState<string | null>(null);
 
   return (
     <View style={s.container}>
@@ -41,7 +41,10 @@ export default function Home() {
           {NAV_ITEMS.map(({ label, path }) => (
             <TouchableOpacity
               key={path}
-              onPress={() => { setSelected(path); router.push(path as any); }}
+              onPress={() => {
+                setSelected(path);
+                setTimeout(() => router.push(path as any), 150);
+              }}
               activeOpacity={0.7}
               style={selected === path ? s.pill : undefined}
             >

@@ -159,6 +159,7 @@ export default function JournalNew() {
 
   const [families, setFamilies] = useState<string[]>([]);
   const [pendingFamily, setPendingFamily] = useState("");
+  const [customFamily, setCustomFamily] = useState("");
   const [familyPickerVisible, setFamilyPickerVisible] = useState(false);
   const [genderPickerVisible, setGenderPickerVisible] = useState(false);
   const [seasonPickerVisible, setSeasonPickerVisible] = useState(false);
@@ -271,10 +272,20 @@ export default function JournalNew() {
       if (a && typeof a === "object") {
         if (!title && a.perfume) setTitle(a.perfume);
         if (!brand && a.brand) setBrand(a.brand);
+        if (!perfumer && a.perfumer) setPerfumer(a.perfumer);
         if (a.gender) setGender(a.gender);
+        if (Array.isArray(a.seasons) && !seasons.length) {
+          const validSeasons = ["Spring", "Summer", "Fall", "Winter"];
+          const valid = a.seasons.filter((x: any) => typeof x === "string" && validSeasons.includes(x));
+          if (valid.length) setSeasons(valid);
+        }
+        if (Array.isArray(a.fragrance_families) && !families.length) {
+          setFamilies(a.fragrance_families.filter((x: any) => typeof x === "string"));
+        }
         if (Array.isArray(a.top_notes) && !notesTop.length) setNotesTop(a.top_notes.filter((x: any) => typeof x === "string"));
         if (Array.isArray(a.heart_notes) && !notesHeart.length) setNotesHeart(a.heart_notes.filter((x: any) => typeof x === "string"));
         if (Array.isArray(a.base_notes) && !notesBase.length) setNotesBase(a.base_notes.filter((x: any) => typeof x === "string"));
+        if (!dryDownText && a.dry_down) setDryDownText(a.dry_down);
         setAiStatus("✦ Auto-filled from label");
       } else {
         setAiStatus("Couldn't read the label.");
@@ -458,7 +469,7 @@ export default function JournalNew() {
                     <View style={[s.corner, s.cornerTR]} />
                     <View style={[s.corner, s.cornerBL]} />
                     <View style={[s.corner, s.cornerBR]} />
-                    <Text style={s.uploadIcon}>📷</Text>
+                    <Text style={s.uploadIcon}>↑</Text>
                     <Text style={s.uploadLabel}>Tap to capture or upload</Text>
                   </>
                 )}
@@ -540,7 +551,12 @@ export default function JournalNew() {
               <SH text="Inspiration" />
               <TouchableOpacity style={s.photoUpload} onPress={pickInspirationPhoto} activeOpacity={0.85}>
                 {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />}
-                {!inspirationImage && <Text style={s.uploadLabel}>Upload Inspiration Photo</Text>}
+                {!inspirationImage && (
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={s.uploadIcon}>↑</Text>
+                    <Text style={s.uploadLabel}>Upload Inspiration Photo</Text>
+                  </View>
+                )}
                 {inspirationImage && (
                   <View style={s.aiStatusBar}><Text style={s.aiStatusText}>Tap to change</Text></View>
                 )}
@@ -753,6 +769,31 @@ export default function JournalNew() {
                 <Text style={{ color: "#a78bfa", fontSize: 15 }}>Done</Text>
               </TouchableOpacity>
             </View>
+            <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
+              <TextInput
+                style={{
+                  flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)",
+                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 15,
+                }}
+                placeholder="Type a custom family…"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                value={customFamily}
+                onChangeText={setCustomFamily}
+                onSubmitEditing={() => {
+                  if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyPickerVisible(false); }
+                }}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                style={[s.addBtn, !customFamily.trim() && { opacity: 0.4 }]}
+                disabled={!customFamily.trim()}
+                onPress={() => {
+                  if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyPickerVisible(false); }
+                }}
+              >
+                <Text style={s.addBtnText}>Use</Text>
+              </TouchableOpacity>
+            </View>
             <ScrollView>
               {FRAGRANCE_FAMILIES.map((f) => (
                 <TouchableOpacity
@@ -805,7 +846,7 @@ const s = StyleSheet.create({
   chooser: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 24, paddingHorizontal: 18, paddingVertical: 13 },
   chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
   chooserFilled: { color: "#13131a", fontSize: 14 },
-  chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
+  chevron: { color: "rgba(19,19,26,0.4)", fontSize: 20 },
   addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" },
   addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" },
 

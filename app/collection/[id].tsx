@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Modal, StyleSheet, Image, Share, Linking,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -78,6 +78,13 @@ const em = StyleSheet.create({
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   tagText: { color: "#13131a", fontSize: 13 },
+  organDropdown: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: 4, marginBottom: 4, overflow: "hidden" },
+  organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)" },
+  organDropdownText: { color: "#13131a", fontSize: 14 },
+  organDropdownHint: { color: "rgba(0,0,0,0.3)", fontSize: 11 },
+  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },
+  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
   addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" as const },
@@ -115,6 +122,105 @@ function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove 
         returnKeyType="done"
         blurOnSubmit={false}
       />
+      {tags.length > 0 && (
+        <View style={em.tagRow}>
+          {tags.map((t, i) => (
+            <TouchableOpacity key={i} style={em.tag} onPress={() => onRemove(i)}>
+              <Text style={em.tagText}>{t} ×</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function clamp(v: number) { return Math.min(1, Math.max(0, v)); }
+
+function SliderRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const containerRef = useRef<View>(null);
+  const info = useRef({ x: 0, width: 1 });
+  const numValue = Number(value) || 0;
+
+  const measure = () => {
+    containerRef.current?.measureInWindow((x, _y, width) => {
+      if (width > 0) info.current = { x, width };
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        measure();
+        onChange(String(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)));
+      },
+      onPanResponderMove: (evt) => {
+        onChange(String(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)));
+      },
+    })
+  ).current;
+
+  const pct = numValue / 10;
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={em.label}>{label}</Text>
+      <View ref={containerRef} onLayout={measure} style={em.sliderTrack} {...panResponder.panHandlers}>
+        <View style={[em.sliderFill, { width: `${pct * 100}%` as any }]} />
+        <View style={[em.sliderThumb, { left: `${pct * 100}%` as any }]} />
+      </View>
+    </View>
+  );
+}
+
+function NoteInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove }: {
+  tags: string[]; inputVal: string; placeholder: string;
+  onChangeInput: (v: string) => void; onAdd: (v: string) => void; onRemove: (i: number) => void;
+}) {
+  const { user } = useAuth();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!inputVal.trim() || !user?.id) { setSuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.from("materials")
+        .select("name")
+        .eq("user_id", user.id)
+        .ilike("name", `%${inputVal}%`)
+        .limit(8);
+      setSuggestions(
+        (data ?? []).map((m: any) => m.name as string).filter((n) => !tags.includes(n))
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [inputVal, user?.id, tags]);
+
+  const addSuggestion = (name: string) => { onAdd(name); onChangeInput(""); setSuggestions([]); };
+
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <TextInput
+        style={em.input}
+        placeholder={placeholder}
+        placeholderTextColor="rgba(19,19,26,0.4)"
+        value={inputVal}
+        onChangeText={onChangeInput}
+        onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); setSuggestions([]); } }}
+        returnKeyType="done"
+        blurOnSubmit={false}
+      />
+      {suggestions.length > 0 && (
+        <View style={em.organDropdown}>
+          {suggestions.map((name) => (
+            <TouchableOpacity key={name} style={em.organDropdownRow} onPress={() => addSuggestion(name)}>
+              <Text style={em.organDropdownText}>{name}</Text>
+              <Text style={em.organDropdownHint}>Organ</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       {tags.length > 0 && (
         <View style={em.tagRow}>
           {tags.map((t, i) => (
@@ -269,7 +375,10 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
               {image ? (
                 <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
               ) : (
-                <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Upload Photo</Text>
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 32, marginBottom: 10 }}>↑</Text>
+                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Tap to capture or upload</Text>
+                </View>
               )}
               {image ? (
                 <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
@@ -365,28 +474,17 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <TagInput tags={accords} inputVal={accordInput} placeholder="Add accord…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
 
             <Text style={em.label}>Top Notes</Text>
-            <TagInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+            <NoteInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
 
             <Text style={em.label}>Middle Notes</Text>
-            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+            <NoteInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
 
             <Text style={em.label}>Base Notes</Text>
-            <TagInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
+            <NoteInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
 
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Projection</Text>
-                <F placeholder="1–10" value={projection} onChangeText={setProjection} keyboardType="decimal-pad" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Sillage</Text>
-                <F placeholder="1–10" value={sillage} onChangeText={setSillage} keyboardType="decimal-pad" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Longevity</Text>
-                <F placeholder="1–10" value={longevity} onChangeText={setLongevity} keyboardType="decimal-pad" />
-              </View>
-            </View>
+            <SliderRow label="Projection" value={projection} onChange={setProjection} />
+            <SliderRow label="Sillage" value={sillage} onChange={setSillage} />
+            <SliderRow label="Longevity" value={longevity} onChange={setLongevity} />
 
             <Text style={em.label}>Dry Down</Text>
             <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} />
@@ -401,7 +499,10 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
               {inspirationImage ? (
                 <Image source={{ uri: inspirationImage }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
               ) : (
-                <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Upload Inspiration Photo</Text>
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 32, marginBottom: 10 }}>↑</Text>
+                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Upload Inspiration Photo</Text>
+                </View>
               )}
               {inspirationImage ? (
                 <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
@@ -504,6 +605,13 @@ export default function CollectionDetail() {
     ]);
   };
 
+  const handleToggleFavorite = async () => {
+    if (!perfume) return;
+    const newVal = !perfume.is_favorite;
+    setPerfume((prev) => prev ? { ...prev, is_favorite: newVal } : prev);
+    await supabase.from("perfumes").update({ is_favorite: newVal }).eq("id", id);
+  };
+
   const handleShare = async () => {
     if (!perfume) return;
     try {
@@ -549,7 +657,9 @@ export default function CollectionDetail() {
                 : <Text style={d.photoPlaceholder}>Photo</Text>}
             </View>
             <Text style={d.photoName} numberOfLines={1}>{perfume.name}</Text>
-            <Text style={d.photoHeart}>{perfume.is_favorite ? "♥" : "♡"}</Text>
+            <TouchableOpacity onPress={handleToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ alignSelf: "flex-end" }}>
+              <Text style={d.photoHeart}>{perfume.is_favorite ? "♥" : "♡"}</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={d.entryMeta}>

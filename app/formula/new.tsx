@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Modal, StyleSheet, Alert, Image,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -351,7 +352,7 @@ export default function NewFormula() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={20}>
 
           {/* Header */}
           <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
@@ -406,7 +407,7 @@ export default function NewFormula() {
                     {pendingMoodItems.filter((i) => i.type === "image" || i.type === "audio").map((item) => (
                       <View key={item.id} style={{ width: "47%", aspectRatio: 4 / 3, borderRadius: 12, overflow: "hidden", position: "relative", backgroundColor: "rgba(0,0,0,0.08)" }}>
                         {item.type === "image"
-                          ? <Image source={{ uri: (item as any).uri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                          ? <Image source={{ uri: (item as any).uri }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
                           : <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Text style={{ fontSize: 28 }}>🎵</Text><Text style={{ fontSize: 10, color: "#13131a", marginTop: 4, paddingHorizontal: 4, textAlign: "center" }} numberOfLines={2}>{(item as any).name}</Text></View>
                         }
                         <TouchableOpacity
@@ -460,7 +461,7 @@ export default function NewFormula() {
 
           {/* ③ Inline material add */}
           <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-            <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
               <View style={{ flex: 1 }}>
                 <TextInput
                   style={s.searchBarInline}
@@ -558,7 +559,7 @@ export default function NewFormula() {
                   </Text>
                 )}
                 <Text style={[s.tableTotalVal, { width: 68, textAlign: "right" }]}>
-                  {totalG > 0 ? "100.000%" : "—"}
+                  {targetConcentrateG > 0 ? `${Math.round((totalG / targetConcentrateG) * 100)}%` : "—"}
                 </Text>
                 <View style={{ width: 30 }} />
               </View>
@@ -612,7 +613,7 @@ export default function NewFormula() {
             )}
           </View>
 
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {/* Bottom buttons */}
         <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "transparent" }}>
