@@ -117,7 +117,7 @@ function HomeLeftIcon({ focused }: { focused: boolean }) {
 // ─── Custom Floating Bar ──────────────────────────────────────────────────────
 
 const ROUTE_ACTIVE_COLORS: Record<string, string> = {
-  journal: "#F2C842",
+  journal: "#edff8d",
   collection: "#0fb8aa",
   formulas: "#EC8FB5",
   materials: "#C6FF00",

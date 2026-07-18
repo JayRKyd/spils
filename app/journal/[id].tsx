@@ -39,6 +39,7 @@ interface JournalEntry {
   time_of_day: string | null;
   emotions: string[] | null;
   colors: string[] | null;
+  temperature: number | null;
   price_text: string | null;
   music_url: string | null;
   music_source: string | null;
@@ -234,6 +235,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const scrollRef = useRef<ScrollView>(null);
   const [colors, setColors] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
+  const [temperature, setTemperature] = useState(5);
   const [genderOpen, setGenderOpen] = useState(false);
   const [familyOpen, setFamilyOpen] = useState(false);
   const [pendingFamily, setPendingFamily] = useState("");
@@ -277,6 +279,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setSillage(entry.sillage ? parseFloat(entry.sillage) || 5 : 5);
     setLongevity(entry.longevity ? parseFloat(entry.longevity) || 5 : 5);
     setColors(entry.colors ?? []);
+    setTemperature(entry.temperature ?? 5);
     setSelectedColor("#a78bfa");
     setBottleImage(entry.image_url ?? null);
     setInspirationImage(entry.inspiration_image_url ?? null);
@@ -306,6 +309,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       sillage: String(sillage),
       longevity: String(longevity),
       colors: colors.length ? colors : null,
+      temperature: temperature,
       image_url: bottleImage ?? null,
       inspiration_image_url: inspirationImage ?? null,
     }).eq("id", entry.id);
@@ -513,6 +517,9 @@ function EditModal({ visible, entry, onClose, onSaved }: {
               </TouchableOpacity>
             </View>
 
+            <Text style={em.label}>Temperature</Text>
+            <SliderRow label="Cold → Warm" value={temperature} onChange={setTemperature} />
+
             <Text style={em.label}>Music URL</Text>
             <F placeholder="Spotify / YouTube link…" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
 
@@ -558,6 +565,7 @@ const ms = StyleSheet.create({
   handle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   btn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
   btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
+  btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
   btnDanger: { borderColor: "rgba(220,50,50,0.25)" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
   btnTextLight: { color: "#fff" },
@@ -656,20 +664,20 @@ export default function JournalDetail() {
     <Wrapper>
       {/* Top Nav */}
       <View style={d.topNav}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
-            <Text style={d.backIcon}>‹</Text>
-          </TouchableOpacity>
-          <Text style={d.logoText}>SP/LS.</Text>
-        </View>
+        <Text style={d.logoText}>SP/LS.</Text>
         <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
           <Text style={d.profileIcon}>👤</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
-        {/* Page title */}
-        <Text style={d.pageTitle}>Journal</Text>
+        {/* Page title with back button */}
+        <View style={d.titleRow}>
+          <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
+            <Text style={d.backIcon}>‹</Text>
+          </TouchableOpacity>
+          <Text style={d.pageTitle}>Journal</Text>
+        </View>
 
         {/* Entry Header */}
         <View style={d.entryHeader}>
@@ -707,6 +715,7 @@ export default function JournalDetail() {
           <Row label="Projection" value={entry.projection ?? "—"} />
           <Row label="Sillage" value={entry.sillage ?? "—"} />
           <Row label="Longevity" value={entry.longevity ?? "—"} />
+          <Row label="Temperature" value={entry.temperature != null ? `${entry.temperature <= 3 ? "Cold" : entry.temperature <= 6 ? "Cool" : entry.temperature <= 8 ? "Warm" : "Hot"} (${entry.temperature}/10)` : "—"} />
           <Row label="Dry Down" value={entry.dry_down ?? "—"} />
 
           {/* Inspiration photo — view only, edit via modal */}
@@ -781,10 +790,10 @@ export default function JournalDetail() {
               <Text style={ms.btnText}>Share</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ms.btn} onPress={handleAddToCollection}>
-              <Text style={ms.btnText}>+Collection</Text>
+              <Text style={ms.btnText}>Add to Collection</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={ms.btn} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
-              <Text style={ms.btnText}>Print</Text>
+            <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
+              <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[ms.btn, ms.btnDanger]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
               <Text style={[ms.btnText, { color: "#dc2626" }]}>Delete</Text>
@@ -808,7 +817,8 @@ const d = StyleSheet.create({
   profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
   profileIcon: { fontSize: 16 },
 
-  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, marginBottom: 20, paddingHorizontal: 2 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 20 },
+  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, paddingHorizontal: 2 },
 
   entryHeader: { flexDirection: "row", gap: 16, marginBottom: 16 },
   photoBox: { width: 150, height: 150, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(0,0,0,0.08)", overflow: "hidden", alignItems: "center", justifyContent: "center" },

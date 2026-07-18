@@ -179,6 +179,7 @@ export default function JournalNew() {
 
   const [colors, setColors] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
+  const [temperatureVal, setTemperatureVal] = useState(5);
   const [musicUrl, setMusicUrl] = useState("");
 
   const [bottleImage, setBottleImage] = useState<string | null>(null);
@@ -386,7 +387,7 @@ export default function JournalNew() {
     setNotesTop([]); setNotesHeart([]); setNotesBase([]);
     setTopInput(""); setMidInput(""); setBaseInput("");
     setProjectionVal(5); setSillageVal(5); setLongevityVal(5); setDryDownVal(5); setDryDownText("");
-    setColors([]); setSelectedColor("#a78bfa"); setMusicUrl("");
+    setColors([]); setSelectedColor("#a78bfa"); setTemperatureVal(5); setMusicUrl("");
     setBottleImage(null); setBottleBase64(null); setInspirationImage(null);
     setAiResult(null); setAiStatus(null);
     setMoreVisible(false);
@@ -418,6 +419,7 @@ export default function JournalNew() {
       longevity: String(longevityVal),
       dry_down: dryDownText.trim() || null,
       colors: colors.length ? colors : null,
+      temperature: temperatureVal,
       music_url: musicUrl.trim() || null,
       music_source: musicUrl.trim() ? detectSource(musicUrl.trim()) : null,
       image_url: bottleBase64 ?? null,
@@ -587,6 +589,10 @@ export default function JournalNew() {
                 </TouchableOpacity>
               </View>
 
+              {/* Temperature */}
+              <SH text="Temperature" />
+              <SliderRow label="Cold → Warm" value={temperatureVal} onChange={setTemperatureVal} />
+
               {/* Music */}
               <SH text="Music" />
               <TextInput style={s.field} placeholder="URL..." placeholderTextColor="rgba(19,19,26,0.4)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" />
@@ -631,9 +637,6 @@ export default function JournalNew() {
               <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
                 <Text style={s.moreBtnText}>More</Text>
               </TouchableOpacity>
-              <View style={s.fabBtn}>
-                <Text style={s.fabBtnText}>+</Text>
-              </View>
               <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
               </TouchableOpacity>
@@ -651,7 +654,7 @@ export default function JournalNew() {
               {moreView === "main" && (
                 <>
                   <TouchableOpacity style={ms.btn} onPress={handleAddToCollection}>
-                    <Text style={ms.btnText}>+Collection</Text>
+                    <Text style={ms.btnText}>Add to Collection</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity style={[ms.btn, isWishlisted && ms.btnWishlisted]} onPress={handleAddToWishlist}>
@@ -670,8 +673,8 @@ export default function JournalNew() {
                     <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={[ms.btn, ms.btnBeige]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
-                    <Text style={ms.btnText}>Print</Text>
+                  <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
+                    <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -888,6 +891,7 @@ const ms = StyleSheet.create({
   btnDark: { backgroundColor: "#13131a", borderColor: "#13131a" },
   btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
   btnBeige: { backgroundColor: "#EDE5D8", borderColor: "#EDE5D8" },
+  btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
   btnWishlisted: { backgroundColor: "#E5F772", borderColor: "#E5F772" },
   btnDelete: { backgroundColor: "#FF2D55", borderColor: "#FF2D55" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },

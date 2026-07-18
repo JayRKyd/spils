@@ -298,8 +298,8 @@ function MaterialModal({
                     <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={() => setMoreView("share")}>
                       <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[ms.btn, ms.btnBeige]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
-                      <Text style={ms.btnText}>Print</Text>
+                    <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
+                      <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -1159,6 +1159,7 @@ const ms = StyleSheet.create({
   btnDark: { backgroundColor: "#13131a", borderColor: "#13131a" },
   btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
   btnBeige: { backgroundColor: "#EDE5D8", borderColor: "#EDE5D8" },
+  btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
   btnDelete: { backgroundColor: "#FF2D55", borderColor: "#FF2D55" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },
   btnTextLight: { color: "#fff" },

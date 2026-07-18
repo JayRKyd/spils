@@ -310,6 +310,12 @@ export default function CollectionNew() {
     router.back();
   };
 
+  const handleAddToWishlist = () => {
+    setTags((prev) => prev.includes("Wishlist") ? prev : [...prev, "Wishlist"]);
+    setMoreVisible(false);
+    Alert.alert("Wishlisted ✓", "This will be saved to your wishlist when you tap Save.");
+  };
+
   const handleClearAll = () => {
     setTitle(""); setDescription(""); setBrand(""); setPerfumer("");
     setGender(""); setPriceText(""); setSizeText(""); setRating(""); setSeasons([]);
@@ -572,9 +578,6 @@ export default function CollectionNew() {
             <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
               <Text style={s.moreBtnText}>More</Text>
             </TouchableOpacity>
-            <View style={s.fabBtn}>
-              <Text style={s.fabBtnText}>+</Text>
-            </View>
             <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
             </TouchableOpacity>
@@ -590,6 +593,10 @@ export default function CollectionNew() {
 
               {moreView === "main" && (
                 <>
+                  <TouchableOpacity style={[ms.btn, tags.includes("Wishlist") && ms.btnWishlisted]} onPress={handleAddToWishlist}>
+                    <Text style={ms.btnText}>{tags.includes("Wishlist") ? "✓ Wishlisted" : "Add to Wishlist"}</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity style={[ms.btn, ms.btnDark]} onPress={handleClearAll}>
                     <Text style={[ms.btnText, ms.btnTextLight]}>Clear All</Text>
                   </TouchableOpacity>
@@ -602,8 +609,8 @@ export default function CollectionNew() {
                     <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={[ms.btn, ms.btnBeige]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
-                    <Text style={ms.btnText}>Print</Text>
+                  <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
+                    <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -837,6 +844,8 @@ const ms = StyleSheet.create({
   btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
   btnDelete: { backgroundColor: "#FF2D55", borderColor: "#FF2D55" },
   btnBeige: { backgroundColor: "#EDE5D8", borderColor: "#EDE5D8" },
+  btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
+  btnWishlisted: { backgroundColor: "#E5F772", borderColor: "#E5F772" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },
   btnTextLight: { color: "#fff" },
   confirmText: { color: "#13131a", fontSize: 17, fontWeight: "600", textAlign: "center", marginVertical: 16 },

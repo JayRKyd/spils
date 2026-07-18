@@ -574,6 +574,7 @@ const ms = StyleSheet.create({
   handle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   btn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
   btnDanger: { borderColor: "rgba(220,50,50,0.25)" },
+  btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
 });
 
@@ -617,6 +618,14 @@ export default function CollectionDetail() {
     try {
       await Share.share({ message: `${perfume.name}${perfume.brand ? ` — ${perfume.brand}` : ""}${perfume.notes ? `\n${perfume.notes}` : ""}`.trim() });
     } catch {}
+  };
+
+  const handleAddToWishlist = async () => {
+    if (!perfume) return;
+    setMoreVisible(false);
+    setPerfume((prev) => prev ? { ...prev, status: "Wishlist" } : prev);
+    await supabase.from("perfumes").update({ status: "Wishlist" }).eq("id", id);
+    Alert.alert("Added to Wishlist", `${perfume.name} was moved to your wishlist.`);
   };
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -775,11 +784,11 @@ export default function CollectionDetail() {
             <TouchableOpacity style={ms.btn} onPress={handleShare}>
               <Text style={ms.btnText}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={ms.btn} onPress={() => { setMoreVisible(false); Alert.alert("+Collection", "Already in your collection."); }}>
-              <Text style={ms.btnText}>+Collection</Text>
+            <TouchableOpacity style={ms.btn} onPress={handleAddToWishlist}>
+              <Text style={ms.btnText}>Add to Wishlist</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={ms.btn} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
-              <Text style={ms.btnText}>Print</Text>
+            <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
+              <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[ms.btn, ms.btnDanger]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
               <Text style={[ms.btnText, { color: "#dc2626" }]}>Delete</Text>

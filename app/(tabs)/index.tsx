@@ -83,5 +83,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 4,
   },
-  navItem: { color: "#fff", fontSize: 44, fontWeight: "700", paddingVertical: 2 },
+  navItem: { color: "#fff", fontSize: 34, fontWeight: "800", letterSpacing: -0.5, paddingVertical: 2 },
 });

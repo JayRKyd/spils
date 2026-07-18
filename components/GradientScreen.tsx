@@ -11,7 +11,7 @@ export const GRADIENTS = {
   journal:     ["#7a3c18", "#5a2810", "#3c180a"] as const,
   community:   ["#1a5c6e", "#104855", "#0a3040"] as const,
   marketplace: ["#6a4e18", "#503a10", "#38280a"] as const,
-  profile:     ["#4a1e8c", "#341268", "#200a48"] as const,
+  profile:     ["#000000", "#000000", "#000000"] as const,
   detail:      ["#3a2e78", "#262060", "#181445"] as const,
 } as const;
 

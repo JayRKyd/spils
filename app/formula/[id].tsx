@@ -991,8 +991,8 @@ export default function FormulaDetail() {
             <TouchableOpacity style={s.sheetBtn} onPress={handleSaveVersion}>
               <Text style={s.sheetBtnText}>Save Version</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.sheetBtn} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print feature coming soon."); }}>
-              <Text style={s.sheetBtnText}>Print</Text>
+            <TouchableOpacity style={[s.sheetBtn, s.sheetBtnGrey]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print feature coming soon."); }}>
+              <Text style={[s.sheetBtnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.sheetBtn, s.sheetBtnDanger]} onPress={() => { setMoreVisible(false); handleDeleteFormula(); }}>
               <Text style={[s.sheetBtnText, { color: "#e53535" }]}>Delete Formula</Text>
@@ -1239,5 +1239,6 @@ const s = StyleSheet.create({
   moreHandle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   sheetBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 100, paddingVertical: 16, alignItems: "center" as const },
   sheetBtnDanger: { borderColor: "rgba(220,50,50,0.2)" },
+  sheetBtnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
   sheetBtnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
 });
