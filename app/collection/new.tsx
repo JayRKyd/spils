@@ -11,6 +11,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { SpilsLogo } from "@/components/SpilsLogo";
 import ColorPicker from "react-native-wheel-color-picker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -24,11 +25,13 @@ const FRAGRANCE_FAMILIES = [
   "Woody Green", "Woody Spicy",
 ];
 
-const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Cologne", "Oil"];
-const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
+const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "EDC", "Cologne", "Oil"];
+const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass Market", "Private Collection", "Classic/Vintage", "Limited Edition", "Discontinued", "Other"];
 const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
+const SEASON_LIST = ["Spring", "Summer", "Fall", "Winter"];
+const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 
-const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
+const ACCENT = "#0fb8aa";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +40,36 @@ function SH({ text }: { text: string }) {
 }
 
 function clamp(v: number) { return Math.min(1, Math.max(0, v)); }
+
+function temperatureColor(t: number): string {
+  if (t <= 2) return "#2E6BE8";
+  if (t <= 4) return "#3BA7E8";
+  if (t <= 6) return "#3BC9A0";
+  if (t <= 8) return "#F0A93B";
+  return "#E8503B";
+}
+
+function TemperatureSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const containerRef = useRef<View>(null);
+  const info = useRef({ x: 0, width: 1 });
+  const measure = () => { containerRef.current?.measureInWindow((x, _y, width) => { if (width > 0) info.current = { x, width }; }); };
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => { measure(); onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)); },
+      onPanResponderMove: (evt) => { onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)); },
+    })
+  ).current;
+  const pct = value / 10;
+  return (
+    <View ref={containerRef} onLayout={measure} style={s.tempSlider} {...panResponder.panHandlers}>
+      <LinearGradient colors={["#2E6BE8", "#3BA7E8", "#3BC9A0", "#F0A93B", "#E8503B"]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill as any} />
+      <Text style={s.tempSliderLabel}>TEMPERATURE</Text>
+      <View style={[s.sliderThumb, { left: `${pct * 100}%` as any }]} />
+    </View>
+  );
+}
 
 // ─── Slider ───────────────────────────────────────────────────────────────────
 
@@ -108,7 +141,7 @@ function NoteInput({ placeholder, tags, inputVal, onChangeInput, onAdd, onRemove
       <TextInput
         style={s.field}
         placeholder={placeholder}
-        placeholderTextColor="rgba(19,19,26,0.4)"
+        placeholderTextColor="rgba(255,255,255,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
         onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); setSuggestions([]); } }}
@@ -128,8 +161,8 @@ function NoteInput({ placeholder, tags, inputVal, onChangeInput, onAdd, onRemove
       {tags.length > 0 && (
         <View style={s.tagRow}>
           {tags.map((t, i) => (
-            <TouchableOpacity key={i} style={s.tag} onPress={() => onRemove(i)}>
-              <Text style={s.tagText}>{t} ×</Text>
+            <TouchableOpacity key={i} style={s.noteTag} onPress={() => onRemove(i)}>
+              <Text style={s.noteTagText}>{t} ×</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -152,6 +185,7 @@ export default function CollectionNew() {
   const [priceText, setPriceText] = useState("");
   const [sizeText, setSizeText] = useState("");
   const [rating, setRating] = useState("");
+  const [remindsMeOf, setRemindsMeOf] = useState("");
   const [seasons, setSeasons] = useState<string[]>([]);
   const [concentration, setConcentration] = useState("");
   const [category, setCategory] = useState("");
@@ -181,6 +215,7 @@ export default function CollectionNew() {
 
   const [colors, setColors] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
+  const [temperatureVal, setTemperatureVal] = useState(5);
   const [musicUrl, setMusicUrl] = useState("");
 
   const [bottleImage, setBottleImage] = useState<string | null>(null);
@@ -344,6 +379,8 @@ export default function CollectionNew() {
       price: priceText ? parseFloat(priceText) : null,
       size_ml: sizeText ? parseFloat(sizeText) : null,
       rating: rating ? parseFloat(rating) : null,
+      reminds_me_of: remindsMeOf.trim() || null,
+      temperature: temperatureVal,
       season: seasons.length ? seasons : null,
       concentration: concentration || null,
       category: category || null,
@@ -371,90 +408,95 @@ export default function CollectionNew() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <LinearGradient colors={TEAL} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={["#000000", "#000000", "#0fb8aa"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             {/* Top nav */}
             <View style={s.topNav}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-                  <Text style={s.backIcon}>‹</Text>
-                </TouchableOpacity>
-                <Text style={s.logoText}>SP/LS.</Text>
-              </View>
+              <SpilsLogo height={22} color="#edff8d" />
               <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
                 <Text style={s.profileIcon}>👤</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={{ paddingHorizontal: 16 }}>
-              <Text style={s.pageTitle}>Collection</Text>
-
-              {/* Bottle photo */}
-              <TouchableOpacity style={s.photoUpload} onPress={pickPhoto} activeOpacity={0.85}>
-                {bottleImage && <Image source={{ uri: bottleImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />}
-                {aiLoading && (
-                  <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "rgba(13,184,170,0.45)", borderRadius: 18 }]}>
-                    <ActivityIndicator color="#fff" size="large" />
-                    <Text style={{ color: "#fff", fontSize: 13 }}>{aiStatus}</Text>
-                  </View>
-                )}
-                {bottleImage && !aiLoading && aiStatus && (
-                  <View style={[{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(13,184,170,0.3)", paddingVertical: 6, paddingHorizontal: 12, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }]}>
-                    <Text style={{ color: "#0d9488", fontSize: 12, textAlign: "center" }}>{aiStatus}</Text>
-                  </View>
-                )}
-                {!bottleImage && (
-                  <>
-                    <View style={[s.corner, s.cornerTL]} />
-                    <View style={[s.corner, s.cornerTR]} />
-                    <View style={[s.corner, s.cornerBL]} />
-                    <View style={[s.corner, s.cornerBR]} />
-                    <Text style={s.uploadIcon}>↑</Text>
-                    <Text style={s.uploadLabel}>Tap to capture or upload</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* Basic fields */}
-              <TextInput style={s.field} placeholder="Perfume" placeholderTextColor="rgba(19,19,26,0.4)" value={title} onChangeText={setTitle} />
-              <View style={s.row}>
-                <TextInput style={[s.field, { flex: 1 }]} placeholder="Brand" placeholderTextColor="rgba(19,19,26,0.4)" value={brand} onChangeText={setBrand} />
-                <TextInput style={[s.field, { flex: 1 }]} placeholder="Perfumer" placeholderTextColor="rgba(19,19,26,0.4)" value={perfumer} onChangeText={setPerfumer} />
-              </View>
-              <View style={s.row}>
-                <TouchableOpacity style={[s.field, s.chooser, { flex: 1 }]} onPress={() => setGenderPickerVisible(true)}>
-                  <Text style={gender ? s.chooserFilled : s.chooserEmpty}>{gender || "Gender"}</Text>
-                  <Text style={s.chevron}>▾</Text>
+            <View style={{ paddingHorizontal: 30 }}>
+              <View style={s.titleRow}>
+                <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Text style={s.backCarrot}>‹</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.field, s.chooser, { flex: 1 }]} onPress={() => setSeasonPickerVisible(true)}>
-                  <Text style={seasons.length ? s.chooserFilled : s.chooserEmpty}>{seasons.length ? seasons.join(", ") : "Season"}</Text>
-                  <Text style={s.chevron}>▾</Text>
-                </TouchableOpacity>
+                <Text style={s.pageTitle}>Collection</Text>
               </View>
+
+              {/* Photo + fields row */}
+              <View style={s.topRow}>
+                <TouchableOpacity style={s.photoBox} onPress={pickPhoto} activeOpacity={0.85}>
+                  {bottleImage && <Image source={{ uri: bottleImage }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />}
+                  {aiLoading && (
+                    <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "rgba(15,184,170,0.85)" }]}>
+                      <ActivityIndicator color="#fff" size="large" />
+                      <Text style={{ color: "#fff", fontSize: 12 }}>{aiStatus}</Text>
+                    </View>
+                  )}
+                  {!bottleImage && !aiLoading && (
+                    <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+                      <Text style={s.captureTitle}>Tap to Capture</Text>
+                      <Text style={s.captureSub}>(Best if shot on clean background)</Text>
+                      <Text style={s.captureSub}>or</Text>
+                      <Text style={s.captureSub}>Upload an Image</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <View style={s.topFields}>
+                  <TextInput style={s.field} placeholder="Perfume" placeholderTextColor="rgba(255,255,255,0.4)" value={title} onChangeText={setTitle} />
+                  <TextInput style={s.field} placeholder="Brand" placeholderTextColor="rgba(255,255,255,0.4)" value={brand} onChangeText={setBrand} />
+                  <TextInput style={s.field} placeholder="Perfumer" placeholderTextColor="rgba(255,255,255,0.4)" value={perfumer} onChangeText={setPerfumer} />
+                  <View style={s.row}>
+                    <TextInput style={[s.field, { flex: 1 }]} placeholder="Price" placeholderTextColor="rgba(255,255,255,0.4)" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
+                    <TextInput style={[s.field, { flex: 1 }]} placeholder="Size" placeholderTextColor="rgba(255,255,255,0.4)" value={sizeText} onChangeText={setSizeText} keyboardType="decimal-pad" />
+                  </View>
+                  <TextInput style={[s.field, { alignSelf: "flex-start", minWidth: 90 }]} placeholder="Rating" placeholderTextColor="rgba(255,255,255,0.4)" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+                </View>
+              </View>
+
+              {/* Category | Concentration */}
               <View style={s.row}>
-                <TouchableOpacity style={[s.field, s.chooser, { flex: 1 }]} onPress={() => setCategoryPickerVisible(true)}>
+                <TouchableOpacity style={[s.chooserField, { flex: 1 }]} onPress={() => setCategoryPickerVisible(true)}>
                   <Text style={category ? s.chooserFilled : s.chooserEmpty}>{category || "Category"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.field, s.chooser, { flex: 1 }]} onPress={() => setConcentrationPickerVisible(true)}>
+                <TouchableOpacity style={[s.chooserField, { flex: 1 }]} onPress={() => setConcentrationPickerVisible(true)}>
                   <Text style={concentration ? s.chooserFilled : s.chooserEmpty}>{concentration || "Concentration"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
               </View>
-              <View style={s.row}>
-                <TextInput style={[s.field, { flex: 1 }]} placeholder="Size (ml)" placeholderTextColor="rgba(19,19,26,0.4)" value={sizeText} onChangeText={setSizeText} keyboardType="decimal-pad" />
-                <TextInput style={[s.field, { flex: 1 }]} placeholder="Price" placeholderTextColor="rgba(19,19,26,0.4)" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
-              </View>
-              <TextInput style={s.field} placeholder="Rating (0-10)" placeholderTextColor="rgba(19,19,26,0.4)" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
 
-              {/* Fragrance Family */}
-              <SH text="Fragrance Family" />
+              {/* Gender | Season icons */}
+              <View style={[s.row, { marginTop: 10 }]}>
+                <TouchableOpacity style={[s.chooserField, { flex: 1 }]} onPress={() => setGenderPickerVisible(true)}>
+                  <Text style={gender ? s.chooserFilled : s.chooserEmpty}>{gender || "Gender"}</Text>
+                  <Text style={s.chevron}>▾</Text>
+                </TouchableOpacity>
+                <View style={s.seasonIcons}>
+                  {SEASON_LIST.map((sn) => {
+                    const active = seasons.includes(sn);
+                    return (
+                      <TouchableOpacity key={sn} style={[s.seasonIcon, active && s.seasonIconActive]} onPress={() => setSeasons((p) => active ? p.filter((x) => x !== sn) : [...p, sn])}>
+                        <Text style={s.seasonIconText}>{SEASON_ICONS[sn]}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Reminds me of */}
+              <TextInput style={[s.field, { marginTop: 10 }]} placeholder="Reminds me of..." placeholderTextColor="rgba(255,255,255,0.4)" value={remindsMeOf} onChangeText={setRemindsMeOf} />
+
+              {/* Olfactive Profile */}
               <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-                <TouchableOpacity style={[s.field, s.chooser, { flex: 1 }]} onPress={() => setFamilyPickerVisible(true)}>
-                  <Text style={pendingFamily ? s.chooserFilled : s.chooserEmpty}>{pendingFamily || "Choose"}</Text>
+                <TouchableOpacity style={s.chooserField} onPress={() => setFamilyPickerVisible(true)}>
+                  <Text style={pendingFamily ? s.chooserFilled : s.chooserEmpty}>{pendingFamily || "OLFACTIVE PROFILE"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -477,81 +519,69 @@ export default function CollectionNew() {
 
               {/* Pyramid */}
               <SH text="Pyramid" />
-              <NoteInput placeholder="Top Notes" tags={notesTop} inputVal={topInput} onChangeInput={setTopInput} onAdd={(v) => { setNotesTop((p) => [...p, v]); setTopInput(""); }} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
-              <NoteInput placeholder="Middle Notes" tags={notesHeart} inputVal={midInput} onChangeInput={setMidInput} onAdd={(v) => { setNotesHeart((p) => [...p, v]); setMidInput(""); }} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
-              <NoteInput placeholder="Base Notes" tags={notesBase} inputVal={baseInput} onChangeInput={setBaseInput} onAdd={(v) => { setNotesBase((p) => [...p, v]); setBaseInput(""); }} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
+              <NoteInput placeholder="TOP NOTES" tags={notesTop} inputVal={topInput} onChangeInput={setTopInput} onAdd={(v) => { setNotesTop((p) => [...p, v]); setTopInput(""); }} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+              <NoteInput placeholder="MIDDLE NOTES" tags={notesHeart} inputVal={midInput} onChangeInput={setMidInput} onAdd={(v) => { setNotesHeart((p) => [...p, v]); setMidInput(""); }} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+              <NoteInput placeholder="BASE NOTES" tags={notesBase} inputVal={baseInput} onChangeInput={setBaseInput} onAdd={(v) => { setNotesBase((p) => [...p, v]); setBaseInput(""); }} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
 
               {/* Performance Sliders */}
               <SH text="Performance" />
               <SliderRow label="Projection" value={projectionVal} onChange={setProjectionVal} />
               <SliderRow label="Sillage" value={sillageVal} onChange={setSillageVal} />
               <SliderRow label="Longevity" value={longevityVal} onChange={setLongevityVal} />
-              <View style={{ marginBottom: 14 }}>
-                <Text style={[s.fieldLabel, { marginBottom: 6 }]}>Dry Down</Text>
-                <TextInput
-                  style={s.field}
-                  placeholder="Describe the dry down..."
-                  placeholderTextColor="rgba(19,19,26,0.4)"
-                  value={dryDownText}
-                  onChangeText={setDryDownText}
-                  multiline
-                />
-              </View>
 
-              {/* Inspiration Photo */}
-              <SH text="Inspiration" />
-              <TouchableOpacity style={s.photoUpload} onPress={pickInspirationPhoto} activeOpacity={0.85}>
-                {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />}
-                {!inspirationImage && (
-                  <View style={{ alignItems: "center" }}>
-                    <Text style={s.uploadIcon}>↑</Text>
-                    <Text style={s.uploadLabel}>Upload Inspiration Photo</Text>
-                  </View>
-                )}
-                {inspirationImage && (
-                  <View style={s.aiStatusBar}><Text style={s.aiStatusText}>Tap to change</Text></View>
-                )}
-              </TouchableOpacity>
+              {/* Drydown */}
+              <View style={s.sectionBox}>
+                <Text style={s.boxLabel}>DRYDOWN</Text>
+                <TextInput style={s.boxInput} placeholder="Describe the dry down..." placeholderTextColor="rgba(255,255,255,0.3)" value={dryDownText} onChangeText={setDryDownText} multiline />
+              </View>
 
               {/* Color(s) */}
-              <SH text="Color(s)" />
-              <View style={s.colorWheelWrap}>
-                <ColorPicker
-                  color={selectedColor}
-                  onColorChange={setSelectedColor}
-                  thumbSize={28}
-                  sliderSize={28}
-                  noSnap={true}
-                  row={false}
-                  swatches={false}
-                  discrete={false}
-                />
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-                  {colors.map((c, i) => (
-                    <TouchableOpacity key={i} style={[s.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
-                  ))}
+              <View style={s.sectionBox}>
+                <Text style={s.boxLabel}>COLOR(S)</Text>
+                <View style={{ height: 280, marginBottom: 12 }}>
+                  <ColorPicker color={selectedColor} onColorChange={setSelectedColor} thumbSize={28} sliderSize={28} noSnap={true} row={false} swatches={false} discrete={false} />
                 </View>
-                <TouchableOpacity style={[s.addBtn, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
-                  <Text style={s.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                    {colors.map((c, i) => (
+                      <TouchableOpacity key={i} style={[s.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
+                    ))}
+                  </View>
+                  <TouchableOpacity style={[s.addBtn, { marginBottom: 0 }, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
+                    <Text style={s.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+
+              {/* Temperature */}
+              <TemperatureSlider value={temperatureVal} onChange={setTemperatureVal} />
 
               {/* Music */}
-              <SH text="Music" />
-              <TextInput style={s.field} placeholder="Hallelujah by Jeff Buckley…" placeholderTextColor="rgba(19,19,26,0.4)" value={musicUrl} onChangeText={setMusicUrl} />
+              <TextInput style={s.field} placeholder="MUSIC (URL, Spotify, YouTube Links...)" placeholderTextColor="rgba(255,255,255,0.4)" value={musicUrl} onChangeText={setMusicUrl} />
+
+              {/* Inspiration */}
+              <Text style={[s.boxLabel, { marginTop: 4 }]}>INSPIRATION</Text>
+              <TouchableOpacity style={s.inspBoxWhite} onPress={pickInspirationPhoto} activeOpacity={0.85}>
+                {inspirationImage
+                  ? <Image source={{ uri: inspirationImage }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+                  : (
+                    <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+                      <Text style={s.captureTitle}>Tap to Capture</Text>
+                      <Text style={s.captureSub}>(Best if shot on clean background)</Text>
+                      <Text style={s.captureSub}>or</Text>
+                      <Text style={s.captureSub}>Upload an Image</Text>
+                    </View>
+                  )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setInspirationImage(null)} style={{ alignSelf: "flex-end", marginTop: 6, marginBottom: 12 }}>
+                <Text style={s.deleteLink}>Delete</Text>
+              </TouchableOpacity>
 
               {/* Notes */}
-              <SH text="Notes" />
-              <TextInput
-                style={[s.field, { height: 160, textAlignVertical: "top", paddingTop: 14 }]}
-                placeholder="Notes..."
-                placeholderTextColor="rgba(19,19,26,0.4)"
-                value={description}
-                onChangeText={setDescription}
-                multiline
-              />
+              <View style={[s.sectionBox, { minHeight: 170 }]}>
+                <Text style={s.boxLabel}>NOTES</Text>
+                <TextInput style={[s.boxInput, { minHeight: 120 }]} placeholder="Write your notes..." placeholderTextColor="rgba(255,255,255,0.3)" value={description} onChangeText={setDescription} multiline />
+              </View>
 
               {/* TAG Options */}
               <SH text="TAG Options:" />
@@ -575,11 +605,11 @@ export default function CollectionNew() {
 
           {/* Bottom action bar */}
           <View style={s.bottomBar}>
-            <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
-              <Text style={s.moreBtnText}>More</Text>
+            <TouchableOpacity style={s.moreBtn} onPress={() => router.back()}>
+              <Text style={s.moreBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
+              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -746,7 +776,7 @@ export default function CollectionNew() {
         <Modal visible={familyPickerVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setFamilyPickerVisible(false)}>
           <SafeAreaView style={{ flex: 1, backgroundColor: "#0e0e16" }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" }}>
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>Select Family</Text>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>Olfactive Profile</Text>
               <TouchableOpacity onPress={() => setFamilyPickerVisible(false)}>
                 <Text style={{ color: "#0fb8aa", fontSize: 15 }}>Done</Text>
               </TouchableOpacity>
@@ -773,65 +803,71 @@ export default function CollectionNew() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
-  logoText: { color: "#13131a", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
-  backIcon: { color: "#13131a", fontSize: 24, fontWeight: "300", lineHeight: 28, marginTop: -2 },
-  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
+  logoText: { color: "#edff8d", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -3 },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
   profileIcon: { fontSize: 16 },
-  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, marginBottom: 16 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 18 },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
 
-  photoUpload: { width: "100%", height: 380, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" },
-  uploadIcon: { fontSize: 32, marginBottom: 10, opacity: 0.4 },
-  uploadLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
-  corner: { position: "absolute", width: 22, height: 22, borderColor: "rgba(19,19,26,0.3)", borderWidth: 0 },
-  cornerTL: { top: 16, left: 16, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 4 },
-  cornerTR: { top: 16, right: 16, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 4 },
-  cornerBL: { bottom: 16, left: 16, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 4 },
-  cornerBR: { bottom: 16, right: 16, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 4 },
-  aiStatusBar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(13,184,170,0.3)", paddingVertical: 6, paddingHorizontal: 12 },
-  aiStatusText: { color: "#0d9488", fontSize: 12, textAlign: "center" },
+  topRow: { flexDirection: "row", gap: 12, marginBottom: 14, alignItems: "stretch" },
+  photoBox: { flex: 1.15, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  captureTitle: { color: "#13131a", fontSize: 14, fontWeight: "600", marginBottom: 8, textAlign: "center" },
+  captureSub: { color: "rgba(19,19,26,0.5)", fontSize: 11, textAlign: "center", lineHeight: 17 },
+  topFields: { flex: 1 },
 
-  field: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 24, paddingHorizontal: 18, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 10 },
+  field: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 14, marginBottom: 10 },
   row: { flexDirection: "row", gap: 10 },
 
-  sectionHeader: { color: "rgba(19,19,26,0.45)", fontSize: 11, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", marginTop: 18, marginBottom: 12 },
-  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 10 },
-  tagChip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 50, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(255,255,255,0.45)" },
-  tagChipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  tagChipText: { color: "rgba(19,19,26,0.7)", fontSize: 13, fontWeight: "500" },
-  tagChipTextActive: { color: "#E5F772" },
-  fieldLabel: { color: "rgba(19,19,26,0.55)", fontSize: 13 },
+  sectionHeader: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", marginTop: 18, marginBottom: 12 },
+  fieldLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
 
-  chooser: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
-  chooserFilled: { color: "#13131a", fontSize: 14 },
-  chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
-  addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" },
-  addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" },
+  tagChip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 50, borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", backgroundColor: "transparent" },
+  tagChipActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  tagChipText: { color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: "500" },
+  tagChipTextActive: { color: "#13131a", fontWeight: "700" },
+
+  chooserField: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 10 },
+  chooserEmpty: { color: "rgba(255,255,255,0.4)", fontSize: 14 },
+  chooserFilled: { color: "#fff", fontSize: 14 },
+  chevron: { color: "rgba(255,255,255,0.5)", fontSize: 20 },
+  addBtn: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, justifyContent: "center", marginBottom: 10 },
+  addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+
+  seasonIcons: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 10 },
+  seasonIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  seasonIconActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  seasonIconText: { fontSize: 14 },
 
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
-  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
-  tagText: { color: "#13131a", fontSize: 13 },
+  tag: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
+  tagText: { color: "#fff", fontSize: 13 },
+  noteTag: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#0fb8aa", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  noteTagText: { color: "#0fb8aa", fontSize: 12, fontWeight: "600" },
   organDropdown: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: -6, marginBottom: 8, overflow: "hidden" },
   organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
   organDropdownText: { color: "#13131a", fontSize: 14 },
   organDropdownHint: { color: "#0fb8aa", fontSize: 11, fontWeight: "600" },
 
-  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
-  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },
-  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#0fb8aa" },
+  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 
-  colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
+  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
 
+  sectionBox: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  boxLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 },
+  boxInput: { color: "#fff", fontSize: 14, padding: 0, minHeight: 24, textAlignVertical: "top" },
+  inspBoxWhite: { alignSelf: "center", width: "62%", aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  deleteLink: { color: "#ff6b6b", fontSize: 13, fontWeight: "600" },
+  tempSlider: { height: 44, borderRadius: 22, overflow: "hidden", justifyContent: "center", marginBottom: 12, position: "relative" },
+  tempSliderLabel: { position: "absolute", left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 1, textShadowColor: "rgba(0,0,0,0.4)", textShadowRadius: 3 },
 
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" },
-  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12 },
-  moreBtnText: { color: "#13131a", fontSize: 14 },
-  fabBtn: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)", alignItems: "center", justifyContent: "center" },
-  fabBtnText: { color: "rgba(19,19,26,0.5)", fontSize: 26, fontWeight: "300", lineHeight: 30 },
-  saveBtn: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingVertical: 16 },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 15 },
+  moreBtnText: { color: "#fff", fontSize: 14 },
+  saveBtn: { backgroundColor: "#0fb8aa", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
   saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 });
 

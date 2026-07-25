@@ -11,6 +11,7 @@ import * as ImagePicker from "expo-image-picker";
 import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { SpilsLogo } from "@/components/SpilsLogo";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,10 @@ interface JournalEntry {
   emotions: string[] | null;
   colors: string[] | null;
   temperature: number | null;
+  size: string | null;
+  category: string | null;
+  concentration: string | null;
+  reminds_me_of: string | null;
   price_text: string | null;
   music_url: string | null;
   music_source: string | null;
@@ -50,6 +55,14 @@ interface JournalEntry {
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
+
+function temperatureColor(t: number): string {
+  if (t <= 2) return "#2E6BE8";
+  if (t <= 4) return "#3BA7E8";
+  if (t <= 6) return "#3BC9A0";
+  if (t <= 8) return "#F0A93B";
+  return "#E8503B";
+}
 const FRAGRANCE_FAMILIES = [
   "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Aquatic",
   "Aromatic", "Aromatic Fougère", "Chypre", "Citrus", "Citrus Woods",
@@ -58,55 +71,99 @@ const FRAGRANCE_FAMILIES = [
   "Oriental Woody", "Spicy", "Umami", "Woody", "Woody Aromatic",
   "Woody Green", "Woody Spicy",
 ];
+const CATEGORY_OPTIONS = ["Designer", "Niche", "Luxury", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
+const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "EDC", "Cologne", "Oil"];
 
 // ─── Edit Modal Styles (hoisted so TagInput + F can reference em) ────────────
 
 const em = StyleSheet.create({
-  header: { alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
-  headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" },
-  cancelBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12 },
-  cancelBtnText: { color: "#13131a", fontSize: 14 },
-  savePill: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
+  profileIcon: { fontSize: 16 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -3 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 18 },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
+
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingVertical: 16 },
+  cancelBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 15 },
+  cancelBtnText: { color: "#fff", fontSize: 14 },
+  savePill: { backgroundColor: "#edff8d", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
   savePillText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
-  label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
-  input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
+
+  label: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
+  input: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 14, marginBottom: 4 },
+  row: { flexDirection: "row", gap: 10 },
+
+  topRow: { flexDirection: "row", gap: 12, marginBottom: 14, alignItems: "stretch" },
+  photoBox: { flex: 1.15, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  captureTitle: { color: "#13131a", fontSize: 14, fontWeight: "600", marginBottom: 8, textAlign: "center" },
+  captureSub: { color: "rgba(19,19,26,0.5)", fontSize: 11, textAlign: "center", lineHeight: 17 },
+  topFields: { flex: 1 },
+
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
-  chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  chipText: { color: "rgba(19,19,26,0.6)", fontSize: 13 },
-  chipTextActive: { color: "#E5F772" },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", backgroundColor: "rgba(255,255,255,0.05)" },
+  chipActive: { backgroundColor: "#edff8d", borderColor: "#edff8d" },
+  chipText: { color: "rgba(255,255,255,0.7)", fontSize: 13 },
+  chipTextActive: { color: "#13131a" },
+
+  seasonIcons: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 10 },
+  seasonIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  seasonIconActive: { backgroundColor: "#edff8d", borderColor: "#edff8d" },
+  seasonIconText: { fontSize: 14 },
+
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
-  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  tagText: { color: "#13131a", fontSize: 13 },
+  tag: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  tagText: { color: "#fff", fontSize: 13 },
+  noteTag: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#edff8d", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  noteTagText: { color: "#edff8d", fontSize: 12, fontWeight: "600" },
+
   organDropdown: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: 4, marginBottom: 4, overflow: "hidden" },
   organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)" },
   organDropdownText: { color: "#13131a", fontSize: 14 },
   organDropdownHint: { color: "rgba(0,0,0,0.3)", fontSize: 11 },
-  publicRow: { marginTop: 20, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  publicLabel: { color: "#13131a", fontSize: 15, fontWeight: "600" },
-  publicSub: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginTop: 2 },
-  colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
-  addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" as const },
-  addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" as const },
-  chooser: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13 },
-  chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
-  chooserFilled: { color: "#13131a", fontSize: 14 },
-  chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
-  inlineList: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, marginBottom: 10, overflow: "hidden" as const },
-  inlineRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.07)" },
-  inlineRowActive: { backgroundColor: "#13131a" },
-  inlineRowText: { color: "#13131a", fontSize: 14 },
-  inlineRowTextActive: { color: "#E5F772", fontWeight: "600" as const },
-  photoUpload: { width: "100%", height: 320, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" as const },
-  uploadIcon: { fontSize: 32, marginBottom: 10, opacity: 0.4 },
-  uploadLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
-  aiStatusBar: { position: "absolute" as const, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.25)", paddingVertical: 6, paddingHorizontal: 12 },
-  aiStatusText: { color: "#fff", fontSize: 12, textAlign: "center" as const },
-  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
-  sliderFill: { position: "absolute" as const, left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },
-  sliderThumb: { position: "absolute" as const, width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+
+  publicRow: { marginTop: 8, marginBottom: 8, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  publicLabel: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  publicSub: { color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 2 },
+
+  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
+  addBtn: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, justifyContent: "center" as const, marginBottom: 10 },
+  addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" as const },
+  chooser: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 10 },
+  chooserEmpty: { color: "rgba(255,255,255,0.4)", fontSize: 14 },
+  chooserFilled: { color: "#fff", fontSize: 14 },
+  chevron: { color: "rgba(255,255,255,0.5)", fontSize: 20 },
+  inlineList: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", borderRadius: 12, marginBottom: 10, overflow: "hidden" as const },
+  inlineRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+  inlineRowActive: { backgroundColor: "rgba(237,255,141,0.15)" },
+  inlineRowText: { color: "#fff", fontSize: 14 },
+  inlineRowTextActive: { color: "#edff8d", fontWeight: "600" as const },
+
+  photoUpload: { width: "100%", height: 320, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" as const },
+  uploadIcon: { fontSize: 32, marginBottom: 10, color: "rgba(255,255,255,0.5)" },
+  uploadLabel: { color: "rgba(255,255,255,0.5)", fontSize: 14 },
+  aiStatusBar: { position: "absolute" as const, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.55)", paddingVertical: 6, paddingHorizontal: 12 },
+  aiStatusText: { color: "#edff8d", fontSize: 12, textAlign: "center" as const },
+
+  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
+  sliderFill: { position: "absolute" as const, left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#C9F24D" },
+  sliderThumb: { position: "absolute" as const, width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+
+  sectionBox: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  boxLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 },
+  boxInput: { color: "#fff", fontSize: 14, padding: 0, minHeight: 24, textAlignVertical: "top" as const },
+  inspBoxWhite: { alignSelf: "center", width: "62%", aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" as const },
+  deleteLink: { color: "#ff6b6b", fontSize: 13, fontWeight: "600" },
+  tempSlider: { height: 44, borderRadius: 22, overflow: "hidden", justifyContent: "center", marginBottom: 12, position: "relative" as const },
+  tempSliderLabel: { position: "absolute" as const, left: 0, right: 0, textAlign: "center" as const, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 1, textShadowColor: "rgba(0,0,0,0.4)", textShadowRadius: 3 },
+
+  aiHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 18, marginBottom: 12 },
+  aiHeader: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
+  betaBadge: { backgroundColor: "#edff8d", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  betaText: { color: "#13131a", fontSize: 9, fontWeight: "700" },
+  aiBtnFull: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingVertical: 16, paddingHorizontal: 16, alignItems: "flex-start" as const, justifyContent: "center", marginBottom: 10 },
+  aiBtnText: { color: "#fff", fontSize: 12, fontWeight: "600", letterSpacing: 0.5 },
+  aiAnswerBox: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: "#fff", fontSize: 14, height: 240, textAlignVertical: "top" as const, marginTop: 4 },
 });
 
 // ─── Slider ───────────────────────────────────────────────────────────────────
@@ -141,7 +198,7 @@ function SliderRow({ label, value, onChange }: { label: string; value: number; o
 
   return (
     <View style={{ marginBottom: 14 }}>
-      <Text style={em.label}>{label}  <Text style={{ color: "#13131a", fontWeight: "700" }}>{value}</Text></Text>
+      <Text style={[em.label, { marginTop: 0, marginBottom: 8 }]}>{label}</Text>
       <View ref={containerRef} onLayout={measure} style={em.sliderTrack} {...panResponder.panHandlers}>
         <View style={[em.sliderFill, { width: `${pct * 100}%` as any }]} />
         <View style={[em.sliderThumb, { left: `${pct * 100}%` as any }]} />
@@ -150,10 +207,32 @@ function SliderRow({ label, value, onChange }: { label: string; value: number; o
   );
 }
 
+function TemperatureSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const containerRef = useRef<View>(null);
+  const info = useRef({ x: 0, width: 1 });
+  const measure = () => { containerRef.current?.measureInWindow((x, _y, width) => { if (width > 0) info.current = { x, width }; }); };
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => { measure(); onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)); },
+      onPanResponderMove: (evt) => { onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)); },
+    })
+  ).current;
+  const pct = value / 10;
+  return (
+    <View ref={containerRef} onLayout={measure} style={em.tempSlider} {...panResponder.panHandlers}>
+      <LinearGradient colors={["#2E6BE8", "#3BA7E8", "#3BC9A0", "#F0A93B", "#E8503B"]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill as any} />
+      <Text style={em.tempSliderLabel}>TEMPERATURE</Text>
+      <View style={[em.sliderThumb, { left: `${pct * 100}%` as any }]} />
+    </View>
+  );
+}
+
 // ─── Edit Modal Components ────────────────────────────────────────────────────
 
 function F({ style, ...props }: React.ComponentProps<typeof TextInput>) {
-  return <TextInput style={[em.input, style]} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />;
+  return <TextInput style={[em.input, style]} placeholderTextColor="rgba(255,255,255,0.4)" {...props} />;
 }
 
 function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove, onScrollRequest }: {
@@ -186,7 +265,7 @@ function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove,
       <TextInput
         style={em.input}
         placeholder={placeholder}
-        placeholderTextColor="rgba(19,19,26,0.4)"
+        placeholderTextColor="rgba(255,255,255,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
         onFocus={() => onScrollRequest?.()}
@@ -210,8 +289,8 @@ function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove,
       {tags.length > 0 && (
         <View style={em.tagRow}>
           {tags.map((t, i) => (
-            <TouchableOpacity key={i} style={em.tag} onPress={() => onRemove(i)}>
-              <Text style={em.tagText}>{t} ×</Text>
+            <TouchableOpacity key={i} style={em.noteTag} onPress={() => onRemove(i)}>
+              <Text style={em.noteTagText}>{t} ×</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -229,7 +308,11 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [perfumer, setPerfumer] = useState("");
   const [gender, setGender] = useState("");
   const [priceText, setPriceText] = useState("");
+  const [sizeText, setSizeText] = useState("");
   const [rating, setRating] = useState("");
+  const [category, setCategory] = useState("");
+  const [concentration, setConcentration] = useState("");
+  const [remindsMeOf, setRemindsMeOf] = useState("");
   const [seasons, setSeasons] = useState<string[]>([]);
   const [isPublic, setIsPublic] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -237,7 +320,11 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
   const [temperature, setTemperature] = useState(5);
   const [genderOpen, setGenderOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [concentrationOpen, setConcentrationOpen] = useState(false);
   const [familyOpen, setFamilyOpen] = useState(false);
+  const [aiActionLoading, setAiActionLoading] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<string | null>(null);
   const [pendingFamily, setPendingFamily] = useState("");
   const [entryDate, setEntryDate] = useState("");
   const [notesTop, setNotesTop] = useState<string[]>([]);
@@ -265,7 +352,11 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setPerfumer(entry.perfumer ?? "");
     setGender(entry.gender ?? "");
     setPriceText(entry.price_text ?? "");
+    setSizeText(entry.size ?? "");
     setRating(entry.rating_10?.toString() ?? "");
+    setCategory(entry.category ?? "");
+    setConcentration(entry.concentration ?? "");
+    setRemindsMeOf(entry.reminds_me_of ?? "");
     setSeasons(entry.seasons ?? []);
     setIsPublic(entry.is_public);
     setEntryDate(entry.entry_date);
@@ -295,6 +386,10 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       perfumer: perfumer.trim() || null,
       gender: gender.trim() || null,
       price_text: priceText.trim() || null,
+      size: sizeText.trim() || null,
+      category: category.trim() || null,
+      concentration: concentration.trim() || null,
+      reminds_me_of: remindsMeOf.trim() || null,
       rating_10: rating ? parseFloat(rating) : null,
       seasons: seasons.length ? seasons : null,
       is_public: isPublic,
@@ -356,83 +451,152 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const toggleSeason = (s: string) =>
     setSeasons((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
 
+  const runAIAction = async (action: string) => {
+    setAiActionLoading(action);
+    setAiResult(null);
+    try {
+      const resp = await (supabase as any).functions.invoke("journal-ai", {
+        body: {
+          mode: "action", action,
+          context: { perfume: title, brand, gender, seasons: seasons.join(", "), notes: description, pyramid: { top: notesTop, heart: notesHeart, base: notesBase } },
+        },
+      });
+      if (resp.error) throw resp.error;
+      setAiResult(resp.data?.text ?? "No result returned.");
+    } catch {
+      setAiResult("AI request failed. Please try again.");
+    } finally {
+      setAiActionLoading(null);
+    }
+  };
+
+  const AI_ACTIONS = [
+    { key: "facts", label: "FACTS" },
+    { key: "similar_market", label: "SIMILAR PERFUMES" },
+  ];
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+      <LinearGradient colors={["#000000", "#000000", "#C9F24D"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
-          <View style={em.header}>
-            <Text style={em.headerTitle}>Edit Entry</Text>
+          {/* Top nav */}
+          <View style={em.topNav}>
+            <SpilsLogo height={22} color="#edff8d" />
+            <TouchableOpacity style={em.profileBtn} onPress={onClose}>
+              <Text style={em.profileIcon}>👤</Text>
+            </TouchableOpacity>
           </View>
 
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 20, paddingBottom: 300 }} keyboardShouldPersistTaps="handled">
-            {/* Bottle photo */}
-            <TouchableOpacity style={em.photoUpload} onPress={pickBottlePhoto} activeOpacity={0.85}>
-              {bottleImage && <Image source={{ uri: bottleImage }} style={[StyleSheet.absoluteFill as any, { borderRadius: 18 }]} resizeMode="contain" />}
-              {!bottleImage && (
-                <>
-                  <Text style={em.uploadIcon}>↑</Text>
-                  <Text style={em.uploadLabel}>Tap to capture or upload</Text>
-                </>
-              )}
-              {bottleImage && (
-                <View style={em.aiStatusBar}><Text style={em.aiStatusText}>Tap to change</Text></View>
-              )}
-            </TouchableOpacity>
+          <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 200 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {/* Back carrot + header */}
+            <View style={em.titleRow}>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Text style={em.backCarrot}>‹</Text>
+              </TouchableOpacity>
+              <Text style={em.pageTitle}>Journal</Text>
+            </View>
 
-            <Text style={em.label}>Title</Text>
-            <F placeholder="Perfume name…" value={title} onChangeText={setTitle} />
-
-            <Text style={em.label}>Brand</Text>
-            <F placeholder="Brand…" value={brand} onChangeText={setBrand} />
-
-            <Text style={em.label}>Perfumer</Text>
-            <F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
-
-            <Text style={em.label}>Gender</Text>
-            <TouchableOpacity style={em.chooser} onPress={() => setGenderOpen((v) => !v)}>
-              <Text style={gender ? em.chooserFilled : em.chooserEmpty}>{gender || "Select gender"}</Text>
-              <Text style={em.chevron}>{genderOpen ? "▴" : "▾"}</Text>
-            </TouchableOpacity>
-            {genderOpen && (
-              <View style={em.inlineList}>
-                {["Female", "Male", "Unisex"].map((g) => (
-                  <TouchableOpacity key={g} style={[em.inlineRow, gender === g && em.inlineRowActive]} onPress={() => { setGender(g); setGenderOpen(false); }}>
-                    <Text style={[em.inlineRowText, gender === g && em.inlineRowTextActive]}>{g}</Text>
-                    {gender === g ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Price</Text>
-                <F placeholder="190.00" value={priceText} onChangeText={setPriceText} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Rating (0–10)</Text>
-                <F placeholder="8.5" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+            {/* Photo + basic fields */}
+            <View style={em.topRow}>
+              <TouchableOpacity style={em.photoBox} onPress={pickBottlePhoto} activeOpacity={0.85}>
+                {bottleImage
+                  ? <Image source={{ uri: bottleImage }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+                  : (
+                    <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+                      <Text style={em.captureTitle}>Tap to Capture</Text>
+                      <Text style={em.captureSub}>(Best if shot on clean background)</Text>
+                      <Text style={em.captureSub}>or</Text>
+                      <Text style={em.captureSub}>Upload an Image</Text>
+                    </View>
+                  )}
+              </TouchableOpacity>
+              <View style={em.topFields}>
+                <F placeholder="Perfume" value={title} onChangeText={setTitle} style={{ marginBottom: 10 }} />
+                <F placeholder="Brand" value={brand} onChangeText={setBrand} style={{ marginBottom: 10 }} />
+                <F placeholder="Perfumer" value={perfumer} onChangeText={setPerfumer} style={{ marginBottom: 10 }} />
+                <View style={[em.row, { marginBottom: 10 }]}>
+                  <F placeholder="Price" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" style={{ flex: 1, marginBottom: 0 }} />
+                  <F placeholder="Size" value={sizeText} onChangeText={setSizeText} style={{ flex: 1, marginBottom: 0 }} />
+                </View>
+                <F placeholder="Rating" value={rating} onChangeText={setRating} keyboardType="decimal-pad" style={{ alignSelf: "flex-start", minWidth: 90, marginBottom: 0 }} />
               </View>
             </View>
 
-            <Text style={em.label}>Date</Text>
-            <F placeholder="YYYY-MM-DD" value={entryDate} onChangeText={setEntryDate} />
-
-            <Text style={em.label}>Season(s)</Text>
-            <View style={em.chipRow}>
-              {SEASONS.map((s) => (
-                <TouchableOpacity key={s} style={[em.chip, seasons.includes(s) && em.chipActive]} onPress={() => toggleSeason(s)}>
-                  <Text style={[em.chipText, seasons.includes(s) && em.chipTextActive]}>{SEASON_ICONS[s]} {s}</Text>
+            {/* Category | Concentration */}
+            <View style={[em.row, { alignItems: "flex-start" }]}>
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity style={em.chooser} onPress={() => setCategoryOpen((v) => !v)}>
+                  <Text style={category ? em.chooserFilled : em.chooserEmpty}>{category || "Category"}</Text>
+                  <Text style={em.chevron}>▾</Text>
                 </TouchableOpacity>
-              ))}
+                {categoryOpen && (
+                  <View style={em.inlineList}>
+                    {CATEGORY_OPTIONS.map((o) => (
+                      <TouchableOpacity key={o} style={[em.inlineRow, category === o && em.inlineRowActive]} onPress={() => { setCategory(o); setCategoryOpen(false); }}>
+                        <Text style={[em.inlineRowText, category === o && em.inlineRowTextActive]}>{o}</Text>
+                        {category === o ? <Text style={{ color: "#edff8d" }}>✓</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity style={em.chooser} onPress={() => setConcentrationOpen((v) => !v)}>
+                  <Text style={concentration ? em.chooserFilled : em.chooserEmpty}>{concentration || "Concentration"}</Text>
+                  <Text style={em.chevron}>▾</Text>
+                </TouchableOpacity>
+                {concentrationOpen && (
+                  <View style={em.inlineList}>
+                    {CONCENTRATION_OPTIONS.map((o) => (
+                      <TouchableOpacity key={o} style={[em.inlineRow, concentration === o && em.inlineRowActive]} onPress={() => { setConcentration(o); setConcentrationOpen(false); }}>
+                        <Text style={[em.inlineRowText, concentration === o && em.inlineRowTextActive]}>{o}</Text>
+                        {concentration === o ? <Text style={{ color: "#edff8d" }}>✓</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
 
-            <Text style={em.label}>Fragrance Family</Text>
-            <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+            {/* Gender | Season icons */}
+            <View style={[em.row, { alignItems: "flex-start" }]}>
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity style={em.chooser} onPress={() => setGenderOpen((v) => !v)}>
+                  <Text style={gender ? em.chooserFilled : em.chooserEmpty}>{gender || "Gender"}</Text>
+                  <Text style={em.chevron}>▾</Text>
+                </TouchableOpacity>
+                {genderOpen && (
+                  <View style={em.inlineList}>
+                    {["Female", "Male", "Unisex"].map((g) => (
+                      <TouchableOpacity key={g} style={[em.inlineRow, gender === g && em.inlineRowActive]} onPress={() => { setGender(g); setGenderOpen(false); }}>
+                        <Text style={[em.inlineRowText, gender === g && em.inlineRowTextActive]}>{g}</Text>
+                        {gender === g ? <Text style={{ color: "#edff8d" }}>✓</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <View style={em.seasonIcons}>
+                {SEASONS.map((sn) => {
+                  const active = seasons.includes(sn);
+                  return (
+                    <TouchableOpacity key={sn} style={[em.seasonIcon, active && em.seasonIconActive]} onPress={() => toggleSeason(sn)}>
+                      <Text style={em.seasonIconText}>{SEASON_ICONS[sn]}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Reminds me of */}
+            <F placeholder="Reminds me of..." value={remindsMeOf} onChangeText={setRemindsMeOf} style={{ marginBottom: 10 }} />
+
+            {/* Olfactive Profile */}
+            <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity style={em.chooser} onPress={() => setFamilyOpen((v) => !v)}>
-                <Text style={pendingFamily ? em.chooserFilled : em.chooserEmpty}>{pendingFamily || "Choose family"}</Text>
-                <Text style={em.chevron}>{familyOpen ? "▴" : "▾"}</Text>
+                <Text style={pendingFamily ? em.chooserFilled : em.chooserEmpty}>{pendingFamily || "OLFACTIVE PROFILE"}</Text>
+                <Text style={em.chevron}>▾</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[em.addBtn, (!pendingFamily || accords.includes(pendingFamily)) && { opacity: 0.4 }]}
@@ -447,7 +611,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
                 {FRAGRANCE_FAMILIES.map((f) => (
                   <TouchableOpacity key={f} style={[em.inlineRow, pendingFamily === f && em.inlineRowActive]} onPress={() => { setPendingFamily(f); setFamilyOpen(false); }}>
                     <Text style={[em.inlineRowText, pendingFamily === f && em.inlineRowTextActive]}>{f}</Text>
-                    {pendingFamily === f ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
+                    {pendingFamily === f ? <Text style={{ color: "#edff8d" }}>✓</Text> : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -462,74 +626,89 @@ function EditModal({ visible, entry, onClose, onSaved }: {
               </View>
             )}
 
-            <Text style={em.label}>Top Notes</Text>
-            <TagInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            {/* Pyramid */}
+            <TagInput tags={notesTop} inputVal={topInput} placeholder="TOP NOTES" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="MIDDLE NOTES" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            <TagInput tags={notesBase} inputVal={baseInput} placeholder="BASE NOTES" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
 
-            <Text style={em.label}>Middle Notes</Text>
-            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            {/* Performance */}
+            <View style={{ marginTop: 8 }}>
+              <SliderRow label="Projection" value={projection} onChange={setProjection} />
+              <SliderRow label="Sillage" value={sillage} onChange={setSillage} />
+              <SliderRow label="Longevity" value={longevity} onChange={setLongevity} />
+            </View>
 
-            <Text style={em.label}>Base Notes</Text>
-            <TagInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            {/* Drydown */}
+            <View style={em.sectionBox}>
+              <Text style={em.boxLabel}>DRYDOWN</Text>
+              <TextInput style={em.boxInput} placeholder="Describe the dry down..." placeholderTextColor="rgba(255,255,255,0.3)" value={dryDown} onChangeText={setDryDown} multiline onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            </View>
 
-            <SliderRow label="Projection" value={projection} onChange={setProjection} />
-            <SliderRow label="Sillage" value={sillage} onChange={setSillage} />
-            <SliderRow label="Longevity" value={longevity} onChange={setLongevity} />
-
-            <Text style={em.label}>Dry Down</Text>
-            <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
-
-            {/* Inspiration photo */}
-            <Text style={em.label}>Inspiration</Text>
-            <TouchableOpacity style={em.photoUpload} onPress={pickInspirationPhotoEdit} activeOpacity={0.85}>
-              {inspirationImage && <Image source={{ uri: inspirationImage }} style={[StyleSheet.absoluteFill as any, { borderRadius: 18 }]} resizeMode="contain" />}
-              {!inspirationImage && (
-                <View style={{ alignItems: "center" }}>
-                  <Text style={em.uploadIcon}>↑</Text>
-                  <Text style={em.uploadLabel}>Upload Inspiration Photo</Text>
+            {/* Color(s) */}
+            <View style={em.sectionBox}>
+              <Text style={em.boxLabel}>COLOR(S)</Text>
+              <View style={{ height: 280, marginBottom: 12 }}>
+                <ColorPicker color={selectedColor} onColorChange={setSelectedColor} thumbSize={28} sliderSize={28} noSnap={true} row={false} swatches={false} discrete={false} />
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                  {colors.map((c, i) => (
+                    <TouchableOpacity key={i} style={[em.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
+                  ))}
                 </View>
-              )}
-              {inspirationImage && (
-                <View style={em.aiStatusBar}><Text style={em.aiStatusText}>Tap to change</Text></View>
-              )}
+                <TouchableOpacity style={[em.addBtn, { marginBottom: 0 }, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
+                  <Text style={em.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Temperature */}
+            <TemperatureSlider value={temperature} onChange={setTemperature} />
+
+            {/* Music */}
+            <F placeholder="MUSIC (URL, Spotify, YouTube Links...)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" style={{ marginBottom: 10 }} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+
+            {/* Inspiration */}
+            <Text style={[em.boxLabel, { marginTop: 4 }]}>INSPIRATION</Text>
+            <TouchableOpacity style={em.inspBoxWhite} onPress={pickInspirationPhotoEdit} activeOpacity={0.85}>
+              {inspirationImage
+                ? <Image source={{ uri: inspirationImage }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+                : (
+                  <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+                    <Text style={em.captureTitle}>Tap to Capture</Text>
+                    <Text style={em.captureSub}>(Best if shot on clean background)</Text>
+                    <Text style={em.captureSub}>or</Text>
+                    <Text style={em.captureSub}>Upload an Image</Text>
+                  </View>
+                )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setInspirationImage(null)} style={{ alignSelf: "flex-end", marginTop: 6, marginBottom: 12 }}>
+              <Text style={em.deleteLink}>Delete</Text>
             </TouchableOpacity>
 
-            <Text style={em.label}>Color(s)</Text>
-            <View style={em.colorWheelWrap}>
-              <ColorPicker
-                color={selectedColor}
-                onColorChange={setSelectedColor}
-                thumbSize={28}
-                sliderSize={28}
-                noSnap={true}
-                row={false}
-                swatches={false}
-                discrete={false}
-              />
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-                {colors.map((c, i) => (
-                  <TouchableOpacity key={i} style={[em.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
-                ))}
-              </View>
-              <TouchableOpacity style={[em.addBtn, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
-                <Text style={em.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
-              </TouchableOpacity>
+            {/* Notes */}
+            <View style={[em.sectionBox, { minHeight: 170 }]}>
+              <Text style={em.boxLabel}>NOTES</Text>
+              <TextInput style={[em.boxInput, { minHeight: 120 }]} placeholder="Write your notes..." placeholderTextColor="rgba(255,255,255,0.3)" value={description} onChangeText={setDescription} multiline onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
             </View>
 
-            <Text style={em.label}>Temperature</Text>
-            <SliderRow label="Cold → Warm" value={temperature} onChange={setTemperature} />
-
-            <Text style={em.label}>Music URL</Text>
-            <F placeholder="Spotify / YouTube link…" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
-
-            <Text style={em.label}>Notes</Text>
-            <F placeholder="Your thoughts…" value={description} onChangeText={setDescription} multiline style={{ height: 120, textAlignVertical: "top" }} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
-
+            {/* Public toggle */}
             <TouchableOpacity style={em.publicRow} onPress={() => setIsPublic((v) => !v)}>
               <Text style={em.publicLabel}>{isPublic ? "🌐 Public" : "🔒 Private"}</Text>
               <Text style={em.publicSub}>Tap to toggle visibility</Text>
             </TouchableOpacity>
+
+            {/* Ask Scent Somm AI */}
+            <View style={em.aiHeaderRow}>
+              <Text style={em.aiHeader}>ASK SCENT SOMM AI</Text>
+              <View style={em.betaBadge}><Text style={em.betaText}>Beta</Text></View>
+            </View>
+            {AI_ACTIONS.map((a) => (
+              <TouchableOpacity key={a.key} style={em.aiBtnFull} onPress={() => runAIAction(a.key)} disabled={!!aiActionLoading}>
+                {aiActionLoading === a.key ? <ActivityIndicator color="#fff" size="small" /> : <Text style={em.aiBtnText}>{a.label}</Text>}
+              </TouchableOpacity>
+            ))}
+            <TextInput style={em.aiAnswerBox} placeholder="(ANSWERS SHOW UP HERE)" placeholderTextColor="rgba(255,255,255,0.4)" value={aiResult ?? ""} editable={false} multiline />
           </ScrollView>
           </KeyboardAvoidingView>
           <View style={em.bottomBar}>
@@ -537,7 +716,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
               <Text style={em.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[em.savePill, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={em.savePillText}>Save</Text>}
+              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.savePillText}>Save</Text>}
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -643,17 +822,17 @@ export default function JournalDetail() {
   };
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={["#000000", "#000000", "#C9F24D"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView>
     </LinearGradient>
   );
 
   if (loading) {
-    return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color="#13131a" size="large" /></View></Wrapper>;
+    return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color="#fff" size="large" /></View></Wrapper>;
   }
 
   if (!entry) {
-    return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Text style={{ color: "rgba(19,19,26,0.5)" }}>Entry not found</Text></View></Wrapper>;
+    return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Text style={{ color: "rgba(255,255,255,0.5)" }}>Entry not found</Text></View></Wrapper>;
   }
 
   const d_ = new Date(entry.entry_date + "T12:00:00");
@@ -664,101 +843,146 @@ export default function JournalDetail() {
     <Wrapper>
       {/* Top Nav */}
       <View style={d.topNav}>
-        <Text style={d.logoText}>SP/LS.</Text>
+        <SpilsLogo height={22} color="#edff8d" />
         <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
           <Text style={d.profileIcon}>👤</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
-        {/* Page title with back button */}
+      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 140 }} showsVerticalScrollIndicator={false} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
+        {/* Back carrot + section header */}
         <View style={d.titleRow}>
-          <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
-            <Text style={d.backIcon}>‹</Text>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={d.backCarrot}>‹</Text>
           </TouchableOpacity>
           <Text style={d.pageTitle}>Journal</Text>
         </View>
 
-        {/* Entry Header */}
-        <View style={d.entryHeader}>
-          <View style={d.photoBox}>
+        {/* Summary card — same container as Calendar page */}
+        <View style={d.summaryCard}>
+          <View style={d.summaryThumb}>
             {entry.image_url
-              ? <Image source={{ uri: entry.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
-              : <Text style={d.photoPlaceholder}>Photo</Text>}
+              ? <Image source={{ uri: entry.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+              : null}
           </View>
-          <View style={d.entryMeta}>
-            <Text style={d.entryTitle} numberOfLines={2}>{displayName}</Text>
-            {entry.brand ? <Text style={d.entryBrand}>by {entry.brand}</Text> : null}
-            <Text style={d.entryDate}>{dateStr}</Text>
+          <View style={{ flex: 1 }}>
+            <View style={d.summaryTopRow}>
+              <Text style={d.summaryName} numberOfLines={1}>{displayName}</Text>
+              <Text style={d.summaryDate}>{dateStr}</Text>
+            </View>
+            {entry.brand ? <Text style={d.summaryBrand} numberOfLines={1}>{entry.brand}</Text> : null}
+            <View style={d.summaryMeta}>
+              {entry.rating_10 != null && (
+                <View style={d.ratingPill}><Text style={d.ratingText}>★ {entry.rating_10}</Text></View>
+              )}
+              {entry.seasons?.slice(0, 3).map((s) => (
+                <Text key={s} style={d.summaryMetaIcon}>{SEASON_ICONS[s]}</Text>
+              ))}
+            </View>
           </View>
         </View>
 
-        {/* Main details card */}
+        {/* Details box */}
         <View style={d.card}>
-          <Row label="Brand" value={entry.brand ?? "—"} />
           <Row label="Perfumer" value={entry.perfumer ?? "—"} />
-          <Row label="Gender" value={entry.gender ?? "—"} />
-          <Row label="Season(s)" value={entry.seasons?.length ? entry.seasons.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ") : "—"} />
           <Row label="Price" value={entry.price_text ?? "—"} />
+          <Row label="Size" value={entry.size ?? "—"} />
           <Row label="Rating" value={entry.rating_10 != null ? String(entry.rating_10) : "—"} />
-          <Row label="Fragrance Family" value={entry.accords?.length ? entry.accords.join(", ") : "—"} />
+          <Row label="Category" value={entry.category ?? "—"} />
+          <Row label="Concentration" value={entry.concentration ?? "—"} />
+          <Row label="Gender" value={entry.gender ?? "—"} />
+          <View style={d.row}>
+            <Text style={d.rowLabel}>Season(s)</Text>
+            <Text style={d.rowValueIcons}>{entry.seasons?.length ? entry.seasons.map((s) => SEASON_ICONS[s]).join("  ") : "—"}</Text>
+          </View>
+          <Row label="Reminds me of..." value={entry.reminds_me_of ?? "—"} />
+        </View>
 
-          <View style={d.divider} />
+        {/* Olfactive Profile box */}
+        <View style={d.card}>
+          <Row label="Olfactive Profile" value={entry.accords?.length ? entry.accords.join(", ") : "—"} />
+        </View>
 
+        {/* Notes box */}
+        <View style={d.card}>
           <Row label="Top Notes" value={entry.notes_top?.length ? entry.notes_top.join(", ") : "—"} />
           <Row label="Middle Notes" value={entry.notes_heart?.length ? entry.notes_heart.join(", ") : "—"} />
           <Row label="Base Notes" value={entry.notes_base?.length ? entry.notes_base.join(", ") : "—"} />
         </View>
 
-        {/* One unified card: Performance + Inspiration + Colors + Music + Notes */}
-        <View style={d.card}>
-          <Row label="Projection" value={entry.projection ?? "—"} />
-          <Row label="Sillage" value={entry.sillage ?? "—"} />
-          <Row label="Longevity" value={entry.longevity ?? "—"} />
-          <Row label="Temperature" value={entry.temperature != null ? `${entry.temperature <= 3 ? "Cold" : entry.temperature <= 6 ? "Cool" : entry.temperature <= 8 ? "Warm" : "Hot"} (${entry.temperature}/10)` : "—"} />
-          <Row label="Dry Down" value={entry.dry_down ?? "—"} />
-
-          {/* Inspiration photo — view only, edit via modal */}
-          {entry.inspiration_image_url ? (
-            <View style={d.inspirationInCard}>
-              <Image source={{ uri: entry.inspiration_image_url }} style={{ width: "100%", height: "100%", borderRadius: 14 }} resizeMode="contain" />
-            </View>
-          ) : null}
-
-          {/* Colors row */}
-          <View style={d.row}>
-            <Text style={d.rowLabel}>Colors</Text>
-            {entry.colors?.length ? (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", flex: 2 }}>
-                {entry.colors.map((c, i) => (
-                  <View key={i} style={[d.colorSwatch, { backgroundColor: c }]} />
-                ))}
-              </View>
-            ) : (
-              <Text style={d.rowValue}>—</Text>
-            )}
+        {/* Performance — text only, 3-column centered */}
+        <View style={[d.card, d.perfCard]}>
+          <View style={d.perfCol}>
+            <Text style={d.perfLabel}>PROJECTION</Text>
+            <Text style={d.perfValue}>{entry.projection ?? "—"}</Text>
           </View>
+          <View style={d.perfCol}>
+            <Text style={d.perfLabel}>SILLAGE</Text>
+            <Text style={d.perfValue}>{entry.sillage ?? "—"}</Text>
+          </View>
+          <View style={d.perfCol}>
+            <Text style={d.perfLabel}>LONGEVITY</Text>
+            <Text style={d.perfValue}>{entry.longevity ?? "—"}</Text>
+          </View>
+        </View>
 
-          {/* Music row */}
-          {entry.music_url ? (
-            <TouchableOpacity style={d.row} onPress={() => Linking.openURL(entry.music_url!)}>
-              <Text style={d.rowLabel}>Music</Text>
-              <Text style={[d.rowValue, { flexShrink: 1 }]} numberOfLines={2}>
-                {entry.music_title || entry.music_url}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={d.row}>
-              <Text style={d.rowLabel}>Music</Text>
-              <Text style={d.rowValue}>—</Text>
+        {/* Drydown */}
+        <View style={d.card}>
+          <Text style={d.blockLabel}>DRYDOWN</Text>
+          <Text style={[d.blockText, !entry.dry_down && d.blockTextEmpty]}>{entry.dry_down || "—"}</Text>
+        </View>
+
+        {/* Inspiration + Colors + Temperature */}
+        <View style={d.inspRow}>
+          <View style={d.inspBox}>
+            {entry.inspiration_image_url
+              ? <Image source={{ uri: entry.inspiration_image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+              : null}
+            <Text style={d.inspLabel}>INSPIRATION</Text>
+          </View>
+          <View style={d.inspRight}>
+            <View style={[d.card, d.colorsBox]}>
+              <Text style={d.blockLabel}>COLORS</Text>
+              {entry.colors?.length ? (
+                <View style={d.colorGrid}>
+                  {entry.colors.map((c, i) => (
+                    <View key={i} style={[d.colorCircle, { backgroundColor: c }]} />
+                  ))}
+                </View>
+              ) : (
+                <Text style={[d.blockText, d.blockTextEmpty]}>—</Text>
+              )}
             </View>
-          )}
+            <View style={[d.card, d.tempBox]}>
+              <Text style={d.blockLabel}>TEMPERATURE</Text>
+              <View style={d.tempCircleWrap}>
+                {entry.temperature != null ? (
+                  <View style={[d.colorCircle, { backgroundColor: temperatureColor(entry.temperature) }]} />
+                ) : (
+                  <Text style={[d.blockText, d.blockTextEmpty]}>—</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
 
-          {/* Notes */}
-          <Text style={d.cardSectionLabel}>Notes</Text>
-          <Text style={[d.descText, !entry.description && { color: "rgba(19,19,26,0.3)" }]}>
-            {entry.description || "No notes added."}
-          </Text>
+        {/* Music */}
+        {entry.music_url ? (
+          <TouchableOpacity style={[d.card, d.musicBox]} onPress={() => Linking.openURL(entry.music_url!)}>
+            <Text style={d.musicLabel}>MUSIC</Text>
+            <Text style={d.musicValue} numberOfLines={1}>{entry.music_title || entry.music_url}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[d.card, d.musicBox]}>
+            <Text style={d.musicLabel}>MUSIC</Text>
+            <Text style={d.musicValue}>—</Text>
+          </View>
+        )}
+
+        {/* Notes */}
+        <View style={d.card}>
+          <Text style={d.blockLabel}>NOTES</Text>
+          <Text style={[d.blockText, !entry.description && d.blockTextEmpty]}>{entry.description || "—"}</Text>
         </View>
       </ScrollView>
 
@@ -808,52 +1032,82 @@ export default function JournalDetail() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const d = StyleSheet.create({
-  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
   logoText: { color: "#13131a", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
-  backIcon: { color: "#13131a", fontSize: 24, fontWeight: "300", lineHeight: 28, marginTop: -2 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -3 },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
   iconBtnText: { fontSize: 15 },
-  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
   profileIcon: { fontSize: 16 },
 
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 20 },
-  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, paddingHorizontal: 2 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 20 },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
 
-  entryHeader: { flexDirection: "row", gap: 16, marginBottom: 16 },
-  photoBox: { width: 150, height: 150, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(0,0,0,0.08)", overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  photoPlaceholder: { color: "rgba(19,19,26,0.35)", fontSize: 13 },
-  entryMeta: { flex: 1, justifyContent: "center", gap: 4 },
-  entryTitle: { color: "#13131a", fontSize: 20, fontWeight: "800", lineHeight: 26 },
-  entryBrand: { color: "rgba(19,19,26,0.55)", fontSize: 14, fontWeight: "500" },
-  entryDate: { color: "rgba(19,19,26,0.45)", fontSize: 13, marginTop: 4 },
+  summaryCard: { flexDirection: "row", gap: 14, alignItems: "center", backgroundColor: "#fff", borderRadius: 16, padding: 14, marginBottom: 16 },
+  summaryThumb: { width: 62, height: 62, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.12)", overflow: "hidden" },
+  summaryTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  summaryName: { color: "#13131a", fontWeight: "700", fontSize: 15, flex: 1, marginRight: 8 },
+  summaryDate: { color: "rgba(19,19,26,0.5)", fontSize: 12 },
+  summaryBrand: { color: "rgba(19,19,26,0.55)", fontSize: 13, marginTop: 2 },
+  summaryMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  summaryMetaIcon: { fontSize: 14 },
+  ratingPill: { borderWidth: 1, borderColor: "rgba(0,0,0,0.25)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  ratingText: { color: "#13131a", fontSize: 11, fontWeight: "600" },
 
-  card: { backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, marginBottom: 12 },
-  cardSectionLabel: { color: "rgba(19,19,26,0.4)", fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", paddingTop: 12, paddingBottom: 8 },
+  card: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 2, marginBottom: 12, backgroundColor: "transparent" },
+  cardSectionLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", paddingTop: 12, paddingBottom: 8 },
 
-  row: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingVertical: 16 },
-  rowLabel: { color: "rgba(19,19,26,0.45)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", flex: 1, paddingTop: 1 },
-  rowValue: { color: "#13131a", fontSize: 13, fontWeight: "500", flex: 2, textAlign: "right" },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14 },
+  rowLabel: { color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: "500", flex: 1 },
+  rowValue: { color: "#fff", fontSize: 11, fontWeight: "600", flex: 2, textAlign: "right", textTransform: "uppercase", letterSpacing: 0.3 },
+  rowValueIcons: { color: "#fff", fontSize: 15, flex: 2, textAlign: "right" },
 
-  divider: { height: 1, backgroundColor: "rgba(0,0,0,0.1)", marginVertical: 4 },
+  // Performance — 3-column centered
+  perfCard: { flexDirection: "row", alignItems: "center", paddingVertical: 18 },
+  perfCol: { flex: 1, alignItems: "center" },
+  perfLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "600", letterSpacing: 0.5, marginBottom: 8 },
+  perfValue: { color: "#fff", fontSize: 20, fontWeight: "600" },
+
+  // Block sections (label on top + content below)
+  blockLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginTop: 14, marginBottom: 10 },
+  blockText: { color: "#fff", fontSize: 13, lineHeight: 20, paddingBottom: 14 },
+  blockTextEmpty: { color: "rgba(255,255,255,0.3)" },
+
+  // Inspiration + Colors + Temperature row
+  inspRow: { flexDirection: "row", gap: 12, marginBottom: 12, alignItems: "stretch" },
+  inspBox: { flex: 1.25, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
+  inspLabel: { position: "absolute", top: 12, left: 12, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, zIndex: 2 },
+  inspRight: { flex: 1, gap: 12 },
+  colorsBox: { marginBottom: 0, paddingHorizontal: 12 },
+  tempBox: { marginBottom: 0 },
+  colorGrid: { flexDirection: "row", flexWrap: "wrap-reverse", gap: 12, justifyContent: "center", alignContent: "center", alignItems: "center", paddingTop: 6, paddingBottom: 24 },
+  colorCircle: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  tempCircleWrap: { alignItems: "center", justifyContent: "center", paddingTop: 4, paddingBottom: 18 },
+
+  // Music single-row box
+  musicBox: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
+  musicLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
+  musicValue: { color: "rgba(255,255,255,0.7)", fontSize: 12, flexShrink: 1, textAlign: "right", marginLeft: 12 },
+
+  divider: { height: 1, backgroundColor: "rgba(255,255,255,0.15)", marginVertical: 4 },
 
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 12 },
   tag: { backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   tagText: { color: "#13131a", fontSize: 12, fontWeight: "500" },
 
-  colorSwatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
+  colorSwatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
 
-  descText: { color: "rgba(19,19,26,0.75)", fontSize: 14, lineHeight: 22, paddingBottom: 14 },
+  descText: { color: "rgba(255,255,255,0.75)", fontSize: 14, lineHeight: 22, paddingBottom: 14 },
 
-  inspirationInCard: { height: 420, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.5)", borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", alignItems: "center", justifyContent: "center", marginVertical: 12, overflow: "hidden" },
+  inspirationInCard: { height: 420, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center", marginVertical: 12, overflow: "hidden" },
 
   editPill: { alignSelf: "center", backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 48, paddingVertical: 14, marginTop: 8, marginBottom: 24 },
   editPillText: { color: "#fff", fontSize: 15, fontWeight: "600" },
 
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 12, paddingBottom: 24 },
-  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 100, paddingHorizontal: 24, paddingVertical: 13 },
-  moreBtnText: { color: "#13131a", fontSize: 14 },
-  saveBottomBtn: { backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 14 },
-  saveBottomBtnText: { color: "#E5F772", fontSize: 15, fontWeight: "700" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 24 },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 30, paddingVertical: 15 },
+  moreBtnText: { color: "#fff", fontSize: 14 },
+  saveBottomBtn: { backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 42, paddingVertical: 15 },
+  saveBottomBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });
 

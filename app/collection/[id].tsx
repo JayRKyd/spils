@@ -11,6 +11,7 @@ import * as ImagePicker from "expo-image-picker";
 import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { SpilsLogo } from "@/components/SpilsLogo";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,18 @@ type Perfume = {
   dry_down?: string | null;
   colors?: string[] | null;
   retailer?: string | null;
+  reminds_me_of?: string | null;
+  temperature?: number | null;
+  created_at?: string | null;
 };
+
+function temperatureColor(t: number): string {
+  if (t <= 2) return "#2E6BE8";
+  if (t <= 4) return "#3BA7E8";
+  if (t <= 6) return "#3BC9A0";
+  if (t <= 8) return "#F0A93B";
+  return "#E8503B";
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,51 +71,100 @@ const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
 // ─── Edit Modal Styles (hoisted so F + TagInput can reference em) ─────────────
 
 const em = StyleSheet.create({
-  header: { alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
-  headerTitle: { color: "#13131a", fontSize: 17, fontWeight: "700" },
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" },
-  cancelBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 100, paddingHorizontal: 24, paddingVertical: 13 },
-  cancelBtnText: { color: "#13131a", fontSize: 14 },
-  savePill: { backgroundColor: "#C6FF00", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 13 },
-  savePillText: { color: "#13131a", fontSize: 14, fontWeight: "700" },
-  photoUpload: { width: "100%", height: 320, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16, overflow: "hidden" as const },
-  uploadLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
-  label: { color: "rgba(19,19,26,0.5)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
-  input: { backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, color: "#13131a", fontSize: 14, marginBottom: 4 },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
+  profileIcon: { fontSize: 16 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -3 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 18 },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
+
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingVertical: 16 },
+  cancelBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 15 },
+  cancelBtnText: { color: "#fff", fontSize: 14 },
+  savePill: { backgroundColor: "#0fb8aa", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
+  savePillText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
+
+  label: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
+  input: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 14, marginBottom: 4 },
+  row: { flexDirection: "row", gap: 10 },
+
+  topRow: { flexDirection: "row", gap: 12, marginBottom: 14, alignItems: "stretch" },
+  photoBox: { flex: 1.15, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  captureTitle: { color: "#13131a", fontSize: 14, fontWeight: "600", marginBottom: 8, textAlign: "center" },
+  captureSub: { color: "rgba(19,19,26,0.5)", fontSize: 11, textAlign: "center", lineHeight: 17 },
+  topFields: { flex: 1 },
+
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)" },
-  chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  chipText: { color: "rgba(19,19,26,0.6)", fontSize: 13 },
-  chipTextActive: { color: "#E5F772" },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", backgroundColor: "rgba(255,255,255,0.05)" },
+  chipActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  chipText: { color: "rgba(255,255,255,0.7)", fontSize: 13 },
+  chipTextActive: { color: "#13131a" },
+
+  seasonIcons: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 10 },
+  seasonIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  seasonIconActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  seasonIconText: { fontSize: 14 },
+
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
-  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  tagText: { color: "#13131a", fontSize: 13 },
+  tag: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  tagText: { color: "#fff", fontSize: 13 },
+  noteTag: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#0fb8aa", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  noteTagText: { color: "#0fb8aa", fontSize: 12, fontWeight: "600" },
   organDropdown: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: 4, marginBottom: 4, overflow: "hidden" },
   organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)" },
   organDropdownText: { color: "#13131a", fontSize: 14 },
-  organDropdownHint: { color: "rgba(0,0,0,0.3)", fontSize: 11 },
-  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", overflow: "hidden", justifyContent: "center" },
-  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.55)" },
-  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
-  colorWheelWrap: { height: 320, backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", padding: 12, marginBottom: 14 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)" },
-  addBtn: { backgroundColor: "#13131a", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 13, justifyContent: "center" as const },
-  addBtnText: { color: "#E5F772", fontSize: 14, fontWeight: "600" as const },
-  chooser: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1.5, borderColor: "rgba(0,0,0,0.3)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 4 },
-  chooserEmpty: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
-  chooserFilled: { color: "#13131a", fontSize: 14 },
-  chevron: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
-  inlineList: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 14, marginBottom: 10, overflow: "hidden" as const },
-  inlineRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.07)" },
-  inlineRowActive: { backgroundColor: "#13131a" },
-  inlineRowText: { color: "#13131a", fontSize: 14 },
-  inlineRowTextActive: { color: "#E5F772", fontWeight: "600" as const },
+  organDropdownHint: { color: "#0fb8aa", fontSize: 11, fontWeight: "600" },
+  sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#0fb8aa" },
+  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
+  addBtn: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, justifyContent: "center" as const, marginBottom: 10 },
+  addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" as const },
+  chooser: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 10 },
+  chooserEmpty: { color: "rgba(255,255,255,0.4)", fontSize: 14 },
+  chooserFilled: { color: "#fff", fontSize: 14 },
+  chevron: { color: "rgba(255,255,255,0.5)", fontSize: 20 },
+  inlineList: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", borderRadius: 12, marginBottom: 10, overflow: "hidden" as const },
+  inlineRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+  inlineRowActive: { backgroundColor: "rgba(15,184,170,0.15)" },
+  inlineRowText: { color: "#fff", fontSize: 14 },
+  inlineRowTextActive: { color: "#0fb8aa", fontWeight: "600" as const },
+
+  sectionBox: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  boxLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 },
+  boxInput: { color: "#fff", fontSize: 14, padding: 0, minHeight: 24, textAlignVertical: "top" as const },
+  inspBoxWhite: { alignSelf: "center", width: "62%", aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" as const },
+  deleteLink: { color: "#ff6b6b", fontSize: 13, fontWeight: "600" },
+  tempSlider: { height: 44, borderRadius: 22, overflow: "hidden", justifyContent: "center", marginBottom: 12, position: "relative" as const },
+  tempSliderLabel: { position: "absolute" as const, left: 0, right: 0, textAlign: "center" as const, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 1, textShadowColor: "rgba(0,0,0,0.4)", textShadowRadius: 3 },
 });
 
 // ─── Edit Modal Components (module-level to avoid remount on re-render) ────────
 
 function F({ style, ...props }: React.ComponentProps<typeof TextInput>) {
-  return <TextInput style={[em.input, style]} placeholderTextColor="rgba(19,19,26,0.4)" {...props} />;
+  return <TextInput style={[em.input, style]} placeholderTextColor="rgba(255,255,255,0.4)" {...props} />;
+}
+
+function TemperatureSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const containerRef = useRef<View>(null);
+  const info = useRef({ x: 0, width: 1 });
+  const measure = () => { containerRef.current?.measureInWindow((x, _y, width) => { if (width > 0) info.current = { x, width }; }); };
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => { measure(); onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)); },
+      onPanResponderMove: (evt) => { onChange(Math.round(clamp((evt.nativeEvent.pageX - info.current.x) / info.current.width) * 10)); },
+    })
+  ).current;
+  const pct = value / 10;
+  return (
+    <View ref={containerRef} onLayout={measure} style={em.tempSlider} {...panResponder.panHandlers}>
+      <LinearGradient colors={["#2E6BE8", "#3BA7E8", "#3BC9A0", "#F0A93B", "#E8503B"]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill as any} />
+      <Text style={em.tempSliderLabel}>TEMPERATURE</Text>
+      <View style={[em.sliderThumb, { left: `${pct * 100}%` as any }]} />
+    </View>
+  );
 }
 
 function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove }: {
@@ -115,7 +176,7 @@ function TagInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove 
       <TextInput
         style={em.input}
         placeholder={placeholder}
-        placeholderTextColor="rgba(19,19,26,0.4)"
+        placeholderTextColor="rgba(255,255,255,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
         onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); onChangeInput(""); } }}
@@ -204,7 +265,7 @@ function NoteInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove
       <TextInput
         style={em.input}
         placeholder={placeholder}
-        placeholderTextColor="rgba(19,19,26,0.4)"
+        placeholderTextColor="rgba(255,255,255,0.4)"
         value={inputVal}
         onChangeText={onChangeInput}
         onSubmitEditing={() => { if (inputVal.trim()) { onAdd(inputVal.trim()); setSuggestions([]); } }}
@@ -224,8 +285,8 @@ function NoteInput({ tags, inputVal, placeholder, onChangeInput, onAdd, onRemove
       {tags.length > 0 && (
         <View style={em.tagRow}>
           {tags.map((t, i) => (
-            <TouchableOpacity key={i} style={em.tag} onPress={() => onRemove(i)}>
-              <Text style={em.tagText}>{t} ×</Text>
+            <TouchableOpacity key={i} style={em.noteTag} onPress={() => onRemove(i)}>
+              <Text style={em.noteTagText}>{t} ×</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -246,10 +307,13 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
   const [sizeText, setSizeText] = useState("");
   const [priceText, setPriceText] = useState("");
   const [rating, setRating] = useState("");
+  const [remindsMeOf, setRemindsMeOf] = useState("");
+  const [temperature, setTemperature] = useState(5);
   const [seasons, setSeasons] = useState<string[]>([]);
   const [concentration, setConcentration] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
+  const [genderOpen, setGenderOpen] = useState(false);
   const [notesTop, setNotesTop] = useState<string[]>([]);
   const [notesHeart, setNotesHeart] = useState<string[]>([]);
   const [notesBase, setNotesBase] = useState<string[]>([]);
@@ -281,6 +345,8 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
     setSizeText(perfume.size_ml != null ? String(perfume.size_ml) : "");
     setPriceText(perfume.price != null ? String(perfume.price) : "");
     setRating(perfume.rating != null ? String(perfume.rating) : "");
+    setRemindsMeOf(perfume.reminds_me_of ?? "");
+    setTemperature(perfume.temperature ?? 5);
     setSeasons(perfume.season ?? []);
     setConcentration(perfume.concentration ?? "");
     setCategory(perfume.category ?? "");
@@ -335,6 +401,8 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       size_ml: sizeText ? parseFloat(sizeText) : null,
       price: priceText ? parseFloat(priceText) : null,
       rating: rating ? parseFloat(rating) : null,
+      reminds_me_of: remindsMeOf.trim() || null,
+      temperature: temperature,
       season: seasons.length ? seasons : null,
       concentration: concentration || null,
       category: category || null,
@@ -360,41 +428,52 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <LinearGradient colors={TEAL} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={{ flex: 1 }}>
+      <LinearGradient colors={["#000000", "#000000", "#0fb8aa"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
-          <View style={em.header}>
-            <Text style={em.headerTitle}>Edit Entry</Text>
+          <View style={em.topNav}>
+            <SpilsLogo height={22} color="#edff8d" />
+            <TouchableOpacity style={em.profileBtn} onPress={onClose}>
+              <Text style={em.profileIcon}>👤</Text>
+            </TouchableOpacity>
           </View>
 
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
-            {/* Photo upload box */}
-            <Text style={em.label}>Photo</Text>
-            <TouchableOpacity onPress={pickPhoto} activeOpacity={0.8}
-              style={{ height: 320, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
-              {image ? (
-                <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
-              ) : (
-                <View style={{ alignItems: "center" }}>
-                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 32, marginBottom: 10 }}>↑</Text>
-                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Tap to capture or upload</Text>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={em.titleRow}>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Text style={em.backCarrot}>‹</Text>
+              </TouchableOpacity>
+              <Text style={em.pageTitle}>Collection</Text>
+            </View>
+
+            {/* Photo + basic fields */}
+            <View style={em.topRow}>
+              <TouchableOpacity style={em.photoBox} onPress={pickPhoto} activeOpacity={0.85}>
+                {image
+                  ? <Image source={{ uri: image }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+                  : (
+                    <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+                      <Text style={em.captureTitle}>Tap to Capture</Text>
+                      <Text style={em.captureSub}>(Best if shot on clean background)</Text>
+                      <Text style={em.captureSub}>or</Text>
+                      <Text style={em.captureSub}>Upload an Image</Text>
+                    </View>
+                  )}
+              </TouchableOpacity>
+              <View style={em.topFields}>
+                <F placeholder="Perfume" value={name} onChangeText={setName} style={{ marginBottom: 10 }} />
+                <F placeholder="Brand" value={brand} onChangeText={setBrand} style={{ marginBottom: 10 }} />
+                <F placeholder="Perfumer" value={perfumer} onChangeText={setPerfumer} style={{ marginBottom: 10 }} />
+                <View style={[em.row, { marginBottom: 10 }]}>
+                  <F placeholder="Price" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" style={{ flex: 1, marginBottom: 0 }} />
+                  <F placeholder="Size" value={sizeText} onChangeText={setSizeText} keyboardType="decimal-pad" style={{ flex: 1, marginBottom: 0 }} />
                 </View>
-              )}
-              {image ? (
-                <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                  <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
+                <F placeholder="Rating" value={rating} onChangeText={setRating} keyboardType="decimal-pad" style={{ alignSelf: "flex-start", minWidth: 90, marginBottom: 0 }} />
+              </View>
+            </View>
 
-            <Text style={em.label}>Name</Text>
-            <F placeholder="Perfume name…" value={name} onChangeText={setName} />
-
-            <Text style={em.label}>Brand</Text>
-            <F placeholder="Brand…" value={brand} onChangeText={setBrand} />
-
-            <Text style={em.label}>Perfumer</Text>
-            <F placeholder="Perfumer…" value={perfumer} onChangeText={setPerfumer} />
+            {/* Reminds me of */}
+            <F placeholder="Reminds me of..." value={remindsMeOf} onChangeText={setRemindsMeOf} style={{ marginBottom: 10 }} />
 
             <Text style={em.label}>Gender</Text>
             <View style={em.chipRow}>
@@ -403,21 +482,6 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                   <Text style={[em.chipText, gender === opt && em.chipTextActive]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
-
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Size (ml)</Text>
-                <F placeholder="50" value={sizeText} onChangeText={setSizeText} keyboardType="decimal-pad" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Price</Text>
-                <F placeholder="190.00" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={em.label}>Rating (0–10)</Text>
-                <F placeholder="8.5" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
-              </View>
             </View>
 
             <Text style={em.label}>Season(s)</Text>
@@ -439,7 +503,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                 {CONCENTRATION_OPTIONS.map((opt) => (
                   <TouchableOpacity key={opt} style={[em.inlineRow, concentration === opt && em.inlineRowActive]} onPress={() => { setConcentration(opt); setConcentrationOpen(false); }}>
                     <Text style={[em.inlineRowText, concentration === opt && em.inlineRowTextActive]}>{opt}</Text>
-                    {concentration === opt ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
+                    {concentration === opt ? <Text style={{ color: "#0fb8aa" }}>✓</Text> : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -455,7 +519,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                 {CATEGORY_OPTIONS.map((opt) => (
                   <TouchableOpacity key={opt} style={[em.inlineRow, category === opt && em.inlineRowActive]} onPress={() => { setCategory(opt); setCategoryOpen(false); }}>
                     <Text style={[em.inlineRowText, category === opt && em.inlineRowTextActive]}>{opt}</Text>
-                    {category === opt ? <Text style={{ color: "#E5F772" }}>✓</Text> : null}
+                    {category === opt ? <Text style={{ color: "#0fb8aa" }}>✓</Text> : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -470,74 +534,73 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
               ))}
             </View>
 
-            <Text style={em.label}>Fragrance Family</Text>
-            <TagInput tags={accords} inputVal={accordInput} placeholder="Add accord…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
+            <Text style={em.label}>Olfactive Profile</Text>
+            <TagInput tags={accords} inputVal={accordInput} placeholder="Add profile…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
 
-            <Text style={em.label}>Top Notes</Text>
-            <NoteInput tags={notesTop} inputVal={topInput} placeholder="Add note…" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+            <Text style={[em.label, { marginTop: 18 }]}>Pyramid</Text>
+            <NoteInput tags={notesTop} inputVal={topInput} placeholder="TOP NOTES" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+            <NoteInput tags={notesHeart} inputVal={heartInput} placeholder="MIDDLE NOTES" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+            <NoteInput tags={notesBase} inputVal={baseInput} placeholder="BASE NOTES" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
 
-            <Text style={em.label}>Middle Notes</Text>
-            <NoteInput tags={notesHeart} inputVal={heartInput} placeholder="Add note…" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+            <View style={{ marginTop: 8 }}>
+              <SliderRow label="Projection" value={projection} onChange={setProjection} />
+              <SliderRow label="Sillage" value={sillage} onChange={setSillage} />
+              <SliderRow label="Longevity" value={longevity} onChange={setLongevity} />
+            </View>
 
-            <Text style={em.label}>Base Notes</Text>
-            <NoteInput tags={notesBase} inputVal={baseInput} placeholder="Add note…" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
+            {/* Drydown */}
+            <View style={em.sectionBox}>
+              <Text style={em.boxLabel}>DRYDOWN</Text>
+              <TextInput style={em.boxInput} placeholder="Describe the dry down..." placeholderTextColor="rgba(255,255,255,0.3)" value={dryDown} onChangeText={setDryDown} multiline />
+            </View>
 
-            <SliderRow label="Projection" value={projection} onChange={setProjection} />
-            <SliderRow label="Sillage" value={sillage} onChange={setSillage} />
-            <SliderRow label="Longevity" value={longevity} onChange={setLongevity} />
-
-            <Text style={em.label}>Dry Down</Text>
-            <F placeholder="Describe the dry down…" value={dryDown} onChangeText={setDryDown} multiline style={{ height: 80, textAlignVertical: "top" }} />
-
-            <Text style={em.label}>Music</Text>
-            <F placeholder="Hallelujah by Jeff Buckley…" value={music} onChangeText={setMusic} />
-
-            {/* Inspiration Photo */}
-            <Text style={em.label}>Inspiration Photo</Text>
-            <TouchableOpacity onPress={pickInspirationPhoto} activeOpacity={0.8}
-              style={{ height: 320, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.07)", borderWidth: 1, borderColor: "rgba(0,0,0,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 4, overflow: "hidden" }}>
-              {inspirationImage ? (
-                <Image source={{ uri: inspirationImage }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-              ) : (
-                <View style={{ alignItems: "center" }}>
-                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 32, marginBottom: 10 }}>↑</Text>
-                  <Text style={{ color: "rgba(19,19,26,0.35)", fontSize: 14 }}>Upload Inspiration Photo</Text>
+            {/* Color(s) */}
+            <View style={em.sectionBox}>
+              <Text style={em.boxLabel}>COLOR(S)</Text>
+              <View style={{ height: 280, marginBottom: 12 }}>
+                <ColorPicker color={selectedColor} onColorChange={setSelectedColor} thumbSize={28} sliderSize={28} noSnap={true} row={false} swatches={false} discrete={false} />
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                  {colors.map((c, i) => (
+                    <TouchableOpacity key={i} style={[em.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
+                  ))}
                 </View>
-              )}
-              {inspirationImage ? (
-                <View style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                  <Text style={{ color: "#fff", fontSize: 11 }}>Tap to change</Text>
-                </View>
-              ) : null}
+                <TouchableOpacity style={[em.addBtn, { marginBottom: 0 }, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
+                  <Text style={em.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Temperature */}
+            <TemperatureSlider value={temperature} onChange={setTemperature} />
+
+            {/* Music */}
+            <F placeholder="MUSIC (URL, Spotify, YouTube Links...)" value={music} onChangeText={setMusic} style={{ marginBottom: 10 }} />
+
+            {/* Inspiration */}
+            <Text style={[em.boxLabel, { marginTop: 4 }]}>INSPIRATION</Text>
+            <TouchableOpacity style={em.inspBoxWhite} onPress={pickInspirationPhoto} activeOpacity={0.85}>
+              {inspirationImage
+                ? <Image source={{ uri: inspirationImage }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
+                : (
+                  <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+                    <Text style={em.captureTitle}>Tap to Capture</Text>
+                    <Text style={em.captureSub}>(Best if shot on clean background)</Text>
+                    <Text style={em.captureSub}>or</Text>
+                    <Text style={em.captureSub}>Upload an Image</Text>
+                  </View>
+                )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setInspirationImage(null)} style={{ alignSelf: "flex-end", marginTop: 6, marginBottom: 12 }}>
+              <Text style={em.deleteLink}>Delete</Text>
             </TouchableOpacity>
 
-            {/* Color Wheel */}
-            <Text style={em.label}>Color(s)</Text>
-            <View style={em.colorWheelWrap}>
-              <ColorPicker
-                color={selectedColor}
-                onColorChange={setSelectedColor}
-                thumbSize={28}
-                sliderSize={28}
-                noSnap={true}
-                row={false}
-                swatches={false}
-                discrete={false}
-              />
+            {/* Notes */}
+            <View style={[em.sectionBox, { minHeight: 170 }]}>
+              <Text style={em.boxLabel}>NOTES</Text>
+              <TextInput style={[em.boxInput, { minHeight: 120 }]} placeholder="Write your notes..." placeholderTextColor="rgba(255,255,255,0.3)" value={notes} onChangeText={setNotes} multiline />
             </View>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-                {colors.map((c, i) => (
-                  <TouchableOpacity key={i} style={[em.colorDot, { backgroundColor: c }]} onPress={() => setColors((p) => p.filter((_, j) => j !== i))} />
-                ))}
-              </View>
-              <TouchableOpacity style={[em.addBtn, colors.length >= 3 && { opacity: 0.35 }]} onPress={() => { if (colors.length < 3 && !colors.includes(selectedColor)) setColors((p) => [...p, selectedColor]); }}>
-                <Text style={em.addBtnText}>{colors.length >= 3 ? "Max 3" : "Add"}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={em.label}>Notes</Text>
-            <F placeholder="Your thoughts…" value={notes} onChangeText={setNotes} multiline style={{ height: 120, textAlignVertical: "top" }} />
           </ScrollView>
           </KeyboardAvoidingView>
 
@@ -629,131 +692,135 @@ export default function CollectionDetail() {
   };
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <LinearGradient colors={TEAL} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={["#000000", "#000000", "#0fb8aa"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView>
     </LinearGradient>
   );
 
-  if (loading) return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color="#13131a" size="large" /></View></Wrapper>;
-  if (!perfume) return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Text style={{ color: "rgba(19,19,26,0.5)" }}>Not found</Text></View></Wrapper>;
+  if (loading) return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color="#fff" size="large" /></View></Wrapper>;
+  if (!perfume) return <Wrapper><View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Text style={{ color: "rgba(255,255,255,0.5)" }}>Not found</Text></View></Wrapper>;
+
+  const createdD = perfume.created_at ? new Date(perfume.created_at) : new Date();
+  const dateStr = `${String(createdD.getMonth() + 1).padStart(2, "0")}.${String(createdD.getDate()).padStart(2, "0")}.${String(createdD.getFullYear()).slice(2)}`;
 
   return (
     <Wrapper>
       {/* Top Nav */}
       <View style={d.topNav}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
-            <Text style={d.backIcon}>‹</Text>
-          </TouchableOpacity>
-          <Text style={d.logoText}>SP/LS.</Text>
-        </View>
+        <SpilsLogo height={22} color="#edff8d" />
         <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
           <Text style={d.profileIcon}>👤</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-        {/* Page title */}
-        <Text style={d.pageTitle}>Collection</Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+        {/* Back carrot + header */}
+        <View style={d.titleRow}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={d.backCarrot}>‹</Text>
+          </TouchableOpacity>
+          <Text style={d.pageTitle}>Collection</Text>
+        </View>
 
-        {/* Entry Header */}
-        <View style={d.entryHeader}>
-          {/* Photo card with name + heart inside */}
-          <View style={d.photoCard}>
-            <View style={d.photoBox}>
-              {perfume.image_url
-                ? <Image source={{ uri: perfume.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
-                : <Text style={d.photoPlaceholder}>Photo</Text>}
-            </View>
-            <Text style={d.photoName} numberOfLines={1}>{perfume.name}</Text>
-            <TouchableOpacity onPress={handleToggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ alignSelf: "flex-end" }}>
-              <Text style={d.photoHeart}>{perfume.is_favorite ? "♥" : "♡"}</Text>
-            </TouchableOpacity>
+        {/* Summary card */}
+        <View style={d.summaryCard}>
+          <View style={d.summaryThumb}>
+            {perfume.image_url ? <Image source={{ uri: perfume.image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" /> : null}
           </View>
-
-          <View style={d.entryMeta}>
-            <Text style={d.entryTitle} numberOfLines={2}>{perfume.name}</Text>
-            {perfume.brand ? <Text style={d.entryBrand}>{perfume.brand}</Text> : null}
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-              {perfume.status ? <View style={d.tag}><Text style={d.tagText}>{perfume.status}</Text></View> : null}
-              {perfume.concentration ? <View style={d.tag}><Text style={d.tagText}>{perfume.concentration}</Text></View> : null}
-              {perfume.category ? <View style={d.tag}><Text style={d.tagText}>{perfume.category}</Text></View> : null}
+          <View style={{ flex: 1 }}>
+            <View style={d.summaryTopRow}>
+              <Text style={d.summaryName} numberOfLines={1}>{perfume.name}</Text>
+              <Text style={d.summaryDate}>{dateStr}</Text>
+            </View>
+            {perfume.brand ? <Text style={d.summaryBrand} numberOfLines={1}>{perfume.brand}</Text> : null}
+            <View style={d.summaryMeta}>
+              {perfume.rating != null && <View style={d.ratingPill}><Text style={d.ratingText}>★ {perfume.rating}</Text></View>}
+              {perfume.season?.slice(0, 3).map((sn) => <Text key={sn} style={d.summaryMetaIcon}>{SEASON_ICONS[sn]}</Text>)}
             </View>
           </View>
         </View>
 
-        {/* ONE big card — all info */}
+        {/* Details box */}
         <View style={d.card}>
-          <Row label="Brand" value={perfume.brand ?? "—"} />
           <Row label="Perfumer" value={perfume.nose ?? "—"} />
-          <Row label="Gender" value={perfume.gender ?? "—"} />
-          <Row label="Season(s)" value={perfume.season?.length ? perfume.season.map(s => `${SEASON_ICONS[s]} ${s}`).join(", ") : "—"} />
-          <Row label="Concentration" value={perfume.concentration ?? "—"} />
-          <Row label="Category" value={perfume.category ?? "—"} />
-          <Row label="Size" value={perfume.size_ml != null ? `${perfume.size_ml} ml` : "—"} />
-          <Row label="Price" value={perfume.price != null ? `$${perfume.price}` : "—"} />
+          <Row label="Price" value={perfume.price != null ? String(perfume.price) : "—"} />
+          <Row label="Size" value={perfume.size_ml != null ? `${perfume.size_ml}ml` : "—"} />
           <Row label="Rating" value={perfume.rating != null ? String(perfume.rating) : "—"} />
+          <Row label="Category" value={perfume.category ?? "—"} />
+          <Row label="Concentration" value={perfume.concentration ?? "—"} />
+          <Row label="Gender" value={perfume.gender ?? "—"} />
+          <View style={d.row}>
+            <Text style={d.rowLabel}>Season(s)</Text>
+            <Text style={d.rowValueIcons}>{perfume.season?.length ? perfume.season.map((sn) => SEASON_ICONS[sn]).join("  ") : "—"}</Text>
+          </View>
+          <Row label="Reminds me of..." value={perfume.reminds_me_of ?? "—"} />
+        </View>
 
-          {/* Accords */}
-          <Row label="Fragrance Family" value={perfume.accords?.length ? perfume.accords.join(", ") : "—"} />
+        {/* Olfactive Profile box */}
+        <View style={d.card}>
+          <Row label="Olfactive Profile" value={perfume.accords?.length ? perfume.accords.join(", ") : "—"} />
+        </View>
 
-          <View style={d.divider} />
-
+        {/* Notes box */}
+        <View style={d.card}>
           <Row label="Top Notes" value={perfume.top_notes?.length ? perfume.top_notes.join(", ") : "—"} />
           <Row label="Middle Notes" value={perfume.heart_notes?.length ? perfume.heart_notes.join(", ") : "—"} />
           <Row label="Base Notes" value={perfume.base_notes?.length ? perfume.base_notes.join(", ") : "—"} />
-
-          <View style={d.divider} />
-
-          <Row label="Projection" value={perfume.projection ?? "—"} />
-          <Row label="Sillage" value={perfume.sillage ?? "—"} />
-          <Row label="Longevity" value={perfume.longevity ?? "—"} />
-          <Row label="Dry Down" value={perfume.dry_down ?? "—"} />
-
-          {/* Inspiration photo — view only, edit via modal */}
-          {perfume.inspiration_image_url ? (
-            <View style={d.inspirationInCard}>
-              <Image source={{ uri: perfume.inspiration_image_url }} style={{ width: "100%", height: "100%", borderRadius: 14 }} resizeMode="contain" />
-            </View>
-          ) : null}
-
-          {/* Colors */}
-          <View style={d.row}>
-            <Text style={d.rowLabel}>Colors</Text>
-            {perfume.colors?.length ? (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", flex: 2 }}>
-                {perfume.colors.map((c, i) => (
-                  <View key={i} style={[d.colorSwatch, { backgroundColor: c }]} />
-                ))}
-              </View>
-            ) : (
-              <Text style={d.rowValue}>—</Text>
-            )}
-          </View>
-
-          {/* Music */}
-          <View style={d.row}>
-            <Text style={d.rowLabel}>Music</Text>
-            {perfume.music?.startsWith("http") ? (
-              <TouchableOpacity onPress={() => Linking.openURL(perfume.music!)} style={{ flexShrink: 1 }}>
-                <Text style={[d.rowValue, { flexShrink: 1, textDecorationLine: "underline" }]} numberOfLines={2}>
-                  {perfume.music}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={[d.rowValue, { flexShrink: 1 }]} numberOfLines={2}>
-                {perfume.music || "—"}
-              </Text>
-            )}
-          </View>
-
-          {/* Notes */}
-          <Text style={d.cardSectionLabel}>Notes</Text>
-          <Text style={[d.descText, !perfume.notes && { color: "rgba(19,19,26,0.3)" }]}>
-            {perfume.notes || "No notes added."}
-          </Text>
         </View>
 
+        {/* Performance — 3-column */}
+        <View style={[d.card, d.perfCard]}>
+          <View style={d.perfCol}><Text style={d.perfLabel}>PROJECTION</Text><Text style={d.perfValue}>{perfume.projection ?? "—"}</Text></View>
+          <View style={d.perfCol}><Text style={d.perfLabel}>SILLAGE</Text><Text style={d.perfValue}>{perfume.sillage ?? "—"}</Text></View>
+          <View style={d.perfCol}><Text style={d.perfLabel}>LONGEVITY</Text><Text style={d.perfValue}>{perfume.longevity ?? "—"}</Text></View>
+        </View>
+
+        {/* Drydown */}
+        <View style={d.card}>
+          <Text style={d.blockLabel}>DRYDOWN</Text>
+          <Text style={[d.blockText, !perfume.dry_down && d.blockTextEmpty]}>{perfume.dry_down || "—"}</Text>
+        </View>
+
+        {/* Inspiration + Colors + Temperature */}
+        <View style={d.inspRow}>
+          <View style={d.inspBox}>
+            {perfume.inspiration_image_url ? <Image source={{ uri: perfume.inspiration_image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" /> : null}
+            <Text style={d.inspLabel}>INSPIRATION</Text>
+          </View>
+          <View style={d.inspRight}>
+            <View style={[d.card, d.colorsBox]}>
+              <Text style={d.blockLabel}>COLORS</Text>
+              {perfume.colors?.length ? (
+                <View style={d.colorGrid}>{perfume.colors.map((c, i) => <View key={i} style={[d.colorCircle, { backgroundColor: c }]} />)}</View>
+              ) : <Text style={[d.blockText, d.blockTextEmpty]}>—</Text>}
+            </View>
+            <View style={[d.card, d.tempBox]}>
+              <Text style={d.blockLabel}>TEMPERATURE</Text>
+              <View style={d.tempCircleWrap}>
+                {perfume.temperature != null ? <View style={[d.colorCircle, { backgroundColor: temperatureColor(perfume.temperature) }]} /> : <Text style={[d.blockText, d.blockTextEmpty]}>—</Text>}
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Music */}
+        {perfume.music ? (
+          <TouchableOpacity style={[d.card, d.musicBox]} onPress={() => { if (perfume.music?.startsWith("http")) Linking.openURL(perfume.music); }}>
+            <Text style={d.musicLabel}>MUSIC</Text>
+            <Text style={d.musicValue} numberOfLines={1}>{perfume.music}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[d.card, d.musicBox]}>
+            <Text style={d.musicLabel}>MUSIC</Text>
+            <Text style={d.musicValue}>—</Text>
+          </View>
+        )}
+
+        {/* Notes */}
+        <View style={d.card}>
+          <Text style={d.blockLabel}>NOTES</Text>
+          <Text style={[d.blockText, !perfume.notes && d.blockTextEmpty]}>{perfume.notes || "—"}</Text>
+        </View>
       </ScrollView>
 
       {/* Bottom Bar */}
@@ -803,53 +870,58 @@ export default function CollectionDetail() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const d = StyleSheet.create({
-  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
-  logoText: { color: "#13131a", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
-  backIcon: { color: "#13131a", fontSize: 24, fontWeight: "300", lineHeight: 28, marginTop: -2 },
-  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -3 },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
   profileIcon: { fontSize: 16 },
 
-  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, marginBottom: 20, paddingHorizontal: 2 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 20 },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
 
-  entryHeader: { flexDirection: "row", gap: 16, marginBottom: 16 },
+  summaryCard: { flexDirection: "row", gap: 14, alignItems: "center", backgroundColor: "#fff", borderRadius: 16, padding: 14, marginBottom: 16 },
+  summaryThumb: { width: 62, height: 62, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.12)", overflow: "hidden" },
+  summaryTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  summaryName: { color: "#13131a", fontWeight: "700", fontSize: 15, flex: 1, marginRight: 8 },
+  summaryDate: { color: "rgba(19,19,26,0.5)", fontSize: 12 },
+  summaryBrand: { color: "rgba(19,19,26,0.55)", fontSize: 13, marginTop: 2 },
+  summaryMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  summaryMetaIcon: { fontSize: 14 },
+  ratingPill: { borderWidth: 1, borderColor: "rgba(0,0,0,0.25)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  ratingText: { color: "#13131a", fontSize: 11, fontWeight: "600" },
 
-  photoCard: { width: 140, backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", overflow: "hidden", paddingBottom: 10 },
-  photoBox: { width: "100%", height: 140, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  photoPlaceholder: { color: "rgba(19,19,26,0.35)", fontSize: 13 },
-  photoName: { color: "#13131a", fontSize: 11, fontWeight: "600", marginTop: 8, paddingHorizontal: 8, textAlign: "center" },
-  photoHeart: { color: "#13131a", fontSize: 18, marginTop: 4, alignSelf: "flex-end", paddingRight: 10 },
+  card: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 2, marginBottom: 12, backgroundColor: "transparent" },
 
-  entryMeta: { flex: 1, justifyContent: "center", paddingLeft: 4, gap: 4 },
-  entryTitle: { color: "#13131a", fontSize: 20, fontWeight: "800", lineHeight: 26 },
-  entryBrand: { color: "rgba(19,19,26,0.55)", fontSize: 14, fontWeight: "500" },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14 },
+  rowLabel: { color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: "500", flex: 1 },
+  rowValue: { color: "#fff", fontSize: 11, fontWeight: "600", flex: 2, textAlign: "right", textTransform: "uppercase", letterSpacing: 0.3 },
+  rowValueIcons: { color: "#fff", fontSize: 15, flex: 2, textAlign: "right" },
 
-  tag: { backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
-  tagText: { color: "#13131a", fontSize: 12, fontWeight: "500" },
+  perfCard: { flexDirection: "row", alignItems: "center", paddingVertical: 18 },
+  perfCol: { flex: 1, alignItems: "center" },
+  perfLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "600", letterSpacing: 0.5, marginBottom: 8 },
+  perfValue: { color: "#fff", fontSize: 20, fontWeight: "600" },
 
-  card: { backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, marginBottom: 12 },
-  cardSectionLabel: { color: "rgba(19,19,26,0.4)", fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", paddingTop: 12, paddingBottom: 8 },
+  blockLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginTop: 14, marginBottom: 10 },
+  blockText: { color: "#fff", fontSize: 13, lineHeight: 20, paddingBottom: 14 },
+  blockTextEmpty: { color: "rgba(255,255,255,0.3)" },
 
-  row: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingVertical: 16 },
-  rowLabel: { color: "rgba(19,19,26,0.45)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", flex: 1, paddingTop: 1 },
-  rowValue: { color: "#13131a", fontSize: 13, fontWeight: "500", flex: 2, textAlign: "right" },
+  inspRow: { flexDirection: "row", gap: 12, marginBottom: 12, alignItems: "stretch" },
+  inspBox: { flex: 1.25, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
+  inspLabel: { position: "absolute", top: 12, left: 12, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, zIndex: 2 },
+  inspRight: { flex: 1, gap: 12 },
+  colorsBox: { marginBottom: 0, paddingHorizontal: 12 },
+  tempBox: { marginBottom: 0 },
+  colorGrid: { flexDirection: "row", flexWrap: "wrap-reverse", gap: 12, justifyContent: "center", alignContent: "center", alignItems: "center", paddingTop: 6, paddingBottom: 24 },
+  colorCircle: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  tempCircleWrap: { alignItems: "center", justifyContent: "center", paddingTop: 4, paddingBottom: 18 },
 
-  divider: { height: 1, backgroundColor: "rgba(0,0,0,0.1)", marginVertical: 4 },
+  musicBox: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
+  musicLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
+  musicValue: { color: "rgba(255,255,255,0.7)", fontSize: 12, flexShrink: 1, textAlign: "right", marginLeft: 12 },
 
-  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 12 },
-
-  colorSwatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
-
-  descText: { color: "rgba(19,19,26,0.75)", fontSize: 14, lineHeight: 22, paddingBottom: 14 },
-
-  inspirationInCard: { height: 420, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.5)", borderWidth: 1, borderColor: "rgba(0,0,0,0.07)", alignItems: "center", justifyContent: "center", marginVertical: 12, overflow: "hidden" },
-
-  editPill: { alignSelf: "center", backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 48, paddingVertical: 14, marginTop: 8, marginBottom: 24 },
-  editPillText: { color: "#fff", fontSize: 15, fontWeight: "600" },
-
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 12, paddingBottom: 24 },
-  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 100, paddingHorizontal: 24, paddingVertical: 13 },
-  moreBtnText: { color: "#13131a", fontSize: 14 },
-  saveBottomBtn: { backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 14 },
-  saveBottomBtnText: { color: "#E5F772", fontSize: 15, fontWeight: "700" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 24 },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 30, paddingVertical: 15 },
+  moreBtnText: { color: "#fff", fontSize: 14 },
+  saveBottomBtn: { backgroundColor: "#13131a", borderRadius: 100, paddingHorizontal: 42, paddingVertical: 15 },
+  saveBottomBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });

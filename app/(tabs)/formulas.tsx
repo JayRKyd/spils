@@ -11,6 +11,9 @@ import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
+const ACCENT = "#EC8FB5";
+const HEART = "#EC4C8E";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Formula {
@@ -78,40 +81,44 @@ function FormulaCard({ formula, onToggleFavorite }: {
 
   return (
     <View style={c.card}>
-      {/* Top row: name + heart */}
+      {/* Top row: name + date */}
       <TouchableOpacity
         style={c.topRow}
         onPress={() => router.push(`/formula/${formula.id}` as any)}
         activeOpacity={0.75}
       >
         <Text style={c.name} numberOfLines={1}>{formula.name}</Text>
+        <Text style={c.date}>{date}</Text>
+      </TouchableOpacity>
+
+      {/* Description */}
+      <TouchableOpacity
+        onPress={() => router.push(`/formula/${formula.id}` as any)}
+        activeOpacity={0.75}
+      >
+        <Text style={c.desc} numberOfLines={1}>
+          {formula.description || "One line of notes will go here..."}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Bottom row */}
+      <View style={c.bottomRow}>
+        <View style={c.bottomLeft}>
+          <View style={c.statusPill}>
+            <Text style={c.statusPillText}>{status.toUpperCase()}</Text>
+          </View>
+          <Text style={c.meta}>{formula.material_count ?? 0} MATERIALS</Text>
+          <Text style={c.sep}>  |  </Text>
+          <TouchableOpacity onPress={toggleVersions}>
+            <Text style={c.versionsLink}>VERSIONS</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           onPress={(e) => { e.stopPropagation?.(); onToggleFavorite(); }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={[c.heart, formula.is_favorite && c.heartActive]}>{formula.is_favorite ? "♥" : "♡"}</Text>
         </TouchableOpacity>
-      </TouchableOpacity>
-
-      {/* Description */}
-      <Text style={c.desc} numberOfLines={3}>
-        {formula.description || "No description"}
-      </Text>
-
-      {/* Bottom row */}
-      <View style={c.bottomRow}>
-        <View style={c.bottomLeft}>
-          <Text style={c.statusText}>{status}</Text>
-          <Text style={c.sep}>  |  </Text>
-          <Text style={c.meta}>{formula.material_count ?? 0} Materials</Text>
-          <>
-            <Text style={c.sep}>  |  </Text>
-            <TouchableOpacity onPress={toggleVersions}>
-              <Text style={c.versionsLink}>Versions.</Text>
-            </TouchableOpacity>
-          </>
-        </View>
-        <Text style={c.date}>{date}</Text>
       </View>
 
       {/* Version history */}
@@ -193,64 +200,73 @@ export default function Formulas() {
 
   return (
     <LinearGradient
-      colors={["#FFD4E6", "#F5AEC8", "#EC8FB5"]}
-      start={{ x: 0.1, y: 0 }}
-      end={{ x: 0.9, y: 1 }}
+      colors={["#000000", "#000000", ACCENT]}
+      locations={[0, 0.82, 1]}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
       style={{ flex: 1 }}
     >
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top nav */}
         <View style={s.topNav}>
-          <SpilsLogo height={22} />
+          <SpilsLogo height={22} color="#edff8d" />
           <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Title */}
-        <Text style={s.pageTitle}>Lab</Text>
-
-        {/* Search */}
-        <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>⌕</Text>
-          <TextInput
-            style={s.searchInput}
-            placeholder="Search projects..."
-            placeholderTextColor="rgba(0,0,0,0.35)"
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <Text style={s.searchClear}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Filter row */}
-        <View style={s.filterRow}>
-          <View style={s.filterLeft}>
-            <TouchableOpacity style={s.secureBadge} onPress={() => setSecureVisible(true)}>
-              <Text style={s.secureBadgeText}>Your Formulas are Secure</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.ifraPill} onPress={() => setIfraVisible(true)}>
-              <Text style={s.ifraPillText}>IFRA</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Title + Sort */}
+        <View style={s.headerRow}>
+          <Text style={s.pageTitle}>Lab</Text>
           <TouchableOpacity onPress={() => setSortOpen(true)}>
             <Text style={[s.sortText, activeFilter !== "All" && s.sortTextActive]}>{activeFilter === "All" ? "Sort" : activeFilter}</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Search */}
+        <View style={s.searchRow}>
+          <View style={s.searchWrap}>
+            <Text style={s.searchIcon}>⌕</Text>
+            <TextInput
+              style={s.searchInput}
+              placeholder="Search projects..."
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch("")}>
+                <Text style={s.searchClear}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity style={s.searchBtn} onPress={() => {}}>
+            <Text style={s.searchBtnText}>Search</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Chips */}
+        <View style={s.filterRow}>
+          <TouchableOpacity style={s.secureBadge} onPress={() => setSecureVisible(true)}>
+            <Text style={s.secureBadgeText}>Your Formulas are Secure</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.ifraPill} onPress={() => setIfraVisible(true)}>
+            <Text style={s.ifraPillText}>IFRA</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Section label */}
+        <Text style={s.sectionLabel}>Your Formulas</Text>
+
         {/* List */}
         {loading ? (
-          <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
+          <ActivityIndicator color={ACCENT} style={{ marginTop: 48 }} />
         ) : (
           <FlatList
             data={filtered}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 }}
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 8, paddingBottom: 100 }}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             ListEmptyComponent={
               <Text style={s.empty}>
                 {search ? "No projects match your search." : activeFilter !== "All" ? `No ${activeFilter.toLowerCase()} formulas.` : "No projects yet. Tap + to create one."}
@@ -344,60 +360,86 @@ const s = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 2,
   },
-  logo: { fontSize: 20, fontWeight: "900", color: "#13131a", letterSpacing: -0.5 },
+  logo: { fontSize: 20, fontWeight: "900", color: "#edff8d", letterSpacing: -0.5 },
   profileCircle: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.1)",
-    borderWidth: 1, borderColor: "rgba(0,0,0,0.1)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center", justifyContent: "center",
   },
   profileIcon: { fontSize: 16 },
 
-  pageTitle: {
-    fontSize: 32, fontWeight: "800", color: "#13131a",
-    letterSpacing: -1, paddingHorizontal: 20, marginTop: 6, marginBottom: 12,
-  },
-
-  searchWrap: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.55)",
+    justifyContent: "space-between",
+    paddingHorizontal: 30,
+    paddingTop: 73,
+    marginBottom: 14,
+  },
+  pageTitle: {
+    fontSize: 23, fontWeight: "700", color: "#fff",
+    letterSpacing: -0.3,
+  },
+
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 30,
+    marginBottom: 14,
+    gap: 8,
+  },
+  searchWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: 24,
-    marginHorizontal: 16,
     paddingHorizontal: 14,
     paddingVertical: 11,
-    marginBottom: 12,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
+    borderColor: "rgba(255,255,255,0.18)",
   },
-  searchIcon: { fontSize: 15, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: "#13131a" },
-  searchClear: { color: "rgba(0,0,0,0.3)", fontSize: 15, paddingLeft: 8 },
+  searchIcon: { fontSize: 15, marginRight: 8, color: "rgba(255,255,255,0.5)" },
+  searchInput: { flex: 1, fontSize: 14, color: "#fff" },
+  searchClear: { color: "rgba(255,255,255,0.4)", fontSize: 15, paddingLeft: 8 },
+  searchBtn: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  searchBtnText: { fontSize: 14, fontWeight: "700", color: "#13131a" },
 
   filterRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    marginBottom: 10,
+    gap: 10,
+    paddingHorizontal: 30,
+    marginBottom: 18,
   },
-  filterLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   secureBadge: {
-    backgroundColor: "#C6FF00",
+    backgroundColor: "#edff8d",
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   secureBadgeText: { fontSize: 12, fontWeight: "700", color: "#13131a" },
   ifraPill: {
-    backgroundColor: "#13131a",
+    backgroundColor: "transparent",
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
     paddingHorizontal: 16,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   ifraPillText: { fontSize: 12, fontWeight: "700", color: "#fff" },
-  sortText: { fontSize: 14, fontWeight: "600", color: "#13131a" },
-  sortTextActive: { fontWeight: "700", textDecorationLine: "underline" },
+  sortText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+  sortTextActive: { fontWeight: "700", textDecorationLine: "underline", color: ACCENT },
+  sectionLabel: {
+    fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.6)",
+    paddingHorizontal: 30, marginBottom: 10, letterSpacing: 0.3,
+  },
   pickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
   pickerSheet: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
   pickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(0,0,0,0.15)", alignSelf: "center", marginBottom: 16 },
@@ -405,7 +447,7 @@ const s = StyleSheet.create({
   pickerBtnText: { color: "#13131a", fontSize: 15 },
   pickerBtnTextActive: { fontWeight: "700", color: "#ec8fb5" },
   empty: {
-    color: "rgba(0,0,0,0.45)",
+    color: "rgba(255,255,255,0.5)",
     textAlign: "center",
     marginTop: 56,
     fontSize: 14,
@@ -491,29 +533,28 @@ const s = StyleSheet.create({
 // Card styles
 const c = StyleSheet.create({
   card: {
-    backgroundColor: "rgba(255,255,255,0.22)",
-    borderRadius: 18,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.45)",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: "transparent",
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
   },
   topRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  name: { fontSize: 15, fontWeight: "700", color: "#13131a", flex: 1, marginRight: 8 },
-  heart: { fontSize: 20, color: "rgba(19,19,26,0.4)" },
-  heartActive: { color: "#13131a" },
+  name: { fontSize: 16, fontWeight: "700", color: "#fff", flex: 1, marginRight: 8 },
+  heart: { fontSize: 22, color: "rgba(255,255,255,0.4)" },
+  heartActive: { color: HEART },
 
   desc: {
     fontSize: 13,
-    color: "#888888",
+    color: "rgba(255,255,255,0.55)",
     lineHeight: 18,
-    marginBottom: 10,
+    marginBottom: 14,
   },
 
   bottomRow: {
@@ -522,32 +563,41 @@ const c = StyleSheet.create({
     justifyContent: "space-between",
   },
   bottomLeft: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
-  statusText: { fontSize: 12, color: "#13131a", fontWeight: "500" },
-  sep: { fontSize: 12, color: "rgba(0,0,0,0.3)" },
-  meta: { fontSize: 12, color: "#555555" },
+  statusPill: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 10,
+  },
+  statusPillText: { fontSize: 9, color: "rgba(255,255,255,0.8)", fontWeight: "700", letterSpacing: 0.6 },
+  sep: { fontSize: 11, color: "rgba(255,255,255,0.3)" },
+  meta: { fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: "600", letterSpacing: 0.5 },
   versionsLink: {
-    fontSize: 12,
-    color: "#13131a",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.55)",
     fontWeight: "600",
+    letterSpacing: 0.5,
     textDecorationLine: "underline",
   },
-  date: { fontSize: 12, color: "#555555", marginLeft: 8 },
+  date: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginLeft: 8 },
 
   versionPill: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.35)",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.35)",
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 8,
   },
-  versionName: { fontSize: 13, color: "#13131a", flex: 1, marginRight: 8 },
-  versionTag: { fontWeight: "400", color: "#555" },
-  versionDate: { fontSize: 12, color: "#555555" },
+  versionName: { fontSize: 13, color: "#fff", flex: 1, marginRight: 8 },
+  versionTag: { fontWeight: "400", color: "rgba(255,255,255,0.6)" },
+  versionDate: { fontSize: 12, color: "rgba(255,255,255,0.5)" },
 });
 
 // Create modal styles

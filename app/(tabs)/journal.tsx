@@ -201,16 +201,16 @@ const fm = StyleSheet.create({
 
 // ─── Entry Card ──────────────────────────────────────────────────────────────
 
-function EntryCard({ entry }: { entry: JournalEntry }) {
+function EntryCard({ entry, light }: { entry: JournalEntry; light?: boolean }) {
   const d = new Date(entry.entry_date + "T12:00:00");
   const date = `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
   const displayName = entry.title || entry.perfumes?.name || `Entry ${date}`;
 
   return (
     <TouchableOpacity onPress={() => router.push(`/journal/${entry.id}` as any)} activeOpacity={0.75}>
-      <View style={s.card}>
+      <View style={[s.card, light && s.cardLight]}>
         {/* Thumbnail */}
-        <View style={s.thumb}>
+        <View style={[s.thumb, light && s.thumbLight]}>
           {entry.image_url ? (
             <Image source={{ uri: entry.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
@@ -314,7 +314,6 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
   });
 
   const monthName = new Date(year, month).toLocaleString("en-US", { month: "long" }).toUpperCase();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   const prevMonth = () => { if (month === 0) { setMonth(11); setYear((y) => y - 1); } else setMonth((m) => m - 1); };
   const nextMonth = () => { if (month === 11) { setMonth(0); setYear((y) => y + 1); } else setMonth((m) => m + 1); };
@@ -341,7 +340,13 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={cal.panel}>
+      <LinearGradient
+        colors={["rgba(237,255,141,0.18)", "rgba(28,28,26,0.9)", "rgba(28,28,26,0.9)"]}
+        locations={[0, 0.42, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={cal.panel}
+      >
         {/* Month nav */}
         <View style={cal.nav}>
           <TouchableOpacity onPress={prevMonth} style={cal.navBtn}><Text style={cal.navArrow}>‹</Text></TouchableOpacity>
@@ -349,54 +354,38 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
           <TouchableOpacity onPress={nextMonth} style={cal.navBtn}><Text style={cal.navArrow}>›</Text></TouchableOpacity>
         </View>
 
-        {/* Day headers */}
-        <View style={cal.weekRow}>
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <Text key={d} style={cal.dayHeader}>{d}</Text>
-          ))}
-        </View>
-
         {/* Grid */}
         <View style={cal.grid}>
           {cells.map((cell, i) => {
-            const isToday = cell.key === todayStr && cell.current;
+            if (!cell.current) return <View key={i} style={cal.cell} />;
             const isSelected = cell.key === selectedDate;
-            const hasEntries = !!entryMap[cell.key] && cell.current;
+            const hasEntries = !!entryMap[cell.key];
             return (
               <TouchableOpacity
                 key={i}
                 style={cal.cell}
-                onPress={() => { if (cell.current) setSelectedDate(isSelected ? null : cell.key); }}
-                activeOpacity={cell.current ? 0.7 : 1}
+                onPress={() => setSelectedDate(isSelected ? null : cell.key)}
+                activeOpacity={0.7}
               >
-                <View style={[cal.dayCircle, isSelected && cal.cellSelected, hasEntries && !isSelected && cal.cellToday]}>
-                  <Text style={[
-                    cal.cellText,
-                    !cell.current && cal.cellTextDim,
-                    isSelected && cal.cellTextSelected,
-                  ]}>
-                    {cell.day}
-                  </Text>
+                <View style={[cal.dayCircle, hasEntries && !isSelected && cal.dayOutlined, isSelected && cal.dayActive]}>
+                  <Text style={[cal.cellText, isSelected && cal.cellTextActive]}>{cell.day}</Text>
                 </View>
               </TouchableOpacity>
             );
           })}
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Selected day entries */}
       {selectedDate && (
         <View style={{ flex: 1 }}>
-          <Text style={cal.dayLabel}>
-            {new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-          </Text>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
             {selectedEntries.length === 0 ? (
               <Text style={cal.noEntries}>No entries this day</Text>
             ) : (
               selectedEntries.map((e) => (
                 <View key={e.id} style={{ marginBottom: 10 }}>
-                  <EntryCard entry={e} />
+                  <EntryCard entry={e} light />
                 </View>
               ))
             )}
@@ -408,25 +397,19 @@ function CalendarView({ entries, onSelectEntry }: { entries: JournalEntry[]; onS
 }
 
 const cal = StyleSheet.create({
-  panel: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", marginBottom: 14, paddingBottom: 0 },
-  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16 },
-  navBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  navArrow: { color: "rgba(19,19,26,0.5)", fontSize: 20 },
-  monthTitle: { color: "#13131a", fontSize: 13, fontWeight: "700", letterSpacing: 2 },
-  weekRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6 },
-  dayHeader: { flex: 1, textAlign: "center", color: "rgba(19,19,26,0.45)", fontSize: 10, fontWeight: "600" },
-  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 4, paddingBottom: 0 },
-  cell: { width: "14.285%", height: 44, alignItems: "center", justifyContent: "center" },
-  dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  cellToday: { borderWidth: 1.5, borderColor: "#13131a" },
-  cellSelected: { backgroundColor: "#13131a" },
-  cellText: { color: "#13131a", fontSize: 13 },
-  cellTextDim: { color: "rgba(19,19,26,0.2)" },
-  cellTextToday: { fontWeight: "700" },
-  cellTextSelected: { color: "#E5F772", fontWeight: "700" },
-  dot: { position: "absolute", bottom: 5, width: 3, height: 3, borderRadius: 2, backgroundColor: "#13131a" },
-  dayLabel: { color: "rgba(19,19,26,0.55)", fontSize: 13, fontWeight: "600", marginBottom: 10, marginTop: 4 },
-  noEntries: { color: "rgba(19,19,26,0.4)", textAlign: "center", paddingVertical: 20, fontSize: 14 },
+  panel: { borderRadius: 24, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", marginBottom: 16, paddingBottom: 16, overflow: "hidden" },
+  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 22, paddingBottom: 18 },
+  navBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  navArrow: { color: "rgba(255,255,255,0.75)", fontSize: 26, fontWeight: "300" },
+  monthTitle: { color: "#fff", fontSize: 30, fontWeight: "300", letterSpacing: 4 },
+  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingBottom: 4 },
+  cell: { width: "14.285%", height: 46, alignItems: "center", justifyContent: "center" },
+  dayCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  dayOutlined: { borderWidth: 1.5, borderColor: "rgba(255,255,255,0.45)" },
+  dayActive: { backgroundColor: "#edff8d" },
+  cellText: { color: "#fff", fontSize: 14 },
+  cellTextActive: { color: "#13131a", fontWeight: "700" },
+  noEntries: { color: "rgba(255,255,255,0.45)", textAlign: "center", paddingVertical: 20, fontSize: 14 },
 });
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -569,11 +552,11 @@ export default function Journal() {
     setView((prev) => (prev === v ? "landing" : v));
 
   return (
-    <LinearGradient colors={["#E5F772", "#F2C842"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={["#000000", "#000000", "#C9F24D"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top nav */}
         <View style={s.topNav}>
-          <SpilsLogo height={22} />
+          <SpilsLogo height={22} color="#edff8d" />
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile" as any)} style={s.profileBtn}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>
@@ -618,19 +601,19 @@ export default function Journal() {
         </View>
 
         {view !== "landing" && (loading && entries.length === 0 ? (
-          <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
+          <ActivityIndicator color="#fff" style={{ marginTop: 48 }} />
         ) : view === "calendar" ? (
-          <View style={{ flex: 1, paddingHorizontal: 16 }}>
+          <View style={{ flex: 1, paddingHorizontal: 30 }}>
             <CalendarView entries={entries} onSelectEntry={(e) => router.push(`/journal/${e.id}` as any)} />
           </View>
         ) : view === "sotd" ? (
-          <View style={{ flex: 1, paddingHorizontal: 16 }}>
+          <View style={{ flex: 1, paddingHorizontal: 30 }}>
             {/* Quick log input */}
             <View style={s.sotdInputRow}>
               <TextInput
                 style={s.sotdInput}
                 placeholder="Your SOTD..."
-                placeholderTextColor="rgba(19,19,26,0.35)"
+                placeholderTextColor="#fff"
                 value={sotdInput}
                 onChangeText={setSotdInput}
                 returnKeyType="done"
@@ -649,7 +632,7 @@ export default function Journal() {
             <FlatList
               data={sotdEntries}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 100, gap: 8 }}
+              contentContainerStyle={{ paddingBottom: 100, gap: 10 }}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => {
                 const d = new Date(item.entry_date + "T12:00:00");
@@ -658,10 +641,11 @@ export default function Journal() {
                   <View style={s.sotdRow}>
                     <Text style={s.sotdRowName} numberOfLines={1}>{item.perfume_name}</Text>
                     <View style={s.sotdActions}>
-                      <TouchableOpacity onPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); setSotdEditGender(item.gender ?? ""); }}>
-                        <Text style={s.sotdActionBtn}>EDIT</Text>
-                      </TouchableOpacity>
                       <Text style={s.sotdRowDate}>{date}</Text>
+                      <Text style={s.sotdActionSep}>|</Text>
+                      <TouchableOpacity onPress={() => { setSotdSelected(item); setSotdEditValue(item.perfume_name); setSotdEditGender(item.gender ?? ""); }}>
+                        <Text style={s.sotdActionBtn}>Edit</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 );
@@ -750,29 +734,31 @@ export default function Journal() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
   logoText: { color: "#13131a", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
-  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
   profileIcon: { fontSize: 16 },
-  header: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, gap: 10 },
+  header: { paddingHorizontal: 30, paddingTop: 73, paddingBottom: 12, gap: 10 },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  pageTitle: { color: "#13131a", fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
-  iconBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
-  iconBtnText: { fontSize: 18 },
-  badge: { position: "absolute", top: -4, right: -4, backgroundColor: "#13131a", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
-  badgeText: { color: "#E5F772", fontSize: 10, fontWeight: "700" },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
+  iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
+  iconBtnText: { fontSize: 18, color: "#fff" },
+  badge: { position: "absolute", top: -4, right: -4, backgroundColor: "#edff8d", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  badgeText: { color: "#13131a", fontSize: 10, fontWeight: "700" },
   searchWrap: { borderRadius: 16 },
   searchInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   searchIcon: { fontSize: 14 },
   searchInput: { flex: 1, color: "#13131a", fontSize: 14 },
   chipRow: { flexDirection: "row", gap: 10, alignSelf: "stretch" },
-  viewChip: { flex: 1, height: 40, borderRadius: 24, borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", backgroundColor: "rgba(0,0,0,0.06)", alignItems: "center", justifyContent: "center" },
-  viewChipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  viewChipText: { color: "rgba(19,19,26,0.55)", fontSize: 13, fontWeight: "600", textAlign: "center" },
-  viewChipTextActive: { color: "#E5F772" },
+  viewChip: { flex: 1, height: 40, borderRadius: 100, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center" },
+  viewChipActive: { backgroundColor: "#edff8d", borderColor: "#edff8d" },
+  viewChipText: { color: "#fff", fontSize: 13, fontWeight: "600", textAlign: "center" },
+  viewChipTextActive: { color: "#13131a" },
   card: { flexDirection: "row", gap: 12, paddingHorizontal: 14, paddingVertical: 14, backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
   thumb: { width: 62, height: 62, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.08)", overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
   thumbEmoji: { fontSize: 26 },
+  cardLight: { backgroundColor: "#fff", borderColor: "rgba(0,0,0,0.08)" },
+  thumbLight: { backgroundColor: "rgba(0,0,0,0.12)", borderColor: "rgba(0,0,0,0.08)" },
   cardTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 2 },
   cardTitle: { color: "#13131a", fontWeight: "700", fontSize: 14, flex: 1, marginRight: 8 },
   cardDate: { color: "rgba(19,19,26,0.4)", fontSize: 11 },
@@ -784,20 +770,20 @@ const s = StyleSheet.create({
   ratingText: { color: "#13131a", fontSize: 11, fontWeight: "600" },
   seasonPill: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   seasonPillText: { color: "rgba(19,19,26,0.6)", fontSize: 11 },
-  sotdInputRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 50, paddingLeft: 18, paddingRight: 6, paddingVertical: 6, marginBottom: 12 },
-  sotdInput: { flex: 1, color: "#13131a", fontSize: 14, paddingVertical: 6 },
-  sotdSaveBtn: { backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8 },
+  sotdInputRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 50, paddingLeft: 18, paddingRight: 6, paddingVertical: 6, marginBottom: 16 },
+  sotdInput: { flex: 1, color: "#fff", fontSize: 14, paddingVertical: 6 },
+  sotdSaveBtn: { backgroundColor: "#fff", borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8 },
   sotdSaveBtnText: { color: "#13131a", fontSize: 13, fontWeight: "600" },
-  sotdRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(0,0,0,0.04)", borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  sotdRowName: { color: "#13131a", fontWeight: "600", fontSize: 14, flex: 1, marginRight: 8 },
-  sotdRowDate: { color: "rgba(19,19,26,0.4)", fontSize: 12, marginLeft: 8 },
-  sotdActions: { flexDirection: "row", alignItems: "center", gap: 4 },
-  sotdActionBtn: { color: "#13131a", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
-  sotdActionSep: { color: "rgba(19,19,26,0.3)", fontSize: 11 },
+  sotdRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.22)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 16 },
+  sotdRowName: { color: "#fff", fontWeight: "600", fontSize: 14, flex: 1, marginRight: 8 },
+  sotdRowDate: { color: "#fff", fontSize: 12 },
+  sotdActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sotdActionBtn: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  sotdActionSep: { color: "rgba(255,255,255,0.5)", fontSize: 12 },
   sotdEditInput: { color: "#fff", fontSize: 15, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 20, marginBottom: 16 },
   sotdModalBtn: { marginHorizontal: 20, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   sotdModalBtnText: { fontSize: 14, fontWeight: "700" },
-  heroWrap: { flex: 1, marginHorizontal: 16, marginBottom: 100, borderRadius: 24, overflow: "hidden" },
+  heroWrap: { flex: 1, marginHorizontal: 30, marginBottom: 100, borderRadius: 24, overflow: "hidden" },
   heroImage: { width: "100%", height: "100%" },
   emptyState: { alignItems: "center", paddingVertical: 64 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
