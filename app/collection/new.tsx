@@ -31,7 +31,7 @@ const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
 const SEASON_LIST = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 
-const ACCENT = "#0fb8aa";
+const ACCENT = "#00AEEF";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -361,7 +361,7 @@ export default function CollectionNew() {
     setProjectionVal(5); setSillageVal(5); setLongevityVal(5); setDryDownVal(5); setDryDownText("");
     setColors([]); setSelectedColor("#a78bfa"); setMusicUrl("");
     setBottleImage(null); setBottleBase64(null); setInspirationImage(null);
-    setAiResult(null); setAiStatus(null);
+    setAiStatus(null);
     setMoreVisible(false);
   };
 
@@ -408,7 +408,7 @@ export default function CollectionNew() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <LinearGradient colors={["#000000", "#000000", "#0fb8aa"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={["#000000", "#000000", "#00AEEF"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -434,7 +434,7 @@ export default function CollectionNew() {
                 <TouchableOpacity style={s.photoBox} onPress={pickPhoto} activeOpacity={0.85}>
                   {bottleImage && <Image source={{ uri: bottleImage }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />}
                   {aiLoading && (
-                    <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "rgba(15,184,170,0.85)" }]}>
+                    <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "rgba(0,174,239,0.85)" }]}>
                       <ActivityIndicator color="#fff" size="large" />
                       <Text style={{ color: "#fff", fontSize: 12 }}>{aiStatus}</Text>
                     </View>
@@ -778,7 +778,7 @@ export default function CollectionNew() {
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" }}>
               <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>Olfactive Profile</Text>
               <TouchableOpacity onPress={() => setFamilyPickerVisible(false)}>
-                <Text style={{ color: "#0fb8aa", fontSize: 15 }}>Done</Text>
+                <Text style={{ color: "#00AEEF", fontSize: 15 }}>Done</Text>
               </TouchableOpacity>
             </View>
             <ScrollView>
@@ -789,7 +789,7 @@ export default function CollectionNew() {
                   onPress={() => { setPendingFamily(f); setFamilyPickerVisible(false); }}
                 >
                   <Text style={{ color: "#fff", fontSize: 16 }}>{f}</Text>
-                  {pendingFamily === f ? <Text style={{ color: "#0fb8aa" }}>✓</Text> : null}
+                  {pendingFamily === f ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -824,7 +824,7 @@ const s = StyleSheet.create({
   fieldLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
 
   tagChip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 50, borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", backgroundColor: "transparent" },
-  tagChipActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  tagChipActive: { backgroundColor: "#00AEEF", borderColor: "#00AEEF" },
   tagChipText: { color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: "500" },
   tagChipTextActive: { color: "#13131a", fontWeight: "700" },
 
@@ -837,21 +837,21 @@ const s = StyleSheet.create({
 
   seasonIcons: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 10 },
   seasonIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
-  seasonIconActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  seasonIconActive: { backgroundColor: "#00AEEF", borderColor: "#00AEEF" },
   seasonIconText: { fontSize: 14 },
 
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   tag: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
   tagText: { color: "#fff", fontSize: 13 },
-  noteTag: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#0fb8aa", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  noteTagText: { color: "#0fb8aa", fontSize: 12, fontWeight: "600" },
+  noteTag: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#00AEEF", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  noteTagText: { color: "#00AEEF", fontSize: 12, fontWeight: "600" },
   organDropdown: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: -6, marginBottom: 8, overflow: "hidden" },
   organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
   organDropdownText: { color: "#13131a", fontSize: 14 },
-  organDropdownHint: { color: "#0fb8aa", fontSize: 11, fontWeight: "600" },
+  organDropdownHint: { color: "#00AEEF", fontSize: 11, fontWeight: "600" },
 
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
-  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#0fb8aa" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#00AEEF" },
   sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
@@ -867,7 +867,7 @@ const s = StyleSheet.create({
   bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingVertical: 16 },
   moreBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 15 },
   moreBtnText: { color: "#fff", fontSize: 14 },
-  saveBtn: { backgroundColor: "#0fb8aa", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
+  saveBtn: { backgroundColor: "#00AEEF", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
   saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 });
 

@@ -15,22 +15,65 @@ import * as FileSystem from "expo-file-system/legacy";
 import { decode } from "base64-arraybuffer";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-import GradientScreen from "@/components/GradientScreen";
+import { SpilsLogo } from "@/components/SpilsLogo";
 import { GlassRow } from "@/components/GlassCard";
 
+const ACCENT = "#EC008C";
+const HEART = "#edff8d";
+
+function DarkScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <LinearGradient
+      colors={["#000000", "#000000", ACCENT]}
+      locations={[0, 0.82, 1]}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+function formulaStatus(lineCount: number, status?: string | null) {
+  if (status) return status;
+  if (lineCount === 0) return "Draft";
+  if (lineCount < 10) return "In Progress";
+  return "Final";
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${mm}.${dd}.${yy}`;
+}
+
 const SYMBOL_ICONS: Record<string, string> = {
-  Top: "▲", Mid: "■", Base: "●", Solvent: "★", Other: "✴",
+  Top: "▲", Mid: "●", Base: "■", Solvent: "★", Other: "✴",
 };
+
+// Sort order for the formula list: Top → Mid → Base → others
+const SYMBOL_ORDER: Record<string, number> = { Top: 0, Mid: 1, Base: 2, Solvent: 3, Other: 4 };
+function symbolRank(type?: string | null) {
+  if (!type) return 5;
+  return SYMBOL_ORDER[type] ?? 5;
+}
 
 const MOOD_BUCKET = "moodboard";
 
 const DILUENTS = [
-  "Ethanol (SDA 40B)",
-  "DPG (Dipropylene Glycol)",
-  "TEC (Triethyl Citrate)",
-  "IPM (Isopropyl Myristate)",
-  "MCT Oil",
-  "Perfumers Alcohol",
+  "Ethanol (EtOH)",
+  "Perfumer's Alcohol (PA)",
+  "Dipropylene Glycol (DPG)",
+  "Propylene Glycol (PG)",
+  "Isopropyl Myristate (IPM)",
+  "Jojoba Oil",
+  "Fractionated Coconut Oil",
+  "Dowanol",
+  "Base de Parfum",
+  "Benzyl Benzoate",
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,6 +84,16 @@ interface Formula {
   description: string | null;
   date_created: string;
   notes: string | null;
+  is_favorite?: boolean | null;
+  status?: string | null;
+}
+
+interface FormulaVersion {
+  id: string;
+  formula_id: number;
+  version_num: number;
+  label: string | null;
+  created_at: string;
 }
 
 interface Material {
@@ -76,7 +129,7 @@ function safeNum(v: any, fallback = 0) {
 }
 
 function parseParams(notes: string | null) {
-  const defaults = { bottleSizeMl: 15, concPercent: 20, diluent: "Ethanol (SDA 40B)" };
+  const defaults = { bottleSizeMl: 15, concPercent: 20, diluent: "Ethanol (EtOH)" };
   if (!notes) return defaults;
   const bm = notes.match(/Bottle:\s*([\d.]+)mL/);
   const cm = notes.match(/Concentration:\s*([\d.]+)%/);
@@ -119,15 +172,15 @@ function LineRow({ line, totalG, onDelete, onUpdateAmount }: {
     setEditing(false);
   };
 
+  const symbol = line.material?.type ? (SYMBOL_ICONS[line.material.type] ?? "") : "";
+
   return (
     <View style={s.lineRow}>
+      <Text style={s.lineSymbol}>{symbol}</Text>
       <Text style={[s.lineName, { flex: 1, marginRight: 6 }]} numberOfLines={1}>
         {line.material?.name ?? `Material #${line.material_id}`}
       </Text>
-      <Text style={s.lineTypeCol} numberOfLines={1}>
-        {line.material?.type ?? "—"}
-      </Text>
-      <View style={{ width: 68, alignItems: "flex-end", marginRight: 4 }}>
+      <View style={{ alignItems: "flex-end", marginRight: 2 }}>
         {editing ? (
           <TextInput
             style={s.lineInput}
@@ -141,8 +194,8 @@ function LineRow({ line, totalG, onDelete, onUpdateAmount }: {
         )}
         <Text style={s.linePct}>{pct}%</Text>
       </View>
-      <TouchableOpacity style={{ padding: 6 }} onPress={onDelete}>
-        <Text style={{ color: "#f87171", fontSize: 18 }}>×</Text>
+      <TouchableOpacity style={{ padding: 6, marginLeft: 4 }} onPress={onDelete}>
+        <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 18 }}>×</Text>
       </TouchableOpacity>
     </View>
   );
@@ -150,196 +203,89 @@ function LineRow({ line, totalG, onDelete, onUpdateAmount }: {
 
 // ─── Add Mood Item Modal ──────────────────────────────────────────────────────
 
-const MOOD_TABS = [
-  { key: "image", label: "Image/Video", icon: "⬛" },
-  { key: "audio", label: "Audio",       icon: "♪"  },
-  { key: "note",  label: "Note",        icon: "☰"  },
-] as const;
-type MoodTab = typeof MOOD_TABS[number]["key"];
-
 function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
   visible: boolean; formulaId: number; onClose: () => void; onAdded: () => void;
 }) {
-  const [tab, setTab] = useState<MoodTab>("image");
-  const [noteText, setNoteText] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState<string>("image/jpeg");
-  const [imageCaption, setImageCaption] = useState("");
-  const [audioUri, setAudioUri] = useState<string | null>(null);
-  const [audioName, setAudioName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (visible) { setTab("image"); setNoteText(""); setImageUri(null); setImageMimeType("image/jpeg"); setImageCaption(""); setAudioUri(null); setAudioName(null); }
+    if (visible) { setImageUri(null); setImageMimeType("image/jpeg"); }
   }, [visible]);
 
   const pickImage = async (source: "camera" | "library") => {
-    const opts = { mediaTypes: ["images", "videos"] as any, allowsEditing: false, quality: 0.75 };
+    const opts = { mediaTypes: ["images"] as any, allowsEditing: false, quality: 0.75 };
     const result = source === "camera"
       ? await ImagePicker.launchCameraAsync(opts)
       : await ImagePicker.launchImageLibraryAsync(opts);
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setImageUri(asset.uri);
-      setImageMimeType(asset.mimeType ?? (asset.type === "video" ? "video/mp4" : "image/jpeg"));
+      setImageMimeType(asset.mimeType ?? "image/jpeg");
     }
   };
 
-  const handleImageTap = () => Alert.alert("Upload Image/Video", "Choose source", [
-    { text: "Take Photo", onPress: () => pickImage("camera") },
-    { text: "Choose from Library", onPress: () => pickImage("library") },
+  const handleImageTap = () => Alert.alert("Add Image", "Choose source", [
+    { text: "Tap to Capture", onPress: () => pickImage("camera") },
+    { text: "Upload an Image", onPress: () => pickImage("library") },
     { text: "Cancel", style: "cancel" },
   ]);
 
-  const pickAudio = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["audio/mpeg", "audio/mp4", "audio/wav", "audio/aac", "audio/x-m4a", "audio/*"],
-      copyToCacheDirectory: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setAudioUri(result.assets[0].uri);
-      setAudioName(result.assets[0].name);
-    }
-  };
-
   const handleSave = async () => {
-    if (tab === "note" && !noteText.trim()) return;
-    if (tab === "image" && !imageUri) return;
+    if (!imageUri) return;
     setSaving(true);
     try {
-      if (tab === "note") {
-        const { error } = await supabase.from("formula_moodboard_assets").insert({
-          formula_id: formulaId, file_url: "EMPTY", media_type: "note", caption: noteText.trim(),
-        });
-        if (error) throw error;
-      } else if (tab === "image") {
-        const isVideo = imageMimeType.startsWith("video/");
-        const ext = imageMimeType.split("/")[1] || (isVideo ? "mp4" : "jpg");
-        const slug = isVideo ? "video" : "photo";
-        const fileName = `formula_${formulaId}/${Date.now()}-${slug}.${ext}`;
-        const base64 = await FileSystem.readAsStringAsync(imageUri!, { encoding: "base64" });
-        const arrayBuffer = decode(base64);
-        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: imageMimeType });
-        if (uploadError) throw uploadError;
-        const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
-          formula_id: formulaId, file_url: fileName, media_type: isVideo ? "video" : "image", caption: null,
-        });
-        if (insertError) throw insertError;
-      } else if (tab === "audio") {
-        const ext = audioName?.split(".").pop() ?? "mp3";
-        const fileName = `formula_${formulaId}/${Date.now()}-audio.${ext}`;
-        const base64 = await FileSystem.readAsStringAsync(audioUri!, { encoding: "base64" });
-        const arrayBuffer = decode(base64);
-        const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: `audio/${ext}` });
-        if (uploadError) throw uploadError;
-        const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
-          formula_id: formulaId, file_url: fileName, media_type: "audio", caption: audioName ?? null,
-        });
-        if (insertError) throw insertError;
-      }
+      const ext = imageMimeType.split("/")[1] || "jpg";
+      const fileName = `formula_${formulaId}/${Date.now()}-photo.${ext}`;
+      const base64 = await FileSystem.readAsStringAsync(imageUri, { encoding: "base64" });
+      const arrayBuffer = decode(base64);
+      const { error: uploadError } = await supabase.storage.from(MOOD_BUCKET).upload(fileName, arrayBuffer, { contentType: imageMimeType });
+      if (uploadError) throw uploadError;
+      const { error: insertError } = await supabase.from("formula_moodboard_assets").insert({
+        formula_id: formulaId, file_url: fileName, media_type: "image", caption: null,
+      });
+      if (insertError) throw insertError;
       onAdded();
     } catch (e: any) {
-      Alert.alert("Error", e.message ?? "Failed to add item");
+      Alert.alert("Error", e.message ?? "Failed to add image");
     } finally {
       setSaving(false);
     }
   };
 
-  const canSave = tab === "note" ? noteText.trim().length > 0 : tab === "image" ? imageUri !== null : audioUri !== null;
-
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <LinearGradient colors={["#FFD4E6", "#F5AEC8", "#EC8FB5"]} style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }}>
-          {/* Header */}
-          <View style={mb.header}>
-            <Text style={mb.title}>ADD TO MOOD BOARD</Text>
-            <TouchableOpacity onPress={onClose} style={mb.closeBtn}>
-              <Text style={mb.closeIcon}>✕</Text>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={mb.backdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={onClose} />
+        <View style={mb.sheet}>
+          <TouchableOpacity style={mb.captureBox} onPress={handleImageTap} activeOpacity={0.9}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%", borderRadius: 14 }} resizeMode="cover" />
+            ) : (
+              <View style={{ alignItems: "center", paddingHorizontal: 20 }}>
+                <Text style={mb.captureText}>Tap to Capture</Text>
+                <Text style={mb.captureHint}>(Best if shot on clean background)</Text>
+                <Text style={mb.captureOr}>or</Text>
+                <Text style={mb.captureText}>Upload an Image</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <View style={mb.actions}>
+            <TouchableOpacity style={mb.cancelBtn} onPress={onClose}>
+              <Text style={mb.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[mb.addBtn, (!imageUri || saving) && { opacity: 0.4 }]}
+              onPress={handleSave}
+              disabled={!imageUri || saving}
+            >
+              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={mb.addBtnText}>Add</Text>}
             </TouchableOpacity>
           </View>
-
-          {/* Tabs */}
-          <View style={mb.tabRow}>
-            {MOOD_TABS.map(({ key, label }) => (
-              <TouchableOpacity
-                key={key}
-                style={[mb.tab, tab === key && mb.tabActive]}
-                onPress={() => setTab(key)}
-              >
-                <Text style={[mb.tabText, tab === key && mb.tabTextActive]}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }} keyboardShouldPersistTaps="handled">
-            {tab === "image" && (
-              <>
-                <TouchableOpacity style={mb.photoUpload} onPress={handleImageTap} activeOpacity={0.85}>
-                  {imageUri && (
-                    <Image source={{ uri: imageUri }} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} resizeMode="contain" />
-                  )}
-                  {!imageUri && (
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={mb.photoUploadIcon}>↑</Text>
-                      <Text style={mb.photoUploadLabel}>Tap to capture or upload</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
-
-            {tab === "audio" && (
-              <>
-                <Text style={mb.uploadLabel}>Upload Audio</Text>
-                <TouchableOpacity style={mb.photoUpload} onPress={pickAudio} activeOpacity={0.85}>
-                  {audioUri ? (
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={mb.photoUploadIcon}>♪</Text>
-                      <Text style={[mb.photoUploadLabel, { fontWeight: "600", color: "#13131a" }]} numberOfLines={1}>{audioName}</Text>
-                      <Text style={[mb.photoUploadLabel, { marginTop: 6 }]}>Tap to change</Text>
-                    </View>
-                  ) : (
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={mb.photoUploadIcon}>↑</Text>
-                      <Text style={mb.photoUploadLabel}>Tap to upload audio (MP3, M4A, WAV, AAC)</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
-
-            {tab === "note" && (
-              <TextInput
-                style={mb.noteInput}
-                placeholder="Thoughts, inspiration, observations..."
-                placeholderTextColor="rgba(0,0,0,0.35)"
-                value={noteText}
-                onChangeText={setNoteText}
-                multiline
-                autoFocus
-                textAlignVertical="top"
-              />
-            )}
-
-            {saving && <View style={{ alignItems: "center", paddingVertical: 16 }}><ActivityIndicator color="#13131a" /></View>}
-            <View style={{ height: 40 }} />
-          </ScrollView>
-
-          {/* Save */}
-          <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "transparent" }}>
-            <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
-              <TouchableOpacity
-                style={[mb.saveBtn, !canSave && { opacity: 0.4 }]}
-                onPress={handleSave}
-                disabled={!canSave || saving}
-              >
-                <Text style={mb.saveBtnText}>Add to Mood Board</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </SafeAreaView>
-      </LinearGradient>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -359,7 +305,7 @@ export default function FormulaDetail() {
   // Formula params
   const [bottleSizeMl, setBottleSizeMl] = useState(15);
   const [concPercent, setConcPercent] = useState(20);
-  const [diluent, setDiluent] = useState("Ethanol (SDA 40B)");
+  const [diluent, setDiluent] = useState("Ethanol (EtOH)");
   const [diluentPickerVisible, setDiluentPickerVisible] = useState(false);
 
   // Inline add material
@@ -369,8 +315,11 @@ export default function FormulaDetail() {
   const [inlineAmount, setInlineAmount] = useState("0.000");
   const [inlineAdding, setInlineAdding] = useState(false);
 
-  // Notes collapsible
-  const [notesExpanded, setNotesExpanded] = useState(true);
+  // Accordion section open state (Main Notes always open; others collapsed)
+  const [moodOpen, setMoodOpen] = useState(false);
+  const [paramsOpen, setParamsOpen] = useState(false);
+  const [formulaOpen, setFormulaOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   // Inline name/description editing
   const [editingName, setEditingName] = useState(false);
@@ -380,9 +329,14 @@ export default function FormulaDetail() {
 
   // Modal visibility
   const [addMoodVisible, setAddMoodVisible] = useState(false);
-  const [moodCollapsed, setMoodCollapsed] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [moreVisible, setMoreVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Versions drawer
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [versions, setVersions] = useState<FormulaVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
 
   const totalG = useMemo(() => lines.reduce((sum, l) => sum + safeNum(l.amount_g), 0), [lines]);
   const targetConcentrateG = useMemo(() => +(bottleSizeMl * (concPercent / 100)).toFixed(3), [bottleSizeMl, concPercent]);
@@ -430,7 +384,7 @@ export default function FormulaDetail() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [{ data: fData }, { data: lData }] = await Promise.all([
-      supabase.from("formulas").select("id,name,description,date_created,notes").eq("id", formulaId).single(),
+      supabase.from("formulas").select("*").eq("id", formulaId).single(),
       supabase.from("formula_lines").select("id,material_id,amount_g").eq("formula_id", formulaId).order("id", { ascending: true }),
     ]);
     setFormula(fData as Formula);
@@ -447,6 +401,27 @@ export default function FormulaDetail() {
   }, [formulaId, fetchMoodItems]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const toggleFavorite = async () => {
+    if (!formula) return;
+    const next = !formula.is_favorite;
+    setFormula((prev) => prev ? { ...prev, is_favorite: next } : prev);
+    await supabase.from("formulas").update({ is_favorite: next }).eq("id", formulaId);
+  };
+
+  const openVersions = async () => {
+    setVersionsOpen(true);
+    if (versions.length === 0) {
+      setVersionsLoading(true);
+      const { data } = await supabase
+        .from("formula_versions")
+        .select("*")
+        .eq("formula_id", formulaId)
+        .order("created_at", { ascending: false });
+      setVersions((data as FormulaVersion[]) ?? []);
+      setVersionsLoading(false);
+    }
+  };
 
   const handleInlineAdd = async () => {
     const matName = inlineSelected?.name ?? inlineSearch.trim();
@@ -601,53 +576,66 @@ export default function FormulaDetail() {
   };
 
   if (loading) return (
-    <GradientScreen gradient="lab">
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color="#a78bfa" /></View>
-    </GradientScreen>
+    <DarkScreen>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color={ACCENT} /></View>
+    </DarkScreen>
   );
   if (!formula) return (
-    <GradientScreen gradient="lab">
+    <DarkScreen>
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Text style={{ color: "rgba(255,255,255,0.5)" }}>Formula not found</Text></View>
-    </GradientScreen>
+    </DarkScreen>
   );
 
   const atTarget = Math.abs(totalG - targetConcentrateG) < 0.001;
+  const moodImages = moodItems.filter((i) => i.media_type === "image" && i.display_url);
+  const sortedLines = [...lines].sort((a, b) => symbolRank(a.material?.type) - symbolRank(b.material?.type));
 
   return (
-    <GradientScreen gradient="lab">
+    <DarkScreen>
       {/* Nav */}
-      <View style={s.navBar}>
-        <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>← Lab</Text></TouchableOpacity>
+      <View style={s.topNav}>
+        <SpilsLogo height={22} color="#edff8d" />
         <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
           <Text style={s.profileIcon}>👤</Text>
         </TouchableOpacity>
       </View>
 
-      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={20}>
+      {/* Back carrot + section header */}
+      <View style={s.headerRow}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={s.backCarrot}>‹</Text>
+        </TouchableOpacity>
+        <Text style={s.pageTitle}>Lab</Text>
+      </View>
 
-        {/* Header — inline editable */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-          {editingName ? (
-            <TextInput
-              style={[s.formulaName, { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.3)", paddingBottom: 4 }]}
-              value={nameVal}
-              onChangeText={setNameVal}
-              onBlur={commitName}
-              onSubmitEditing={commitName}
-              autoFocus
-              returnKeyType="done"
-            />
-          ) : (
-            <TouchableOpacity onPress={() => { setNameVal(formula.name); setEditingName(true); }} activeOpacity={0.7}>
-              <Text style={s.formulaName}>{formula.name}</Text>
-            </TouchableOpacity>
-          )}
-          <Text style={s.formulaDate}>
-            {new Date(formula.date_created).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-          </Text>
+      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={20}>
+
+        {/* ── Main Notes card (auto-open) ── */}
+        <View style={s.notesCard}>
+          <View style={s.notesCardTop}>
+            {editingName ? (
+              <TextInput
+                style={[s.cardName, { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.3)", paddingBottom: 2, flex: 1, marginRight: 8 }]}
+                value={nameVal}
+                onChangeText={setNameVal}
+                onBlur={commitName}
+                onSubmitEditing={commitName}
+                autoFocus
+                returnKeyType="done"
+              />
+            ) : (
+              <TouchableOpacity style={{ flex: 1, marginRight: 8 }} onPress={() => { setNameVal(formula.name); setEditingName(true); }} activeOpacity={0.7}>
+                <Text style={s.cardName} numberOfLines={1}>{formula.name}</Text>
+              </TouchableOpacity>
+            )}
+            <Text style={s.cardDate}>
+              {new Date(formula.date_created).toLocaleDateString("en-US", { year: "2-digit", month: "2-digit", day: "2-digit" }).replace(/\//g, ".")}
+            </Text>
+          </View>
+
           {editingDesc ? (
             <TextInput
-              style={[s.formulaDesc, { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.3)", paddingBottom: 4, marginTop: 8 }]}
+              style={[s.cardNotes, { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.3)", paddingBottom: 4, marginTop: 8 }]}
               value={descVal}
               onChangeText={setDescVal}
               onBlur={commitDesc}
@@ -657,216 +645,213 @@ export default function FormulaDetail() {
               placeholderTextColor="rgba(255,255,255,0.3)"
             />
           ) : (
-            <TouchableOpacity onPress={() => { setDescVal(formula.description ?? ""); setEditingDesc(true); }} activeOpacity={0.7} style={{ marginTop: 6 }}>
-              <Text style={s.formulaDesc}>
-                {formula.description || <Text style={{ color: "rgba(255,255,255,0.3)" }}>Tap to add notes...</Text>}
+            <TouchableOpacity onPress={() => { setDescVal(formula.description ?? ""); setEditingDesc(true); }} activeOpacity={0.7} style={{ marginTop: 8 }}>
+              <Text style={s.cardNotes}>
+                {formula.description || <Text style={{ color: "rgba(255,255,255,0.35)" }}>Tap to add notes...</Text>}
               </Text>
             </TouchableOpacity>
           )}
-        </View>
 
-        {/* ① Mood Board */}
-        <View style={[s.panel, { marginHorizontal: 16, marginBottom: 16 }]}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Mood Board</Text>
-            <TouchableOpacity style={s.addBtn} onPress={() => setAddMoodVisible(true)}>
-              <Text style={s.addBtnText}>+ Add Item</Text>
+          <View style={s.cardBottom}>
+            <View style={s.cardBottomLeft}>
+              <View style={s.statusPill}>
+                <Text style={s.statusPillText}>{formulaStatus(lines.length, formula.status).toUpperCase()}</Text>
+              </View>
+              <Text style={s.cardMeta}>{lines.length} MATERIALS</Text>
+              <Text style={s.cardSep}>  |  </Text>
+              <TouchableOpacity onPress={openVersions}>
+                <Text style={s.cardVersions}>VERSIONS</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={toggleFavorite} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[s.cardHeart, formula.is_favorite && s.cardHeartActive]}>{formula.is_favorite ? "♥" : "♡"}</Text>
             </TouchableOpacity>
           </View>
+        </View>
 
-          {!moodCollapsed && (
-            <>
-              {moodItems.length === 0 ? (
-                <View style={{ alignItems: "center", paddingVertical: 24 }}>
+        {/* ── Mood Board ── */}
+        <View style={s.section}>
+          <TouchableOpacity style={s.sectionHead} activeOpacity={0.8} onPress={() => setMoodOpen((v) => !v)}>
+            <Text style={s.sectionHeadTitle}>Mood Board</Text>
+            {moodOpen ? (
+              moodImages.length < 3 ? (
+                <TouchableOpacity style={s.addPill} onPress={() => setAddMoodVisible(true)}>
+                  <Text style={s.addPillText}>Add</Text>
+                </TouchableOpacity>
+              ) : null
+            ) : (
+              <Text style={s.sectionShow}>Show</Text>
+            )}
+          </TouchableOpacity>
+          {moodOpen && (
+            <View style={s.sectionBody}>
+              {moodImages.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 20 }}>
                   <Text style={{ color: "rgba(255,255,255,0.35)", fontSize: 14, textAlign: "center" }}>
-                    No mood board items yet.{"\n"}Add images or notes for inspiration.
+                    No images yet.{"\n"}Tap Add to capture or upload (up to 3).
                   </Text>
                 </View>
               ) : (
-                <>
-                  {/* Notes — full width */}
-                  {moodItems.filter((i) => i.media_type === "note").map((item) => (
-                    <View key={item.id} style={s.noteCard}>
-                      <Text style={s.noteText}>{item.caption}</Text>
-                      <TouchableOpacity style={s.noteDeleteBtn} onPress={() => handleDeleteMoodItem(item.id)}>
-                        <Text style={{ color: "#f87171", fontSize: 16 }}>×</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {moodImages.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={s.moodImgCard}
+                      activeOpacity={0.9}
+                      onPress={() => setLightboxUrl(item.display_url!)}
+                    >
+                      <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                      <TouchableOpacity
+                        style={s.imageDeleteBtn}
+                        onPress={() => handleDeleteMoodItem(item.id)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <BlurView intensity={40} tint="dark" style={s.imageDeleteBlur}>
+                          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>×</Text>
+                        </BlurView>
                       </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   ))}
-
-                  {/* Images — 2 per row */}
-                  {(() => {
-                    const mediaItems = moodItems.filter((i) => (i.media_type === "image" || i.media_type === "video" || i.media_type === "audio") && i.display_url);
-                    if (!mediaItems.length) return null;
-                    return (
-                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
-                        {mediaItems.map((item) => (
-                          <View key={item.id} style={[s.imageCard, { width: "47%" }]}>
-                            {item.media_type === "video" ? (
-                              <Video
-                                source={{ uri: item.display_url! }}
-                                style={{ width: "100%", height: "100%" }}
-                                resizeMode={ResizeMode.COVER}
-                                useNativeControls
-                                isLooping={false}
-                              />
-                            ) : (
-                              <Image source={{ uri: item.display_url! }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
-                            )}
-                            <TouchableOpacity style={s.imageDeleteBtn} onPress={() => handleDeleteMoodItem(item.id)}>
-                              <BlurView intensity={40} tint="dark" style={s.imageDeleteBlur}>
-                                <Text style={{ color: "#f87171", fontSize: 14, fontWeight: "700" }}>×</Text>
-                              </BlurView>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                    );
-                  })()}
-                </>
+                </View>
               )}
-            </>
-          )}
-
-          {/* Hide / Show toggle */}
-          {moodItems.length > 0 && (
-            <TouchableOpacity
-              style={{ alignSelf: "flex-end", marginTop: 10 }}
-              onPress={() => setMoodCollapsed((v) => !v)}
-            >
-              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: "600" }}>
-                {moodCollapsed ? "Show" : "Hide"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ② Formula Parameters */}
-        <View style={[s.panel, { marginHorizontal: 16, marginBottom: 16 }]}>
-          <Text style={[s.sectionTitle, { marginBottom: 14 }]}>Formula Parameters</Text>
-          <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.paramLabel}>Bottle Size (mL)</Text>
-              <TextInput
-                style={s.paramInput}
-                value={bottleSizeMl.toString()}
-                onChangeText={(v) => setBottleSizeMl(parseFloat(v) || 0)}
-                onBlur={() => saveParams()}
-                keyboardType="decimal-pad"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.paramLabel}>Concentration (%)</Text>
-              <TextInput
-                style={s.paramInput}
-                value={concPercent.toString()}
-                onChangeText={(v) => setConcPercent(parseFloat(v) || 0)}
-                onBlur={() => saveParams()}
-                keyboardType="decimal-pad"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-              />
-            </View>
-          </View>
-          <Text style={s.paramLabel}>Diluent</Text>
-          <TouchableOpacity style={s.diluentRow} onPress={() => setDiluentPickerVisible(true)}>
-            <Text style={{ color: "#13131a", fontSize: 14 }}>{diluent}</Text>
-            <Text style={{ color: "rgba(0,0,0,0.4)", fontSize: 15 }}>▾</Text>
-          </TouchableOpacity>
-          <Text style={s.paramCalc}>
-            Current concentrate: {totalG.toFixed(3)}g · Target concentrate: {targetConcentrateG.toFixed(3)}g · Diluent to add: {diluentNeededMl} mL
-          </Text>
-          <TouchableOpacity
-            style={[s.normalizeBtn, (atTarget || totalG === 0) && { opacity: 0.4 }]}
-            onPress={normalizeToTarget}
-            disabled={atTarget || totalG === 0}
-          >
-            <Text style={s.normalizeBtnText}>Normalize to Target</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ③ Type to search bar (inline add) */}
-        <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-            <TextInput
-              style={[s.searchBarInline, { flex: 1 }]}
-              placeholder="Type to search materials..."
-              placeholderTextColor="rgba(0,0,0,0.35)"
-              value={inlineSearch}
-              onChangeText={(v) => { setInlineSearch(v); setInlineSelected(null); }}
-            />
-            <TextInput
-              style={s.amountInline}
-              placeholder="0.000"
-              placeholderTextColor="rgba(0,0,0,0.35)"
-              value={inlineAmount}
-              onChangeText={setInlineAmount}
-              keyboardType="decimal-pad"
-            />
-            <TouchableOpacity
-              style={[s.addBtn, ((!inlineSelected && !inlineSearch.trim()) || inlineAdding) && { opacity: 0.45 }]}
-              onPress={handleInlineAdd}
-              disabled={(!inlineSelected && !inlineSearch.trim()) || inlineAdding}
-            >
-              {inlineAdding
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={s.addBtnText}>Add</Text>
-              }
-            </TouchableOpacity>
-          </View>
-          {/* Search dropdown */}
-          {inlineSearch.trim() && !inlineSelected ? (
-            <View style={s.inlineDropdown}>
-              {inlineResults.slice(0, 8).map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={s.inlineDropdownRow}
-                  onPress={() => { setInlineSelected(item); setInlineSearch(item.name); setInlineResults([]); }}
-                >
-                  <Text style={{ color: "#13131a", fontSize: 14 }}>{item.name}</Text>
-                  {item.type ? <Text style={{ color: "rgba(0,0,0,0.45)", fontSize: 12 }}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text> : null}
-                </TouchableOpacity>
-              ))}
-              {!inlineResults.some((r) => r.name.toLowerCase() === inlineSearch.toLowerCase()) && (
-                <TouchableOpacity
-                  style={[s.inlineDropdownRow, inlineResults.length > 0 && { borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" }]}
-                  onPress={() => { setInlineResults([]); }}
-                >
-                  <Text style={{ color: "#22a55b", fontSize: 14, fontWeight: "600" }}>+ Add "{inlineSearch}" as new material</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : null}
-          {inlineSelected ? (
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
-              <Text style={{ color: "#a78bfa", fontSize: 13 }}>✓ {inlineSelected.name}</Text>
-              <TouchableOpacity onPress={() => { setInlineSelected(null); setInlineSearch(""); }} style={{ marginLeft: 10 }}>
-                <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Clear</Text>
+              <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 14 }} onPress={() => setMoodOpen(false)}>
+                <Text style={s.sectionShow}>Hide</Text>
               </TouchableOpacity>
             </View>
-          ) : !inlineSelected && inlineSearch.trim() && inlineResults.length === 0 ? (
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
-              <Text style={{ color: "#ec8fb5", fontSize: 13 }}>★ "{inlineSearch}" will be added to your Organ</Text>
-            </View>
-          ) : null}
+          )}
         </View>
 
-        {/* ④ Materials Table */}
-        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-          <GlassRow style={{ paddingHorizontal: 16 }}>
-            {/* Table header */}
+        {/* ── Parameters ── */}
+        <View style={s.section}>
+          <TouchableOpacity style={s.sectionHead} activeOpacity={0.8} onPress={() => setParamsOpen((v) => !v)}>
+            <Text style={s.sectionHeadTitle}>Parameters</Text>
+            {!paramsOpen && <Text style={s.sectionShow}>Show</Text>}
+          </TouchableOpacity>
+          {paramsOpen && (
+          <View style={s.sectionBody}>
+            <View style={s.paramRow}>
+              <View style={s.paramColSm}>
+                <Text style={s.paramLabel}>Bottle Size (ml)</Text>
+                <TextInput
+                  style={s.paramInput}
+                  value={bottleSizeMl.toString()}
+                  onChangeText={(v) => setBottleSizeMl(parseFloat(v) || 0)}
+                  onBlur={() => saveParams()}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                />
+              </View>
+              <View style={s.paramColSm}>
+                <Text style={s.paramLabel}>Concentration (%)</Text>
+                <TextInput
+                  style={s.paramInput}
+                  value={concPercent.toString()}
+                  onChangeText={(v) => setConcPercent(parseFloat(v) || 0)}
+                  onBlur={() => saveParams()}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                />
+              </View>
+              <View style={s.paramColLg}>
+                <Text style={s.paramLabel}>Diluent</Text>
+                <TouchableOpacity style={s.diluentRow} onPress={() => setDiluentPickerVisible(true)}>
+                  <Text style={s.diluentText} numberOfLines={1}>{diluent}</Text>
+                  <Text style={s.diluentChevron}>⌄</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={s.paramDivider} />
+
+            <Text style={s.paramCalc}>
+              Target Concentrate: {targetConcentrateG.toFixed(3)}g  |  Diluent: {diluentNeededMl}ml
+            </Text>
+
+            <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 12 }} onPress={() => setParamsOpen(false)}>
+              <Text style={s.sectionShow}>Hide</Text>
+            </TouchableOpacity>
+          </View>
+          )}
+        </View>
+
+        {/* ── Formula ── */}
+        <View style={s.section}>
+          <TouchableOpacity style={s.sectionHead} activeOpacity={0.8} onPress={() => setFormulaOpen((v) => !v)}>
+            <Text style={s.sectionHeadTitle}>Formula</Text>
+            {!formulaOpen && <Text style={s.sectionShow}>Show</Text>}
+          </TouchableOpacity>
+          {formulaOpen && (
+          <View style={s.sectionBody}>
+            {/* Search + Add */}
+            <View style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                <TextInput
+                  style={[s.searchBarInline, { flex: 1 }]}
+                  placeholder="Search Materials..."
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  value={inlineSearch}
+                  onChangeText={(v) => { setInlineSearch(v); setInlineSelected(null); }}
+                />
+                <TouchableOpacity
+                  style={[s.searchAddBtn, ((!inlineSelected && !inlineSearch.trim()) || inlineAdding) && { opacity: 0.45 }]}
+                  onPress={handleInlineAdd}
+                  disabled={(!inlineSelected && !inlineSearch.trim()) || inlineAdding}
+                >
+                  {inlineAdding
+                    ? <ActivityIndicator color="#13131a" size="small" />
+                    : <Text style={s.searchAddText}>Add</Text>}
+                </TouchableOpacity>
+              </View>
+              {/* Search dropdown */}
+              {inlineSearch.trim() && !inlineSelected ? (
+                <View style={s.inlineDropdown}>
+                  {inlineResults.slice(0, 8).map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={s.inlineDropdownRow}
+                      onPress={() => { setInlineSelected(item); setInlineSearch(item.name); setInlineResults([]); }}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 14 }}>{item.name}</Text>
+                      {item.type ? <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text> : null}
+                    </TouchableOpacity>
+                  ))}
+                  {!inlineResults.some((r) => r.name.toLowerCase() === inlineSearch.toLowerCase()) && (
+                    <TouchableOpacity
+                      style={[s.inlineDropdownRow, inlineResults.length > 0 && { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.1)" }]}
+                      onPress={() => { setInlineResults([]); }}
+                    >
+                      <Text style={{ color: ACCENT, fontSize: 14, fontWeight: "600" }}>+ Add "{inlineSearch}" to your Organ</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : null}
+              {inlineSelected ? (
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
+                  <Text style={{ color: ACCENT, fontSize: 13 }}>✓ {inlineSelected.name}</Text>
+                  <TouchableOpacity onPress={() => { setInlineSelected(null); setInlineSearch(""); }} style={{ marginLeft: 10 }}>
+                    <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : !inlineSelected && inlineSearch.trim() && inlineResults.length === 0 ? (
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
+                  <Text style={{ color: ACCENT, fontSize: 13 }}>★ "{inlineSearch}" will be added to your Organ</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Materials Table */}
             <View style={s.tableHeader}>
+              <Text style={[s.tableHeaderText, { width: 56 }]}>Symbol</Text>
               <Text style={[s.tableHeaderText, { flex: 1 }]}>Material</Text>
-              <Text style={[s.tableHeaderText, { width: 52 }]}>Type</Text>
-              <Text style={[s.tableHeaderText, { width: 68, textAlign: "right" }]}>Amount (g)</Text>
-              <View style={{ width: 30 }} />
+              <Text style={[s.tableHeaderText, { textAlign: "right" }]}>Amount (g)</Text>
+              <View style={{ width: 26 }} />
             </View>
             {lines.length === 0 ? (
               <View style={{ paddingVertical: 24, alignItems: "center" }}>
-                <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>No ingredients yet. Add some to get started.</Text>
+                <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>No materials yet. Search above to add.</Text>
               </View>
             ) : (
-              lines.map((line) => (
+              sortedLines.map((line) => (
                 <LineRow
                   key={line.id} line={line} totalG={totalG}
                   onDelete={() => handleDeleteLine(line.id)}
@@ -876,66 +861,44 @@ export default function FormulaDetail() {
             )}
             {/* Total row */}
             <View style={s.tableTotalRow}>
-              <Text style={[s.tableTotalLabel, { flex: 1 }]}>Total</Text>
-              <Text style={s.tableTotalVal}>{totalG.toFixed(3)}</Text>
-              {!atTarget && lines.length > 0 ? (
-                <Text style={s.tableUnderBy}>  Under by {Math.abs(targetConcentrateG - totalG).toFixed(3)}g</Text>
-              ) : null}
-              <Text style={[s.tableTotalVal, { width: 44, textAlign: "right" }]}>
-                {targetConcentrateG > 0 ? `${Math.round((totalG / targetConcentrateG) * 100)}%` : "—"}
-              </Text>
-              <View style={{ width: 30 }} />
+              <Text style={[s.tableTotalLabel, { flex: 1 }]}>Total Materials Concentrate</Text>
+              <Text style={s.tableTotalVal}>{totalG.toFixed(2)}g</Text>
+              <Text style={s.tableTotalPct}>  |  {lines.length > 0 ? "100%" : "0%"}</Text>
             </View>
-          </GlassRow>
+
+            <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 12 }} onPress={() => setFormulaOpen(false)}>
+              <Text style={s.sectionShow}>Hide</Text>
+            </TouchableOpacity>
+          </View>
+          )}
         </View>
 
-        {/* ⑤ Formula Summary */}
-        <View style={[s.panel, { marginHorizontal: 16, marginBottom: 16 }]}>
-          <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Formula Summary</Text>
-          <View style={{ flexDirection: "row" }}>
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={s.statVal}>{totalG.toFixed(3)}g</Text>
-              <Text style={s.statLabel}>Current Total</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={s.statVal}>{targetConcentrateG.toFixed(3)}g</Text>
-              <Text style={s.statLabel}>Target Concentrate</Text>
-            </View>
-            <View style={s.statDivider} />
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={s.statVal}>{diluentNeededMl} mL</Text>
-              <Text style={s.statLabel}>Base/Diluent Needed</Text>
+        {/* ── Summary ── */}
+        <View style={s.section}>
+          <TouchableOpacity style={s.sectionHead} activeOpacity={0.8} onPress={() => setSummaryOpen((v) => !v)}>
+            <Text style={s.sectionHeadTitle}>Summary</Text>
+            <Text style={s.sectionShow}>{summaryOpen ? "Hide" : "Show"}</Text>
+          </TouchableOpacity>
+          {summaryOpen && (
+          <View style={s.sectionBody}>
+            <View style={{ flexDirection: "row" }}>
+              <View style={{ flex: 1, alignItems: "center" }}>
+                <Text style={s.statVal}>{totalG.toFixed(3)}g</Text>
+                <Text style={s.statLabel}>Current Total</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={{ flex: 1, alignItems: "center" }}>
+                <Text style={s.statVal}>{targetConcentrateG.toFixed(3)}g</Text>
+                <Text style={s.statLabel}>Target Concentrate</Text>
+              </View>
+              <View style={s.statDivider} />
+              <View style={{ flex: 1, alignItems: "center" }}>
+                <Text style={s.statVal}>{diluentNeededMl} mL</Text>
+                <Text style={s.statLabel}>Base/Diluent Needed</Text>
+              </View>
             </View>
           </View>
-        </View>
-
-        {/* ⑥ Notes (collapsible) */}
-        <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-          <TouchableOpacity
-            style={[
-              s.notesHeader,
-              notesExpanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
-            ]}
-            onPress={() => setNotesExpanded((v) => !v)}
-            activeOpacity={0.8}
-          >
-            <Text style={s.sectionTitle}>Notes</Text>
-            <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 18, lineHeight: 22 }}>
-              {notesExpanded ? "∧" : "∨"}
-            </Text>
-          </TouchableOpacity>
-          {notesExpanded ? (
-            <View style={s.notesBody}>
-              {formula.description ? (
-                <Text style={s.notesText}>{formula.description}</Text>
-              ) : (
-                <Text style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
-                  No notes yet. Tap Edit to add.
-                </Text>
-              )}
-            </View>
-          ) : null}
+          )}
         </View>
 
       </KeyboardAwareScrollView>
@@ -969,13 +932,24 @@ export default function FormulaDetail() {
         onAdded={() => { setAddMoodVisible(false); fetchMoodItems(); }}
       />
 
+      {/* Image lightbox */}
+      <Modal visible={!!lightboxUrl} transparent animationType="fade" onRequestClose={() => setLightboxUrl(null)}>
+        <View style={s.lightboxBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setLightboxUrl(null)} />
+          <TouchableOpacity style={s.lightboxClose} onPress={() => setLightboxUrl(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={s.lightboxCloseText}>✕</Text>
+          </TouchableOpacity>
+          {lightboxUrl ? <Image source={{ uri: lightboxUrl }} style={s.lightboxImg} resizeMode="contain" /> : null}
+        </View>
+      </Modal>
+
       {/* Persistent bottom bar */}
       <View style={s.bottomBar}>
         <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
           <Text style={s.moreBtnText}>More</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
+          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
         </TouchableOpacity>
       </View>
 
@@ -1000,7 +974,62 @@ export default function FormulaDetail() {
           </View>
         </View>
       </Modal>
-    </GradientScreen>
+
+      {/* Versions drawer */}
+      <Modal visible={versionsOpen} transparent animationType="fade" onRequestClose={() => setVersionsOpen(false)}>
+        <View style={s.drawerBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setVersionsOpen(false)} />
+          <View style={s.drawerCard}>
+            {/* Card header replica */}
+            <View style={s.notesCardTop}>
+              <Text style={s.cardName} numberOfLines={1}>{formula.name}</Text>
+              <Text style={s.cardDate}>
+                {new Date(formula.date_created).toLocaleDateString("en-US", { year: "2-digit", month: "2-digit", day: "2-digit" }).replace(/\//g, ".")}
+              </Text>
+            </View>
+            {formula.description ? <Text style={[s.cardNotes, { marginTop: 8 }]} numberOfLines={2}>{formula.description}</Text> : null}
+            <View style={s.cardBottom}>
+              <View style={s.cardBottomLeft}>
+                <View style={s.statusPill}>
+                  <Text style={s.statusPillText}>{formulaStatus(lines.length, formula.status).toUpperCase()}</Text>
+                </View>
+                <Text style={s.cardMeta}>{lines.length} MATERIALS</Text>
+                <Text style={s.cardSep}>  |  </Text>
+                <Text style={s.cardVersions}>VERSIONS</Text>
+              </View>
+              <Text style={[s.cardHeart, formula.is_favorite && s.cardHeartActive]}>{formula.is_favorite ? "♥" : "♡"}</Text>
+            </View>
+
+            <View style={s.drawerDivider} />
+
+            <Text style={s.drawerTitle}>Versions</Text>
+            {versionsLoading ? (
+              <ActivityIndicator size="small" color={ACCENT} style={{ marginTop: 12, marginBottom: 4 }} />
+            ) : versions.length === 0 ? (
+              <Text style={s.drawerEmpty}>No saved versions yet.</Text>
+            ) : (
+              versions.map((v) => (
+                <TouchableOpacity
+                  key={v.id}
+                  style={s.versionPill}
+                  activeOpacity={0.75}
+                  onPress={() => { setVersionsOpen(false); router.push(`/formula/version/${v.id}` as any); }}
+                >
+                  <Text style={s.versionName} numberOfLines={1}>
+                    {v.label ?? `${formula.name} [version ${v.version_num}]`}
+                  </Text>
+                  <Text style={s.versionDate}>{formatDate(v.created_at)}</Text>
+                </TouchableOpacity>
+              ))
+            )}
+
+            <TouchableOpacity style={s.drawerHide} onPress={() => setVersionsOpen(false)}>
+              <Text style={s.drawerHideText}>Hide</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </DarkScreen>
   );
 }
 
@@ -1008,205 +1037,150 @@ export default function FormulaDetail() {
 
 // Mood board modal styles
 const mb = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#13131a",
-    letterSpacing: 0.3,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeIcon: { color: "#13131a", fontSize: 14, fontWeight: "600" },
-
-  tabRow: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 10,
-    marginBottom: 20,
-  },
-  tab: {
+  backdrop: {
     flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.2)",
-    backgroundColor: "rgba(255,255,255,0.3)",
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
   },
-  tabActive: {
-    backgroundColor: "#13131a",
-    borderColor: "#13131a",
-  },
-  tabText: { fontSize: 13, fontWeight: "600", color: "rgba(0,0,0,0.6)" },
-  tabTextActive: { color: "#ffffff" },
-
-  uploadLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#13131a",
-    marginBottom: 10,
-  },
-  photoUpload: {
+  sheet: {
+    backgroundColor: "#0c0c0c",
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
+    padding: 18,
     width: "100%",
-    height: 380,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.12)",
+  },
+  captureBox: {
+    width: "100%",
+    aspectRatio: 0.8,
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
     overflow: "hidden",
   },
-  photoUploadIcon: { fontSize: 32, color: "rgba(19,19,26,0.35)", marginBottom: 10 },
-  photoUploadLabel: { color: "rgba(19,19,26,0.4)", fontSize: 14 },
-
-  uploadBox: {
-    borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.2)",
-    borderStyle: "dashed",
-    borderRadius: 14,
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  uploadArrow: {
-    fontSize: 32,
-    color: "#13131a",
-    marginBottom: 12,
-  },
-  uploadDesc: {
-    fontSize: 13,
-    color: "rgba(0,0,0,0.55)",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 6,
-  },
-  uploadMax: {
-    fontSize: 12,
-    color: "rgba(0,0,0,0.4)",
-  },
-
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#13131a",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "rgba(255,255,255,0.5)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.7)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#13131a",
-  },
-  noteInput: {
-    backgroundColor: "rgba(255,255,255,0.5)",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.7)",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 14,
-    color: "#13131a",
-    minHeight: 180,
-  },
-
-  saveBtn: {
-    backgroundColor: "#13131a",
-    borderRadius: 24,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  saveBtnText: { color: "#ffffff", fontSize: 15, fontWeight: "700" },
+  captureText: { color: "#13131a", fontSize: 15, fontWeight: "600", textAlign: "center" },
+  captureHint: { color: "rgba(19,19,26,0.45)", fontSize: 12, textAlign: "center", marginTop: 4 },
+  captureOr: { color: "rgba(19,19,26,0.45)", fontSize: 13, marginVertical: 10 },
+  actions: { flexDirection: "row", justifyContent: "space-between", marginTop: 16 },
+  cancelBtn: { flex: 1, marginRight: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 24, paddingVertical: 13, alignItems: "center" },
+  cancelBtnText: { color: "#fff", fontSize: 15, fontWeight: "500" },
+  addBtn: { flex: 1, marginLeft: 8, backgroundColor: "#EC008C", borderRadius: 24, paddingVertical: 13, alignItems: "center" },
+  addBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });
 
 const s = StyleSheet.create({
-  navBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  back: { color: "#13131a", fontSize: 16, fontWeight: "600" },
-  profileBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.08)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 6, paddingBottom: 2 },
+  back: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
   profileIcon: { fontSize: 16 },
   deleteBtn: { color: "#f87171", fontSize: 16 },
 
-  formulaName: { color: "#13131a", fontSize: 26, fontWeight: "700", marginBottom: 4 },
-  formulaDate: { color: "rgba(0,0,0,0.4)", fontSize: 13 },
-  formulaDesc: { color: "rgba(0,0,0,0.55)", fontSize: 14, lineHeight: 20 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 30, paddingTop: 24, paddingBottom: 16 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -4 },
+  pageTitle: { fontSize: 23, fontWeight: "700", color: "#fff", letterSpacing: -0.3 },
 
-  panel: { backgroundColor: "rgba(255,255,255,0.35)", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 16, padding: 16 },
+  // ── Main Notes card ──
+  notesCard: { marginHorizontal: 30, marginBottom: 16, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 16 },
+  notesCardTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  cardName: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  cardDate: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginLeft: 8 },
+  cardNotes: { fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 19 },
+  cardBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+  cardBottomLeft: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
+  statusPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginRight: 10 },
+  statusPillText: { fontSize: 9, color: "rgba(255,255,255,0.8)", fontWeight: "700", letterSpacing: 0.6 },
+  cardMeta: { fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: "600", letterSpacing: 0.5 },
+  cardSep: { fontSize: 11, color: "rgba(255,255,255,0.3)" },
+  cardVersions: { fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: "600", letterSpacing: 0.5, textDecorationLine: "underline" },
+  cardHeart: { fontSize: 22, color: "rgba(255,255,255,0.4)" },
+  cardHeartActive: { color: HEART },
+
+  // ── Accordion section ──
+  section: { marginHorizontal: 30, marginBottom: 12, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 14, overflow: "hidden" },
+  sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 18 },
+  sectionHeadTitle: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  sectionShow: { color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: "500" },
+  sectionBody: { paddingHorizontal: 18, paddingBottom: 20, paddingTop: 2 },
+
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-  sectionTitle: { color: "#13131a", fontWeight: "600", fontSize: 16 },
+  sectionTitle: { color: "#fff", fontWeight: "600", fontSize: 16 },
 
-  addBtn: { backgroundColor: "#13131a", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  addBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  addBtn: { backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  addBtnText: { color: "#13131a", fontWeight: "600", fontSize: 14 },
 
   // Mood Board
-  noteCard: { width: "100%", backgroundColor: "rgba(255,255,255,0.45)", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 12, padding: 16, paddingBottom: 20, position: "relative", minHeight: 90 },
-  noteText: { color: "#13131a", fontSize: 14, lineHeight: 22, paddingRight: 24 },
+  noteCard: { width: "100%", backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 12, padding: 16, paddingBottom: 20, position: "relative", minHeight: 90 },
+  noteText: { color: "#fff", fontSize: 14, lineHeight: 22, paddingRight: 24 },
   noteDeleteBtn: { position: "absolute", top: 10, right: 12 },
   imageCard: { width: "47%", aspectRatio: 4 / 3, borderRadius: 12, overflow: "hidden", position: "relative" },
   imageCaptionBar: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 8, paddingVertical: 6 },
   imageCaptionText: { color: "#fff", fontSize: 11, lineHeight: 14 },
   imageDeleteBtn: { position: "absolute", top: 6, right: 6 },
   imageDeleteBlur: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  addPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 6 },
+  addPillText: { color: "#fff", fontSize: 13, fontWeight: "500" },
+  moodImgCard: { width: "31.5%", aspectRatio: 0.82, borderRadius: 10, overflow: "hidden", position: "relative", backgroundColor: "rgba(255,255,255,0.06)" },
+
+  // Lightbox
+  lightboxBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" },
+  lightboxImg: { width: "92%", height: "80%" },
+  lightboxClose: { position: "absolute", top: 60, right: 24, width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
+  lightboxCloseText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 
   // Formula Parameters
-  paramLabel: { color: "rgba(0,0,0,0.5)", fontSize: 12, marginBottom: 6 },
-  paramInput: { backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: "#13131a", fontSize: 15 },
-  diluentRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
-  paramCalc: { color: "rgba(0,0,0,0.4)", fontSize: 12, lineHeight: 18 },
-  normalizeBtn: { marginTop: 14, backgroundColor: "rgba(139,117,250,0.25)", borderWidth: 1, borderColor: "rgba(167,139,250,0.5)", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-  normalizeBtnText: { color: "#5b3fd4", fontWeight: "600", fontSize: 15 },
+  paramRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  paramColSm: { width: 74 },
+  paramColLg: { flex: 1 },
+  paramLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginBottom: 8 },
+  paramInput: { backgroundColor: "transparent", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9, color: "#fff", fontSize: 14, textAlign: "center" },
+  diluentRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "transparent", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  diluentText: { color: "#fff", fontSize: 13, flex: 1, marginRight: 6 },
+  diluentChevron: { color: "rgba(255,255,255,0.6)", fontSize: 16, marginTop: -4 },
+  paramDivider: { height: 0.5, backgroundColor: "rgba(255,255,255,0.25)", marginTop: 22, marginBottom: 14 },
+  paramCalc: { color: "rgba(255,255,255,0.75)", fontSize: 13, lineHeight: 18 },
 
   // Inline search
-  searchBarInline: { backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11, color: "#13131a", fontSize: 14 },
-  amountInline: { backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.8)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 11, color: "#13131a", fontSize: 14, width: 72, textAlign: "center" },
-  inlineDropdown: { backgroundColor: "#fff", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 12, marginTop: 6, overflow: "hidden" },
-  inlineDropdownRow: { paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  searchBarInline: { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11, color: "#fff", fontSize: 14 },
+  amountInline: { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 11, color: "#fff", fontSize: 14, width: 72, textAlign: "center" },
+  inlineDropdown: { backgroundColor: "#1a1a1a", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 12, marginTop: 6, overflow: "hidden" },
+  inlineDropdownRow: { paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 
   // Materials table
-  tableHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.1)" },
-  tableHeaderText: { color: "rgba(0,0,0,0.4)", fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
-  lineRow: { flexDirection: "row", alignItems: "center", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
-  lineName: { color: "#13131a", fontWeight: "500", fontSize: 14 },
-  lineTypeCol: { width: 52, color: "rgba(0,0,0,0.45)", fontSize: 12 },
-  lineAmount: { color: "#13131a", fontSize: 14 },
-  linePct: { color: "#7c5cbf", fontSize: 12, marginTop: 2 },
-  lineInput: { backgroundColor: "rgba(255,255,255,0.8)", borderWidth: 1, borderColor: "rgba(167,139,250,0.6)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, color: "#13131a", textAlign: "right", width: 80 },
-  tableTotalRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)", marginTop: 2 },
-  tableTotalLabel: { color: "#13131a", fontWeight: "700", fontSize: 14 },
-  tableTotalVal: { color: "#13131a", fontWeight: "700", fontSize: 14 },
-  tableUnderBy: { color: "rgba(200,100,0,0.9)", fontSize: 11 },
+  searchAddBtn: { backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
+  searchAddText: { color: "#13131a", fontSize: 14, fontWeight: "700" },
+  tableHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.15)" },
+  tableHeaderText: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
+  lineRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+  lineSymbol: { width: 56, color: "rgba(255,255,255,0.85)", fontSize: 13, paddingLeft: 2 },
+  lineName: { color: "#fff", fontWeight: "500", fontSize: 14 },
+  lineTypeCol: { width: 52, color: "rgba(255,255,255,0.5)", fontSize: 12 },
+  lineAmount: { color: "#fff", fontSize: 14 },
+  linePct: { color: ACCENT, fontSize: 12, marginTop: 2, textAlign: "right" },
+  lineInput: { backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(236,0,140,0.6)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, color: "#fff", textAlign: "right", width: 80 },
+  tableTotalRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.15)", marginTop: 2 },
+  tableTotalLabel: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  tableTotalVal: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  tableTotalPct: { color: ACCENT, fontWeight: "700", fontSize: 14 },
+  tableUnderBy: { color: "#F0A93B", fontSize: 11 },
 
   // Formula Summary
-  statVal: { color: "#13131a", fontWeight: "700", fontSize: 17, marginBottom: 4, textAlign: "center" },
-  statLabel: { color: "rgba(0,0,0,0.4)", fontSize: 11, textAlign: "center" },
-  statDivider: { width: 1, backgroundColor: "rgba(0,0,0,0.1)", marginVertical: 4 },
+  statVal: { color: "#fff", fontWeight: "700", fontSize: 17, marginBottom: 4, textAlign: "center" },
+  statLabel: { color: "rgba(255,255,255,0.45)", fontSize: 11, textAlign: "center" },
+  statDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.15)", marginVertical: 4 },
 
-  // Notes collapsible
-  notesHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, backgroundColor: "rgba(255,255,255,0.35)", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 12 },
-  notesBody: { backgroundColor: "rgba(255,255,255,0.25)", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderTopWidth: 0, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, padding: 16 },
-  notesText: { color: "rgba(0,0,0,0.65)", fontSize: 14, lineHeight: 21 },
+  // ── Versions drawer ──
+  drawerBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "center", paddingHorizontal: 24 },
+  drawerCard: { backgroundColor: "#0c0c0c", borderRadius: 16, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, width: "100%" },
+  drawerDivider: { height: 0.5, backgroundColor: "rgba(255,255,255,0.25)", marginTop: 18, marginBottom: 4 },
+  drawerTitle: { fontSize: 17, fontWeight: "600", color: "#fff", marginTop: 14, marginBottom: 2 },
+  drawerEmpty: { fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 12, marginBottom: 4 },
+  versionPill: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 10, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.55)", paddingHorizontal: 16, paddingVertical: 14, marginTop: 10 },
+  versionName: { fontSize: 14, fontWeight: "600", color: "#fff", flex: 1, marginRight: 8 },
+  versionDate: { fontSize: 12, color: "rgba(255,255,255,0.5)" },
+  drawerHide: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 4, marginTop: 14 },
+  drawerHideText: { fontSize: 14, color: "rgba(255,255,255,0.7)", fontWeight: "500" },
 
   // Add Mood Modal (unused on detail page, kept for Diluent modal)
   tabRow: { flexDirection: "row", marginHorizontal: 24, marginTop: 16, marginBottom: 16, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, padding: 4 },
@@ -1227,11 +1201,11 @@ const s = StyleSheet.create({
   modalSaveBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
 
   // Bottom bar
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.1)" },
-  moreBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.2)", borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12 },
-  moreBtnText: { color: "#13131a", fontSize: 14 },
-  saveBtn: { backgroundColor: "#C6FF00", borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 },
-  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 40, paddingVertical: 16 },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
+  moreBtnText: { color: "#fff", fontSize: 15, fontWeight: "500" },
+  saveBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
+  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
 
   // More sheet
   moreBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },

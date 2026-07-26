@@ -11,8 +11,8 @@ import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
-const ACCENT = "#EC8FB5";
-const HEART = "#EC4C8E";
+const ACCENT = "#EC008C";
+const HEART = "#edff8d";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,15 +58,16 @@ function FormulaCard({ formula, onToggleFavorite }: {
   formula: Formula;
   onToggleFavorite: () => void;
 }) {
-  const [versionsExpanded, setVersionsExpanded] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState<FormulaVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
 
   const status = getStatus(formula);
   const date = formatDate(formula.date_created);
 
-  const toggleVersions = async () => {
-    if (!versionsExpanded && versions.length === 0) {
+  const openVersions = async () => {
+    setVersionsOpen(true);
+    if (versions.length === 0) {
       setVersionsLoading(true);
       const { data } = await supabase
         .from("formula_versions")
@@ -76,26 +77,55 @@ function FormulaCard({ formula, onToggleFavorite }: {
       setVersions((data as FormulaVersion[]) ?? []);
       setVersionsLoading(false);
     }
-    setVersionsExpanded((v) => !v);
   };
+
+  const openVersion = (id: string) => {
+    setVersionsOpen(false);
+    router.push(`/formula/version/${id}` as any);
+  };
+
+  // Shared card body (reused inside the Versions drawer)
+  const cardBody = (
+    <>
+      <View style={c.topRow}>
+        <Text style={c.name} numberOfLines={1}>{formula.name}</Text>
+        <Text style={c.date}>{date}</Text>
+      </View>
+      <Text style={c.desc} numberOfLines={1}>
+        {formula.description || "One line of notes will go here..."}
+      </Text>
+      <View style={c.bottomRow}>
+        <View style={c.bottomLeft}>
+          <View style={c.statusPill}>
+            <Text style={c.statusPillText}>{status.toUpperCase()}</Text>
+          </View>
+          <Text style={c.meta}>{formula.material_count ?? 0} MATERIALS</Text>
+          <Text style={c.sep}>  |  </Text>
+          <TouchableOpacity onPress={openVersions}>
+            <Text style={c.versionsLink}>VERSIONS</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation?.(); onToggleFavorite(); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[c.heart, formula.is_favorite && c.heartActive]}>{formula.is_favorite ? "♥" : "♡"}</Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
 
   return (
     <View style={c.card}>
-      {/* Top row: name + date */}
+      {/* Top half (name + date + description) opens the PDP */}
       <TouchableOpacity
-        style={c.topRow}
-        onPress={() => router.push(`/formula/${formula.id}` as any)}
         activeOpacity={0.75}
-      >
-        <Text style={c.name} numberOfLines={1}>{formula.name}</Text>
-        <Text style={c.date}>{date}</Text>
-      </TouchableOpacity>
-
-      {/* Description */}
-      <TouchableOpacity
         onPress={() => router.push(`/formula/${formula.id}` as any)}
-        activeOpacity={0.75}
       >
+        <View style={c.topRow}>
+          <Text style={c.name} numberOfLines={1}>{formula.name}</Text>
+          <Text style={c.date}>{date}</Text>
+        </View>
         <Text style={c.desc} numberOfLines={1}>
           {formula.description || "One line of notes will go here..."}
         </Text>
@@ -109,7 +139,7 @@ function FormulaCard({ formula, onToggleFavorite }: {
           </View>
           <Text style={c.meta}>{formula.material_count ?? 0} MATERIALS</Text>
           <Text style={c.sep}>  |  </Text>
-          <TouchableOpacity onPress={toggleVersions}>
+          <TouchableOpacity onPress={openVersions}>
             <Text style={c.versionsLink}>VERSIONS</Text>
           </TouchableOpacity>
         </View>
@@ -121,24 +151,45 @@ function FormulaCard({ formula, onToggleFavorite }: {
         </TouchableOpacity>
       </View>
 
-      {/* Version history */}
-      {versionsExpanded && (
-        versionsLoading
-          ? <ActivityIndicator size="small" color="#999" style={{ marginTop: 8 }} />
-          : versions.map((v) => (
-            <TouchableOpacity
-              key={v.id}
-              style={c.versionPill}
-              activeOpacity={0.75}
-              onPress={() => router.push(`/formula/version/${v.id}` as any)}
-            >
-              <Text style={c.versionName} numberOfLines={1}>
-                {v.label ?? `Version ${v.version_num}`}
-              </Text>
-              <Text style={c.versionDate}>{formatDate(v.created_at)}</Text>
+      {/* Versions drawer */}
+      <Modal visible={versionsOpen} transparent animationType="fade" onRequestClose={() => setVersionsOpen(false)}>
+        <View style={c.drawerBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setVersionsOpen(false)} />
+          <View style={c.drawerCard}>
+            {/* Card header replica */}
+            {cardBody}
+
+            <View style={c.drawerDivider} />
+
+            {/* Versions list */}
+            <Text style={c.drawerTitle}>Versions</Text>
+            {versionsLoading ? (
+              <ActivityIndicator size="small" color={ACCENT} style={{ marginTop: 12, marginBottom: 4 }} />
+            ) : versions.length === 0 ? (
+              <Text style={c.drawerEmpty}>No saved versions yet.</Text>
+            ) : (
+              versions.map((v) => (
+                <TouchableOpacity
+                  key={v.id}
+                  style={c.versionPill}
+                  activeOpacity={0.75}
+                  onPress={() => openVersion(v.id)}
+                >
+                  <Text style={c.versionName} numberOfLines={1}>
+                    {v.label ?? `${formula.name} [version ${v.version_num}]`}
+                  </Text>
+                  <Text style={c.versionDate}>{formatDate(v.created_at)}</Text>
+                </TouchableOpacity>
+              ))
+            )}
+
+            {/* Hide */}
+            <TouchableOpacity style={c.drawerHide} onPress={() => setVersionsOpen(false)}>
+              <Text style={c.drawerHideText}>Hide</Text>
             </TouchableOpacity>
-          ))
-      )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -445,7 +496,7 @@ const s = StyleSheet.create({
   pickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(0,0,0,0.15)", alignSelf: "center", marginBottom: 16 },
   pickerBtn: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
   pickerBtnText: { color: "#13131a", fontSize: 15 },
-  pickerBtnTextActive: { fontWeight: "700", color: "#ec8fb5" },
+  pickerBtnTextActive: { fontWeight: "700", color: "#EC008C" },
   empty: {
     color: "rgba(255,255,255,0.5)",
     textAlign: "center",
@@ -587,17 +638,61 @@ const c = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "transparent",
     borderRadius: 10,
     borderWidth: 0.5,
-    borderColor: "rgba(255,255,255,0.35)",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 8,
+    borderColor: "rgba(255,255,255,0.55)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 10,
   },
-  versionName: { fontSize: 13, color: "#fff", flex: 1, marginRight: 8 },
+  versionName: { fontSize: 14, fontWeight: "600", color: "#fff", flex: 1, marginRight: 8 },
   versionTag: { fontWeight: "400", color: "rgba(255,255,255,0.6)" },
   versionDate: { fontSize: 12, color: "rgba(255,255,255,0.5)" },
+
+  // ─── Versions drawer ───
+  drawerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  drawerCard: {
+    backgroundColor: "#0c0c0c",
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    width: "100%",
+  },
+  drawerDivider: {
+    height: 0.5,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    marginTop: 18,
+    marginBottom: 4,
+  },
+  drawerTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#fff",
+    marginTop: 14,
+    marginBottom: 2,
+  },
+  drawerEmpty: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.45)",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  drawerHide: {
+    alignSelf: "flex-end",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginTop: 14,
+  },
+  drawerHideText: { fontSize: 14, color: "rgba(255,255,255,0.7)", fontWeight: "500" },
 });
 
 // Create modal styles

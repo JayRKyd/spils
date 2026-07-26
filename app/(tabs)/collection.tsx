@@ -125,7 +125,7 @@ export default function Collection() {
   };
 
   return (
-    <LinearGradient colors={["#000000", "#000000", "#0fb8aa"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={["#000000", "#000000", "#00AEEF"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
 
         {/* Top nav */}
@@ -269,7 +269,7 @@ const s = StyleSheet.create({
 
   chipsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingBottom: 14, paddingTop: 2, gap: 8 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 50, borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", backgroundColor: "transparent" },
-  chipActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  chipActive: { backgroundColor: "#00AEEF", borderColor: "#00AEEF" },
   chipText: { color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: "500" },
   chipTextActive: { color: "#13131a", fontWeight: "700" },
 

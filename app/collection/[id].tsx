@@ -66,7 +66,7 @@ const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celeb
 const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Cologne", "Oil"];
 const STATUS_OPTIONS = ["Favorite", "Wishlist", "Sell/Trade"];
 
-const TEAL: [string, string, string] = ["#0d9488", "#0fb8aa", "#12ccba"];
+const TEAL: [string, string, string] = ["#008fc4", "#00AEEF", "#33c1f2"];
 
 // ─── Edit Modal Styles (hoisted so F + TagInput can reference em) ─────────────
 
@@ -81,7 +81,7 @@ const em = StyleSheet.create({
   bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingVertical: 16 },
   cancelBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 15 },
   cancelBtnText: { color: "#fff", fontSize: 14 },
-  savePill: { backgroundColor: "#0fb8aa", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
+  savePill: { backgroundColor: "#00AEEF", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
   savePillText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 
   label: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", marginBottom: 6, marginTop: 14, textTransform: "uppercase", letterSpacing: 0.8 },
@@ -96,26 +96,26 @@ const em = StyleSheet.create({
 
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", backgroundColor: "rgba(255,255,255,0.05)" },
-  chipActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  chipActive: { backgroundColor: "#00AEEF", borderColor: "#00AEEF" },
   chipText: { color: "rgba(255,255,255,0.7)", fontSize: 13 },
   chipTextActive: { color: "#13131a" },
 
   seasonIcons: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 10 },
   seasonIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
-  seasonIconActive: { backgroundColor: "#0fb8aa", borderColor: "#0fb8aa" },
+  seasonIconActive: { backgroundColor: "#00AEEF", borderColor: "#00AEEF" },
   seasonIconText: { fontSize: 14 },
 
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   tag: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   tagText: { color: "#fff", fontSize: 13 },
-  noteTag: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#0fb8aa", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  noteTagText: { color: "#0fb8aa", fontSize: 12, fontWeight: "600" },
+  noteTag: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#00AEEF", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  noteTagText: { color: "#00AEEF", fontSize: 12, fontWeight: "600" },
   organDropdown: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)", marginTop: 4, marginBottom: 4, overflow: "hidden" },
   organDropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)" },
   organDropdownText: { color: "#13131a", fontSize: 14 },
-  organDropdownHint: { color: "#0fb8aa", fontSize: 11, fontWeight: "600" },
+  organDropdownHint: { color: "#00AEEF", fontSize: 11, fontWeight: "600" },
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
-  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#0fb8aa" },
+  sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#00AEEF" },
   sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
   addBtn: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, justifyContent: "center" as const, marginBottom: 10 },
@@ -126,9 +126,9 @@ const em = StyleSheet.create({
   chevron: { color: "rgba(255,255,255,0.5)", fontSize: 20 },
   inlineList: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", borderRadius: 12, marginBottom: 10, overflow: "hidden" as const },
   inlineRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  inlineRowActive: { backgroundColor: "rgba(15,184,170,0.15)" },
+  inlineRowActive: { backgroundColor: "rgba(0,174,239,0.15)" },
   inlineRowText: { color: "#fff", fontSize: 14 },
-  inlineRowTextActive: { color: "#0fb8aa", fontWeight: "600" as const },
+  inlineRowTextActive: { color: "#00AEEF", fontWeight: "600" as const },
 
   sectionBox: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
   boxLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 },
@@ -428,7 +428,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <LinearGradient colors={["#000000", "#000000", "#0fb8aa"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+      <LinearGradient colors={["#000000", "#000000", "#00AEEF"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={em.topNav}>
             <SpilsLogo height={22} color="#edff8d" />
@@ -503,7 +503,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                 {CONCENTRATION_OPTIONS.map((opt) => (
                   <TouchableOpacity key={opt} style={[em.inlineRow, concentration === opt && em.inlineRowActive]} onPress={() => { setConcentration(opt); setConcentrationOpen(false); }}>
                     <Text style={[em.inlineRowText, concentration === opt && em.inlineRowTextActive]}>{opt}</Text>
-                    {concentration === opt ? <Text style={{ color: "#0fb8aa" }}>✓</Text> : null}
+                    {concentration === opt ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -519,7 +519,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                 {CATEGORY_OPTIONS.map((opt) => (
                   <TouchableOpacity key={opt} style={[em.inlineRow, category === opt && em.inlineRowActive]} onPress={() => { setCategory(opt); setCategoryOpen(false); }}>
                     <Text style={[em.inlineRowText, category === opt && em.inlineRowTextActive]}>{opt}</Text>
-                    {category === opt ? <Text style={{ color: "#0fb8aa" }}>✓</Text> : null}
+                    {category === opt ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -692,7 +692,7 @@ export default function CollectionDetail() {
   };
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <LinearGradient colors={["#000000", "#000000", "#0fb8aa"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+    <LinearGradient colors={["#000000", "#000000", "#00AEEF"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView>
     </LinearGradient>
   );

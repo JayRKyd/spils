@@ -118,8 +118,8 @@ function HomeLeftIcon({ focused }: { focused: boolean }) {
 
 const ROUTE_ACTIVE_COLORS: Record<string, string> = {
   journal: "#edff8d",
-  collection: "#0fb8aa",
-  formulas: "#EC8FB5",
+  collection: "#00AEEF",
+  formulas: "#EC008C",
   materials: "#C6FF00",
   community: "#F2533A",
 };
