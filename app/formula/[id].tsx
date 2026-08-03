@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Share, Image,
+  ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Share, Image, Linking,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -194,8 +194,8 @@ function LineRow({ line, totalG, onDelete, onUpdateAmount }: {
         )}
         <Text style={s.linePct}>{pct}%</Text>
       </View>
-      <TouchableOpacity style={{ padding: 6, marginLeft: 4 }} onPress={onDelete}>
-        <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 18 }}>×</Text>
+      <TouchableOpacity style={{ padding: 6, marginLeft: 4, alignSelf: "flex-start" }} onPress={onDelete}>
+        <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 18, lineHeight: 18 }}>×</Text>
       </TouchableOpacity>
     </View>
   );
@@ -307,6 +307,7 @@ export default function FormulaDetail() {
   const [concPercent, setConcPercent] = useState(20);
   const [diluent, setDiluent] = useState("Ethanol (EtOH)");
   const [diluentPickerVisible, setDiluentPickerVisible] = useState(false);
+  const [concFocused, setConcFocused] = useState(false);
 
   // Inline add material
   const [inlineSearch, setInlineSearch] = useState("");
@@ -331,7 +332,14 @@ export default function FormulaDetail() {
   const [addMoodVisible, setAddMoodVisible] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [moreVisible, setMoreVisible] = useState(false);
+  const [moreView, setMoreView] = useState<"main" | "share" | "delete">("main");
   const [saving, setSaving] = useState(false);
+
+  // Status + save flow
+  const [statusVal, setStatusVal] = useState<string | null>(null);
+  const [saveMenuVisible, setSaveMenuVisible] = useState(false);
+  const [versionDialogVisible, setVersionDialogVisible] = useState(false);
+  const [versionName, setVersionName] = useState("");
 
   // Versions drawer
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -348,6 +356,7 @@ export default function FormulaDetail() {
       setBottleSizeMl(p.bottleSizeMl);
       setConcPercent(p.concPercent);
       setDiluent(p.diluent);
+      setStatusVal(formula.status ?? null);
     }
   }, [formula?.id]);
 
@@ -477,11 +486,11 @@ export default function FormulaDetail() {
     setEditingDesc(false);
   };
 
-  const handleDeleteFormula = () => {
-    Alert.alert("Delete Formula", `Delete "${formula?.name}"? This cannot be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await supabase.from("formulas").delete().eq("id", formulaId); router.back(); } },
-    ]);
+  // Called from the in-sheet "Are you sure?" confirmation
+  const handleDeleteFormula = async () => {
+    closeMore();
+    await supabase.from("formulas").delete().eq("id", formulaId);
+    router.back();
   };
 
   const handleDeleteMoodItem = (itemId: string) => {
@@ -511,17 +520,17 @@ export default function FormulaDetail() {
 
   const handleSave = async () => {
     if (!formula) return;
+    setSaveMenuVisible(false);
     setSaving(true);
     const name = editingName ? (nameVal.trim() || formula.name) : formula.name;
     const description = editingDesc ? (descVal.trim() || null) : formula.description;
-    const { error } = await supabase.from("formulas").update({ name, description }).eq("id", formulaId);
+    const { error } = await supabase.from("formulas").update({ name, description, status: statusVal }).eq("id", formulaId);
     setSaving(false);
     if (error) { Alert.alert("Save failed", error.message); return; }
     router.replace("/(tabs)/formulas" as any);
   };
 
-  const handleSaveVersion = async () => {
-    setMoreVisible(false);
+  const handleSaveVersion = async (label: string) => {
     const { data: versions } = await supabase
       .from("formula_versions").select("version_num").eq("formula_id", formulaId)
       .order("version_num", { ascending: false }).limit(1);
@@ -536,11 +545,13 @@ export default function FormulaDetail() {
     const { error } = await supabase.from("formula_versions").insert([{
       formula_id: formulaId,
       version_num: nextNum,
+      label: label.trim() || `Version ${nextNum}`,
       notes: JSON.stringify(snapshot),
       created_by: user?.id,
     }]);
     if (error) { Alert.alert("Error", error.message); return; }
-    Alert.alert("Version Saved", `Version ${nextNum} saved.`);
+    setVersionDialogVisible(false);
+    Alert.alert("Version Saved", `"${label.trim() || `Version ${nextNum}`}" saved.`);
   };
 
   const handleDuplicate = async () => {
@@ -560,19 +571,36 @@ export default function FormulaDetail() {
     ]);
   };
 
-  const handleShare = async () => {
-    if (!formula) return;
+  const buildShareText = () => {
+    if (!formula) return "";
     const ingList = lines.slice().sort((a, b) => b.amount_g - a.amount_g)
       .map((l) => `  • ${l.material?.name ?? "Unknown"}: ${l.amount_g.toFixed(3)}g (${totalG > 0 ? ((l.amount_g / totalG) * 100).toFixed(1) : 0}%)`)
       .join("\n");
-    const text = [
+    return [
       `🧪 ${formula.name}`,
       formula.description ? `\n${formula.description}` : "",
       `\nIngredients — ${totalG.toFixed(3)}g total:`,
       ingList || "  (none)",
       `\nBottle: ${bottleSizeMl}mL · Conc: ${concPercent}% · Diluent: ${diluent}`,
     ].filter(Boolean).join("\n");
-    await Share.share({ title: formula.name, message: text });
+  };
+
+  const closeMore = () => { setMoreVisible(false); setMoreView("main"); };
+
+  const handleOSShare = async () => {
+    if (!formula) return;
+    closeMore();
+    await Share.share({ title: formula.name, message: buildShareText() });
+  };
+
+  const handleEmailShare = () => {
+    closeMore();
+    Linking.openURL(`mailto:?subject=${encodeURIComponent(formula?.name ?? "Formula")}&body=${encodeURIComponent(buildShareText())}`);
+  };
+
+  const handleSMSShare = () => {
+    closeMore();
+    Linking.openURL(`sms:?body=${encodeURIComponent(buildShareText())}`);
   };
 
   if (loading) return (
@@ -589,6 +617,9 @@ export default function FormulaDetail() {
   const atTarget = Math.abs(totalG - targetConcentrateG) < 0.001;
   const moodImages = moodItems.filter((i) => i.media_type === "image" && i.display_url);
   const sortedLines = [...lines].sort((a, b) => symbolRank(a.material?.type) - symbolRank(b.material?.type));
+  const catG = (t: string) => lines.filter((l) => l.material?.type === t).reduce((sum, l) => sum + safeNum(l.amount_g), 0);
+  const topG = catG("Top"), midG = catG("Mid"), baseG = catG("Base");
+  const pctOf = (g: number) => (totalG > 0 ? Math.round((g / totalG) * 100) : 0);
 
   return (
     <DarkScreen>
@@ -655,7 +686,7 @@ export default function FormulaDetail() {
           <View style={s.cardBottom}>
             <View style={s.cardBottomLeft}>
               <View style={s.statusPill}>
-                <Text style={s.statusPillText}>{formulaStatus(lines.length, formula.status).toUpperCase()}</Text>
+                <Text style={s.statusPillText}>{formulaStatus(lines.length, statusVal).toUpperCase()}</Text>
               </View>
               <Text style={s.cardMeta}>{lines.length} MATERIALS</Text>
               <Text style={s.cardSep}>  |  </Text>
@@ -745,9 +776,10 @@ export default function FormulaDetail() {
                 <Text style={s.paramLabel}>Concentration (%)</Text>
                 <TextInput
                   style={s.paramInput}
-                  value={concPercent.toString()}
+                  value={concFocused ? concPercent.toString() : `${concPercent}%`}
                   onChangeText={(v) => setConcPercent(parseFloat(v) || 0)}
-                  onBlur={() => saveParams()}
+                  onFocus={() => setConcFocused(true)}
+                  onBlur={() => { setConcFocused(false); saveParams(); }}
                   keyboardType="decimal-pad"
                   placeholderTextColor="rgba(255,255,255,0.3)"
                 />
@@ -782,11 +814,11 @@ export default function FormulaDetail() {
           </TouchableOpacity>
           {formulaOpen && (
           <View style={s.sectionBody}>
-            {/* Search + Add */}
+            {/* Search + Add (pill inside the bar) */}
             <View style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+              <View style={s.searchPillWrap}>
                 <TextInput
-                  style={[s.searchBarInline, { flex: 1 }]}
+                  style={s.searchPillInput}
                   placeholder="Search Materials..."
                   placeholderTextColor="rgba(255,255,255,0.4)"
                   value={inlineSearch}
@@ -877,28 +909,69 @@ export default function FormulaDetail() {
         <View style={s.section}>
           <TouchableOpacity style={s.sectionHead} activeOpacity={0.8} onPress={() => setSummaryOpen((v) => !v)}>
             <Text style={s.sectionHeadTitle}>Summary</Text>
-            <Text style={s.sectionShow}>{summaryOpen ? "Hide" : "Show"}</Text>
+            {!summaryOpen && <Text style={s.sectionShow}>Show</Text>}
           </TouchableOpacity>
           {summaryOpen && (
           <View style={s.sectionBody}>
             <View style={{ flexDirection: "row" }}>
               <View style={{ flex: 1, alignItems: "center" }}>
                 <Text style={s.statVal}>{totalG.toFixed(3)}g</Text>
-                <Text style={s.statLabel}>Current Total</Text>
+                <Text style={s.statLabel}>CONCENTRATE TOTAL</Text>
               </View>
               <View style={s.statDivider} />
               <View style={{ flex: 1, alignItems: "center" }}>
                 <Text style={s.statVal}>{targetConcentrateG.toFixed(3)}g</Text>
-                <Text style={s.statLabel}>Target Concentrate</Text>
+                <Text style={s.statLabel}>TARGET CONCENTRATE</Text>
               </View>
               <View style={s.statDivider} />
               <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={s.statVal}>{diluentNeededMl} mL</Text>
-                <Text style={s.statLabel}>Base/Diluent Needed</Text>
+                <Text style={s.statVal}>{diluentNeededMl}ml</Text>
+                <Text style={s.statLabel}>DILUENT</Text>
               </View>
+            </View>
+
+            {/* Breakdown by symbol */}
+            {lines.length > 0 && (
+              <View style={s.breakdownRow}>
+                {topG > 0 && <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>▲ {pctOf(topG)}%</Text></View>}
+                {midG > 0 && <View style={[s.bdPill, { backgroundColor: "#F06CA6" }]}><Text style={s.bdPillDark}>● {pctOf(midG)}%</Text></View>}
+                {baseG > 0 && <View style={[s.bdPill, { backgroundColor: "#4C7DF0" }]}><Text style={s.bdPillLight}>■ {pctOf(baseG)}%</Text></View>}
+              </View>
+            )}
+
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+              <TouchableOpacity
+                style={[s.normalizeBtn, (atTarget || totalG === 0) && { opacity: 0.4 }]}
+                onPress={normalizeToTarget}
+                disabled={atTarget || totalG === 0}
+              >
+                <Text style={s.normalizeBtnText}>Normalize to Target</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSummaryOpen(false)}>
+                <Text style={s.sectionShow}>Hide</Text>
+              </TouchableOpacity>
             </View>
           </View>
           )}
+        </View>
+
+        {/* ── Set Status ── */}
+        <View style={{ paddingHorizontal: 30, marginTop: 4, marginBottom: 8 }}>
+          <Text style={s.setStatusLabel}>Set Status</Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {["Draft", "In Progress", "Final"].map((st) => {
+              const active = statusVal === st;
+              return (
+                <TouchableOpacity
+                  key={st}
+                  style={[s.statusChip, active && s.statusChipActive]}
+                  onPress={() => setStatusVal(active ? null : st)}
+                >
+                  <Text style={[s.statusChipText, active && s.statusChipTextActive]}>{st.toUpperCase()}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
       </KeyboardAwareScrollView>
@@ -948,29 +1021,106 @@ export default function FormulaDetail() {
         <TouchableOpacity style={s.moreBtn} onPress={() => setMoreVisible(true)}>
           <Text style={s.moreBtnText}>More</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
+        <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={() => setSaveMenuVisible(true)} disabled={saving}>
+          {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
         </TouchableOpacity>
       </View>
 
       {/* More sheet */}
-      <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={() => setMoreVisible(false)}>
+      <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={closeMore}>
         <View style={s.moreBackdrop}>
-          <TouchableOpacity style={StyleSheet.absoluteFill as any} onPress={() => setMoreVisible(false)} />
+          <TouchableOpacity style={StyleSheet.absoluteFill as any} onPress={closeMore} />
           <View style={s.moreSheet}>
             <View style={s.moreHandle} />
-            <TouchableOpacity style={s.sheetBtn} onPress={() => { setMoreVisible(false); handleShare(); }}>
-              <Text style={s.sheetBtnText}>Share Formula</Text>
+
+            {moreView === "main" && (
+              <>
+                <TouchableOpacity style={[s.sheetBtn, s.sheetBtnBlue]} onPress={() => setMoreView("share")}>
+                  <Text style={[s.sheetBtnText, s.sheetBtnTextLight]}>Share Formula</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.sheetBtn, s.sheetBtnBeige]} onPress={() => { closeMore(); Alert.alert("Print", "Print feature coming soon."); }}>
+                  <Text style={[s.sheetBtnText, { color: "rgba(19,19,26,0.55)" }]}>Print</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.sheetBtn, s.sheetBtnMagenta]} onPress={() => setMoreView("delete")}>
+                  <Text style={[s.sheetBtnText, s.sheetBtnTextLight]}>Delete Formula</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {moreView === "share" && (
+              <>
+                <View style={[s.sheetBtn, s.sheetBtnBlue]}>
+                  <Text style={[s.sheetBtnText, s.sheetBtnTextLight]}>Share</Text>
+                </View>
+                <TouchableOpacity style={s.sheetBtn} onPress={handleOSShare}>
+                  <Text style={s.sheetBtnText}>OS Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.sheetBtn} onPress={handleEmailShare}>
+                  <Text style={s.sheetBtnText}>Email</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.sheetBtn} onPress={handleSMSShare}>
+                  <Text style={s.sheetBtnText}>Text (SMS)</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {moreView === "delete" && (
+              <>
+                <View style={[s.sheetBtn, s.sheetBtnMagenta]}>
+                  <Text style={[s.sheetBtnText, s.sheetBtnTextLight]}>Delete Formula</Text>
+                </View>
+                <Text style={s.sheetConfirmText}>Are you sure?</Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <TouchableOpacity style={[s.sheetBtn, { flex: 1 }]} onPress={handleDeleteFormula}>
+                    <Text style={s.sheetBtnText}>Yes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.sheetBtn, { flex: 1 }]} onPress={() => setMoreView("main")}>
+                    <Text style={s.sheetBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Save menu pop-up */}
+      <Modal visible={saveMenuVisible} transparent animationType="fade" onRequestClose={() => setSaveMenuVisible(false)}>
+        <View style={s.saveMenuBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setSaveMenuVisible(false)} />
+          <View style={s.saveMenuCard}>
+            <TouchableOpacity style={s.saveMenuPrimary} onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={s.saveMenuPrimaryText}>Save</Text>}
             </TouchableOpacity>
-            <TouchableOpacity style={s.sheetBtn} onPress={handleSaveVersion}>
-              <Text style={s.sheetBtnText}>Save Version</Text>
+            <TouchableOpacity style={s.saveMenuSecondary} onPress={() => { setSaveMenuVisible(false); setVersionName("Mod 2.0"); setVersionDialogVisible(true); }}>
+              <Text style={s.saveMenuSecondaryText}>Save a Version</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.sheetBtn, s.sheetBtnGrey]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print feature coming soon."); }}>
-              <Text style={[s.sheetBtnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.sheetBtn, s.sheetBtnDanger]} onPress={() => { setMoreVisible(false); handleDeleteFormula(); }}>
-              <Text style={[s.sheetBtnText, { color: "#e53535" }]}>Delete Formula</Text>
-            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Save a Version dialog */}
+      <Modal visible={versionDialogVisible} transparent animationType="fade" onRequestClose={() => setVersionDialogVisible(false)}>
+        <View style={s.saveMenuBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setVersionDialogVisible(false)} />
+          <View style={s.versionDialog}>
+            <Text style={s.versionDialogTitle}>Save a Version</Text>
+            <TextInput
+              style={s.versionInput}
+              value={versionName}
+              onChangeText={setVersionName}
+              placeholder="Version name"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              autoFocus
+            />
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+              <TouchableOpacity style={s.vdCancel} onPress={() => setVersionDialogVisible(false)}>
+                <Text style={s.vdCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.vdSave} onPress={() => handleSaveVersion(versionName)}>
+                <Text style={s.vdSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -991,7 +1141,7 @@ export default function FormulaDetail() {
             <View style={s.cardBottom}>
               <View style={s.cardBottomLeft}>
                 <View style={s.statusPill}>
-                  <Text style={s.statusPillText}>{formulaStatus(lines.length, formula.status).toUpperCase()}</Text>
+                  <Text style={s.statusPillText}>{formulaStatus(lines.length, statusVal).toUpperCase()}</Text>
                 </View>
                 <Text style={s.cardMeta}>{lines.length} MATERIALS</Text>
                 <Text style={s.cardSep}>  |  </Text>
@@ -1148,8 +1298,10 @@ const s = StyleSheet.create({
   inlineDropdownRow: { paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 
   // Materials table
-  searchAddBtn: { backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
-  searchAddText: { color: "#13131a", fontSize: 14, fontWeight: "700" },
+  searchPillWrap: { flexDirection: "row", alignItems: "center", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 24, paddingLeft: 16, paddingRight: 5, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.04)" },
+  searchPillInput: { flex: 1, fontSize: 14, color: "#fff", paddingVertical: 7, marginRight: 8 },
+  searchAddBtn: { backgroundColor: "#fff", borderRadius: 18, paddingHorizontal: 16, paddingVertical: 7 },
+  searchAddText: { color: "#13131a", fontSize: 12, fontWeight: "600" },
   tableHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.15)" },
   tableHeaderText: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
   lineRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
@@ -1204,15 +1356,44 @@ const s = StyleSheet.create({
   bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 40, paddingVertical: 16 },
   moreBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
   moreBtnText: { color: "#fff", fontSize: 15, fontWeight: "500" },
-  saveBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  saveBtn: { backgroundColor: "#D9F24E", borderRadius: 26, paddingHorizontal: 40, paddingVertical: 14 },
+  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
+
+  // Summary breakdown + Set Status + Save menu
+  normalizeBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 },
+  normalizeBtnText: { color: "rgba(255,255,255,0.75)", fontWeight: "600", fontSize: 12 },
+  breakdownRow: { flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "center" },
+  bdPill: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 6 },
+  bdPillDark: { color: "#13131a", fontSize: 13, fontWeight: "700" },
+  bdPillLight: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  setStatusLabel: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 12 },
+  statusChip: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
+  statusChipActive: { backgroundColor: "#fff", borderColor: "#fff" },
+  statusChipText: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+  statusChipTextActive: { color: "#13131a" },
+  saveMenuBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 40 },
+  saveMenuCard: { backgroundColor: "#0c0c0c", borderRadius: 18, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", padding: 20, gap: 12 },
+  saveMenuPrimary: { backgroundColor: "#D9F24E", borderRadius: 24, paddingVertical: 14, alignItems: "center" },
+  saveMenuPrimaryText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
+  saveMenuSecondary: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 24, paddingVertical: 14, alignItems: "center" },
+  saveMenuSecondaryText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  versionDialog: { backgroundColor: "#0c0c0c", borderRadius: 16, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", padding: 20 },
+  versionDialogTitle: { color: "#fff", fontSize: 15, fontWeight: "600", marginBottom: 14 },
+  versionInput: { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: "#fff", fontSize: 15 },
+  vdCancel: { borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
+  vdCancelText: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: "500" },
+  vdSave: { backgroundColor: "#D9F24E", borderRadius: 20, paddingHorizontal: 22, paddingVertical: 9 },
+  vdSaveText: { color: "#13131a", fontSize: 14, fontWeight: "700" },
 
   // More sheet
   moreBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
   moreSheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 44, gap: 10 },
   moreHandle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   sheetBtn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 100, paddingVertical: 16, alignItems: "center" as const },
-  sheetBtnDanger: { borderColor: "rgba(220,50,50,0.2)" },
-  sheetBtnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
+  sheetBtnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
+  sheetBtnBeige: { backgroundColor: "#EDE5D8", borderColor: "#EDE5D8" },
+  sheetBtnMagenta: { backgroundColor: ACCENT, borderColor: ACCENT },
   sheetBtnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
+  sheetBtnTextLight: { color: "#fff", fontWeight: "600" as const },
+  sheetConfirmText: { color: "#13131a", fontSize: 16, fontWeight: "600" as const, textAlign: "center" as const, marginVertical: 10 },
 });

@@ -46,6 +46,7 @@ function Chip({ label, active, color, onPress }: { label: string; active: boolea
 interface ForumThread {
   id: string; name: string; description: string | null; category: string | null;
   is_pinned: boolean; view_count: number; created_at: string; user_id?: string;
+  source_url?: string | null; image_url?: string | null; is_draft?: boolean | null;
   profiles?: { username: string | null } | null;
   forum_comments?: { count: number }[] | null;
 }
@@ -119,7 +120,7 @@ function NewsTab() {
     <FlatList
       data={news}
       keyExtractor={(i) => i.id}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+      contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 20 }}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={<Text style={ns.heading}>Industry News</Text>}
       ListEmptyComponent={<Text style={ns.empty}>No news articles yet</Text>}
@@ -127,45 +128,43 @@ function NewsTab() {
         const open = expanded === item.id;
         return (
           <View style={ns.card}>
-            {/* Title + date */}
-            <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
+            {/* 1. Headline + 2. Date */}
+            <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
               <Text style={ns.cardTitle} numberOfLines={open ? undefined : 2}>{item.title}</Text>
               <Text style={ns.cardDate}>{fmtDate(item.date)}</Text>
             </View>
 
-            {/* Topic chip */}
-            {item.category ? (
-              <View style={ns.chip}><Text style={ns.chipText}>{item.category}</Text></View>
-            ) : null}
-
-            {/* Description */}
+            {/* 3. Body (2 lines when collapsed) */}
             <Text style={ns.cardDesc} numberOfLines={open ? undefined : 2}>
               {open ? (item.content ?? item.summary ?? "") : (item.summary ?? "")}
             </Text>
 
+            {/* Bottom row — expanded: SOURCE / SHARE + Close · collapsed: TAB + More */}
             {open ? (
-              <>
-                {/* Source + Share pills */}
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                <View style={{ flexDirection: "row", gap: 10 }}>
                   {item.source_url ? (
                     <TouchableOpacity style={ns.actionBtn} onPress={() => Linking.openURL(item.source_url!)} activeOpacity={0.7}>
-                      <Text style={ns.actionBtnText}>Source</Text>
+                      <Text style={ns.actionBtnText}>SOURCE</Text>
                     </TouchableOpacity>
                   ) : null}
                   <TouchableOpacity style={ns.actionBtn} onPress={() => handleShare(item)} activeOpacity={0.7}>
-                    <Text style={ns.actionBtnText}>Share</Text>
+                    <Text style={ns.actionBtnText}>SHARE</Text>
                   </TouchableOpacity>
                 </View>
-                {/* Close — plain text, no border */}
-                <TouchableOpacity style={{ alignItems: "flex-end", marginTop: 10 }} onPress={() => setExpanded(null)} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => setExpanded(null)} activeOpacity={0.7}>
                   <Text style={ns.closeTxt}>Close</Text>
                 </TouchableOpacity>
-              </>
+              </View>
             ) : (
-              /* More — plain text, no border */
-              <TouchableOpacity style={{ alignItems: "flex-end", marginTop: 10 }} onPress={() => setExpanded(item.id)} activeOpacity={0.7}>
-                <Text style={ns.closeTxt}>More</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+                {item.category ? (
+                  <View style={ns.chip}><Text style={ns.chipText}>{item.category.toUpperCase()}</Text></View>
+                ) : <View />}
+                <TouchableOpacity onPress={() => setExpanded(item.id)} activeOpacity={0.7}>
+                  <Text style={ns.closeTxt}>More</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         );
@@ -175,17 +174,17 @@ function NewsTab() {
 }
 
 const ns = StyleSheet.create({
-  heading: { color: "#fff", fontSize: 34, fontWeight: "800", letterSpacing: -0.5, marginTop: 8, marginBottom: 16 },
-  empty: { color: "rgba(255,255,255,0.5)", textAlign: "center", marginTop: 40, fontSize: 14 },
-  card: { backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", padding: 16, marginBottom: 12 },
-  cardTitle: { color: "#fff", fontSize: 15, fontWeight: "700", flex: 1, marginRight: 12, lineHeight: 20 },
-  cardDate: { color: "rgba(255,255,255,0.6)", fontSize: 12, paddingTop: 2 },
-  chip: { alignSelf: "flex-start", borderWidth: 1, borderColor: "rgba(255,255,255,0.55)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 10 },
-  chipText: { color: "rgba(255,255,255,0.9)", fontSize: 12 },
-  cardDesc: { color: "rgba(255,255,255,0.65)", fontSize: 13, lineHeight: 19 },
-  actionBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
-  actionBtnText: { color: "#fff", fontSize: 13, fontWeight: "500" },
-  closeTxt: { color: "rgba(255,255,255,0.75)", fontSize: 13 },
+  heading: { color: "#fff", fontSize: 30, fontWeight: "800", letterSpacing: -0.5, marginTop: 8, marginBottom: 18 },
+  empty: { color: "rgba(255,255,255,0.6)", textAlign: "center", marginTop: 40, fontSize: 14 },
+  card: { backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  cardTitle: { color: "#fff", fontSize: 14, fontWeight: "700", flex: 1, marginRight: 12, lineHeight: 19 },
+  cardDate: { color: "rgba(255,255,255,0.85)", fontSize: 11, paddingTop: 2 },
+  chip: { alignSelf: "flex-start", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
+  chipText: { color: "#fff", fontSize: 10, fontWeight: "600", letterSpacing: 0.5 },
+  cardDesc: { color: "rgba(255,255,255,0.8)", fontSize: 12.5, lineHeight: 18 },
+  actionBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 },
+  actionBtnText: { color: "#fff", fontSize: 10, fontWeight: "600", letterSpacing: 0.5 },
+  closeTxt: { color: "rgba(255,255,255,0.85)", fontSize: 12 },
 });
 
 // ─── ② FORUM TAB ─────────────────────────────────────────────────────────────
@@ -266,39 +265,48 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
   const [newThreadVisible, setNewThreadVisible] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTopic, setNewTopic] = useState("");
+  const [newSource, setNewSource] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Inline expand state
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<ThreadComment[]>([]);
   const [commentLoading, setCommentLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentPosting, setCommentPosting] = useState(false);
   const commentInputRef = useRef<any>(null);
   const [commentFocused, setCommentFocused] = useState(false);
+  const [commentOpen, setCommentOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.7 });
-    if (!result.canceled && result.assets[0]) setNewPhoto(result.assets[0].uri);
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.6, base64: true });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setNewPhoto(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+    }
   };
 
   const fetchThreads = useCallback(async () => {
     setLoading(true);
     let q = (supabase as any)
       .from("forum_threads")
-      .select("*, profiles(username), forum_comments(count)")
+      // image_url intentionally excluded — fetched lazily on expand to keep the feed light
+      .select("id,name,description,category,is_pinned,view_count,created_at,user_id,source_url,is_draft, profiles(username), forum_comments(count)")
       .order("created_at", { ascending: false });
     if (categoryFilter) q = q.eq("category", categoryFilter);
+    // Hide drafts from the public feed (own drafts still appear under My Posts)
+    if (!myPostsOnly) q = q.or("is_draft.is.null,is_draft.eq.false");
     const { data, error } = await q;
     if (error) console.error("fetchThreads error:", error.message);
     setThreads(data ?? []);
     setLoading(false);
-  }, [categoryFilter]);
+  }, [categoryFilter, myPostsOnly]);
 
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
@@ -316,12 +324,19 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
     if (expandedId === thread.id) {
       setExpandedId(null);
       setExpandedComments([]);
+      setExpandedImage(null);
       setCommentText("");
+      setCommentOpen(false);
       return;
     }
     setExpandedId(thread.id);
+    setExpandedImage(null);
     setCommentText("");
+    setCommentOpen(false);
     setCommentLoading(true);
+    // Lazily fetch this thread's image (kept out of the feed query)
+    (supabase as any).from("forum_threads").select("image_url").eq("id", thread.id).single()
+      .then(({ data }: any) => setExpandedImage(data?.image_url ?? null));
     const { data } = await (supabase as any)
       .from("forum_comments")
       .select("*, profiles(username)")
@@ -354,8 +369,9 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
     setEditingId(thread.id);
     setNewName(thread.name);
     setNewTopic(thread.category ?? "");
+    setNewSource((thread as any).source_url ?? "");
     setNewDesc(thread.description ?? "");
-    setNewPhoto(null);
+    setNewPhoto((thread as any).image_url ?? null);
     setNewThreadVisible(true);
   };
 
@@ -372,26 +388,25 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
   const closeModal = () => {
     setNewThreadVisible(false);
     setEditingId(null);
-    setNewName(""); setNewTopic(""); setNewDesc(""); setNewPhoto(null);
+    setNewName(""); setNewTopic(""); setNewSource(""); setNewDesc(""); setNewPhoto(null);
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (isDraft = false) => {
     if (!newName.trim()) return;
     setSaving(true);
+    const payload = {
+      name: newName.trim(),
+      description: newDesc.trim() || "",
+      category: newTopic.trim() || categoryFilter || "General",
+      source_url: newSource.trim() || null,
+      image_url: newPhoto || null,
+      is_draft: isDraft,
+    };
     if (editingId) {
-      const { error } = await (supabase as any).from("forum_threads").update({
-        name: newName.trim(),
-        description: newDesc.trim() || "",
-        category: newTopic.trim() || categoryFilter || "General",
-      }).eq("id", editingId);
+      const { error } = await (supabase as any).from("forum_threads").update(payload).eq("id", editingId);
       if (error) console.error("handleCreate update error:", error.message);
     } else {
-      const { error } = await (supabase as any).from("forum_threads").insert([{
-        name: newName.trim(),
-        description: newDesc.trim() || "",
-        category: newTopic.trim() || categoryFilter || "General",
-        user_id: user?.id,
-      }]);
+      const { error } = await (supabase as any).from("forum_threads").insert([{ ...payload, user_id: user?.id }]);
       if (error) console.error("handleCreate insert error:", error.message);
     }
     setSaving(false);
@@ -399,7 +414,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
     fetchThreads();
   };
 
-  const closeExpanded = () => { setExpandedId(null); setExpandedComments([]); setCommentText(""); };
+  const closeExpanded = () => { setExpandedId(null); setExpandedComments([]); setExpandedImage(null); setCommentText(""); setCommentOpen(false); };
 
   const filtered = myPostsOnly ? threads.filter((t) => t.user_id === user?.id) : threads;
 
@@ -456,8 +471,8 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
             const expanded = expandedId === item.id;
             return (
               <View style={ns.card}>
-                {/* Title + date / comment count */}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                {/* 1. Headline + 2. Date / 4. Comments */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={[ns.cardTitle, { flex: 1, marginRight: 12 }]} numberOfLines={expanded ? undefined : 2}>{item.name}</Text>
                   <View style={{ alignItems: "flex-end" }}>
                     <Text style={ns.cardDate}>{fmtDate(item.created_at)}</Text>
@@ -465,93 +480,89 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
                   </View>
                 </View>
 
-                {/* Topic chip */}
-                {item.category ? <View style={ns.chip}><Text style={ns.chipText}>{item.category}</Text></View> : null}
+                {/* 3. Author */}
+                <Text style={ft.byLine}>BY {(item.profiles?.username ?? "Anonymous User").toUpperCase()}</Text>
 
-                {/* Description */}
-                {item.description ? (
-                  <Text style={ns.cardDesc} numberOfLines={expanded ? undefined : 2}>{item.description}</Text>
-                ) : null}
+                {/* 5. Body — image on the left when expanded & present */}
+                {expanded && expandedImage ? (
+                  <View style={{ flexDirection: "row", marginTop: 12, gap: 14 }}>
+                    <Image source={{ uri: expandedImage }} style={ft.postImage} resizeMode="cover" />
+                    {item.description ? (
+                      <Text style={[ns.cardDesc, { flex: 1, lineHeight: 20 }]}>{item.description}</Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  item.description ? (
+                    <Text style={[ns.cardDesc, { marginTop: 10 }]} numberOfLines={expanded ? undefined : 2}>{item.description}</Text>
+                  ) : null
+                )}
 
-                {/* Author + More/Close toggle */}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-                  <Text style={ft.byLine}>
-                    by <Text style={ft.authorLink}>{item.profiles?.username ?? "Anonymous User"}</Text>
-                  </Text>
-                  {!expanded ? (
+                {/* 6. Tab (ALL CAPS) + 7. More (collapsed) / Comment (expanded) */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                  {item.category ? (
+                    <View style={ns.chip}><Text style={ns.chipText}>{item.category.toUpperCase()}</Text></View>
+                  ) : <View />}
+                  {expanded ? (
+                    <TouchableOpacity
+                      style={[ft.commentBtn, commentOpen && ft.commentBtnActive]}
+                      onPress={() => { setCommentOpen((o) => !o); setTimeout(() => commentInputRef.current?.focus(), 60); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[ft.commentBtnText, commentOpen && ft.commentBtnTextActive]}>Comment</Text>
+                    </TouchableOpacity>
+                  ) : (
                     <TouchableOpacity onPress={() => openThread(item)} activeOpacity={0.7}>
                       <Text style={ns.closeTxt}>More</Text>
                     </TouchableOpacity>
-                  ) : null}
+                  )}
                 </View>
 
-                {/* Expanded: comment input + comments list */}
+                {/* Expanded: comment input (toggle) + comments + Close */}
                 {expanded ? (
-                  <View style={{ marginTop: 14 }}>
-                    {/* Comment CTA pill */}
-                    <TouchableOpacity
-                      style={[ft.commentBtn, commentFocused && ft.commentBtnActive]}
-                      onPress={() => { setCommentFocused(true); commentInputRef.current?.focus(); }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[ft.commentBtnText, commentFocused && ft.commentBtnTextActive]}>Comment</Text>
-                    </TouchableOpacity>
-
-                    {/* Comment input */}
-                    <View style={{ marginTop: 12, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", padding: 12 }}>
-                      <TextInput
-                        ref={commentInputRef}
-                        style={{ color: "#fff", fontSize: 14, minHeight: 60 }}
-                        placeholder="Share your thoughts..."
-                        placeholderTextColor="rgba(255,255,255,0.35)"
-                        value={commentText}
-                        onChangeText={setCommentText}
-                        multiline
-                        onFocus={() => setCommentFocused(true)}
-                        onBlur={() => setCommentFocused(false)}
-                      />
-                      <View style={{ alignItems: "flex-end", marginTop: 6 }}>
-                        <TouchableOpacity
-                          style={[ft.postPill, (!commentText.trim() || commentPosting) && { opacity: 0.4 }]}
-                          onPress={() => postComment(item.id)}
-                          disabled={!commentText.trim() || commentPosting}
-                          activeOpacity={0.75}
-                        >
-                          {commentPosting
-                            ? <ActivityIndicator color="#fff" size="small" />
-                            : <Text style={ft.postPillText}>Post</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Comments list */}
-                    <Text style={ft.commentsLabel}>Comments ({expandedComments.length})</Text>
-                    {commentLoading ? <ActivityIndicator color="#fff" size="small" style={{ marginTop: 8 }} /> : null}
-                    {expandedComments.map((c, idx) => {
-                      const isLast = idx === expandedComments.length - 1;
-                      return (
-                        <View key={c.id} style={{ marginBottom: 12 }}>
-                          <Text style={[ns.cardDesc, { lineHeight: 19 }]}>{c.content}</Text>
-                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                            <Text style={ft.byLine}>
-                              by <Text style={ft.authorLink}>{c.profiles?.username ?? "Anonymous User"}</Text>
-                            </Text>
-                            {isLast ? (
-                              <TouchableOpacity onPress={closeExpanded} activeOpacity={0.7}>
-                                <Text style={ns.closeTxt}>Close</Text>
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
+                  <View style={{ marginTop: 16 }}>
+                    {commentOpen ? (
+                      <View style={{ marginBottom: 18, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", padding: 12 }}>
+                        <TextInput
+                          ref={commentInputRef}
+                          style={{ color: "#fff", fontSize: 14, minHeight: 56 }}
+                          placeholder="Share your thoughts..."
+                          placeholderTextColor="rgba(255,255,255,0.4)"
+                          value={commentText}
+                          onChangeText={setCommentText}
+                          multiline
+                        />
+                        <View style={{ alignItems: "flex-end", marginTop: 6 }}>
+                          <TouchableOpacity
+                            style={[ft.postPill, (!commentText.trim() || commentPosting) && { opacity: 0.4 }]}
+                            onPress={() => postComment(item.id)}
+                            disabled={!commentText.trim() || commentPosting}
+                            activeOpacity={0.75}
+                          >
+                            {commentPosting
+                              ? <ActivityIndicator color="#fff" size="small" />
+                              : <Text style={ft.postPillText}>Post</Text>}
+                          </TouchableOpacity>
                         </View>
-                      );
-                    })}
-
-                    {/* Close when no comments */}
-                    {!commentLoading && expandedComments.length === 0 ? (
-                      <TouchableOpacity style={{ alignItems: "flex-end", marginTop: 8 }} onPress={closeExpanded} activeOpacity={0.7}>
-                        <Text style={ns.closeTxt}>Close</Text>
-                      </TouchableOpacity>
+                      </View>
                     ) : null}
+
+                    <Text style={ft.commentsLabel}>Comments</Text>
+                    {commentLoading ? <ActivityIndicator color="#fff" size="small" style={{ marginTop: 8 }} /> : null}
+                    {!commentLoading && expandedComments.length === 0 ? (
+                      <Text style={[ns.cardDesc, { marginBottom: 8 }]}>No comments yet.</Text>
+                    ) : null}
+                    {expandedComments.map((c) => (
+                      <View key={c.id} style={{ marginBottom: 16 }}>
+                        <Text style={[ns.cardDesc, { lineHeight: 20 }]}>{c.content}</Text>
+                        <Text style={ft.byLineComment}>
+                          by <Text style={ft.authorLink}>{c.profiles?.username ?? "Anonymous User"}</Text>
+                        </Text>
+                      </View>
+                    ))}
+
+                    <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 4 }} onPress={closeExpanded} activeOpacity={0.7}>
+                      <Text style={ns.closeTxt}>Close</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : null}
               </View>
@@ -561,75 +572,99 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
       )}
 
       {/* New Post / Edit Modal */}
-      <Modal visible={newThreadVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeModal}>
-        <SafeAreaView style={np.sheet}>
-          <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
-            <TouchableOpacity onPress={closeModal} activeOpacity={0.7}>
-              <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 22, lineHeight: 24 }}>×</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={np.noteTitle}>{editingId ? "EDIT POST" : "+ NEW POST"}</Text>
+      <Modal visible={newThreadVisible} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeModal}>
+        <LinearGradient colors={["#000000", "#000000", "#B5501F"]} locations={[0, 0.78, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1 }}>
+            {/* Top nav */}
+            <View style={ls.topNav}>
+              <SpilsLogo height={22} color="#edff8d" />
+              <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
+                <Text style={ls.iconBtnText}>👤</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Back carrot */}
+            <View style={ls.backRow}>
+              <TouchableOpacity onPress={closeModal} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={ls.backCarrot}>‹</Text>
+              </TouchableOpacity>
+              <Text style={ls.pageTitle}>Community</Text>
+            </View>
 
-            <View style={{ marginTop: 24, gap: 12 }}>
-              <TextInput style={np.field} placeholder="Title Entry" placeholderTextColor="rgba(255,255,255,0.35)" value={newName} onChangeText={setNewName} />
-              <TextInput style={np.field} placeholder="Topic Entry" placeholderTextColor="rgba(255,255,255,0.35)" value={newTopic} onChangeText={setNewTopic} />
-              <TextInput style={np.field} placeholder="Copy Entry" placeholderTextColor="rgba(255,255,255,0.35)" value={newDesc} onChangeText={setNewDesc} multiline />
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={np.title}>{editingId ? "Edit Post" : "New Post"}</Text>
 
-              <TouchableOpacity style={np.photoBox} onPress={pickPhoto} activeOpacity={0.8}>
+              <TextInput style={np.field} placeholder="Title" placeholderTextColor="rgba(255,255,255,0.4)" value={newName} onChangeText={setNewName} />
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <TextInput style={[np.field, { flex: 1, marginTop: 0 }]} placeholder="Topic" placeholderTextColor="rgba(255,255,255,0.4)" value={newTopic} onChangeText={setNewTopic} />
+                <TextInput style={[np.field, { flex: 1.4, marginTop: 0 }]} placeholder="Source Link (optional)" placeholderTextColor="rgba(255,255,255,0.4)" value={newSource} onChangeText={setNewSource} autoCapitalize="none" />
+              </View>
+
+              <TextInput style={[np.field, np.copyField]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={newDesc} onChangeText={setNewDesc} multiline textAlignVertical="top" />
+
+              <TouchableOpacity style={np.photoBox} onPress={pickPhoto} activeOpacity={0.85}>
                 {newPhoto ? (
-                  <Image source={{ uri: newPhoto }} style={{ width: "100%", height: "100%", borderRadius: 12 }} resizeMode="cover" />
+                  <Image source={{ uri: newPhoto }} style={{ width: "100%", height: "100%", borderRadius: 10 }} resizeMode="cover" />
                 ) : (
-                  <Text style={np.photoLabel}>Add Photo (Option)</Text>
+                  <Text style={np.photoLabel}>Include Image (optional)</Text>
                 )}
               </TouchableOpacity>
-            </View>
 
-            <View style={{ alignItems: "flex-end", marginTop: 20 }}>
-              <TouchableOpacity
-                style={[np.postBtn, (!newName.trim() || saving) && { opacity: 0.4 }]}
-                onPress={handleCreate}
-                disabled={!newName.trim() || saving}
-                activeOpacity={0.75}
-              >
-                {saving
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={np.postBtnText}>{editingId ? "Save" : "Post"}</Text>}
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+                <TouchableOpacity
+                  style={[np.postBtn, (!newName.trim() || saving) && { opacity: 0.4 }]}
+                  onPress={() => handleCreate(true)}
+                  disabled={!newName.trim() || saving}
+                  activeOpacity={0.75}
+                >
+                  <Text style={np.postBtnText}>Save Draft</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[np.postBtn, (!newName.trim() || saving) && { opacity: 0.4 }]}
+                  onPress={() => handleCreate(false)}
+                  disabled={!newName.trim() || saving}
+                  activeOpacity={0.75}
+                >
+                  {saving
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={np.postBtnText}>{editingId ? "Save" : "Post"}</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </LinearGradient>
       </Modal>
     </View>
   );
 }
 
 const ft = StyleSheet.create({
-  btnRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  actionBtn: { flex: 1, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 50, paddingVertical: 11, alignItems: "center" },
+  btnRow: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  actionBtn: { flex: 1, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 50, paddingVertical: 11, alignItems: "center" },
   actionBtnActive: { backgroundColor: "rgba(255,255,255,0.2)" },
   actionBtnText: { color: "#fff", fontSize: 14, fontWeight: "500" },
-  byLine: { color: "rgba(255,255,255,0.55)", fontSize: 12 },
-  authorLink: { color: "rgba(255,255,255,0.9)", fontSize: 12, textDecorationLine: "underline" },
+  byLine: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "600", letterSpacing: 0.5, marginTop: 4 },
+  byLineComment: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 5 },
+  authorLink: { color: "#fff", fontSize: 12, textDecorationLine: "underline" },
   editLink: { color: "rgba(255,255,255,0.8)", fontSize: 13 },
   editSep: { color: "rgba(255,255,255,0.35)", fontSize: 13 },
-  commentBtn: { alignSelf: "flex-start", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.7)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
-  commentBtnActive: { backgroundColor: "#C6FF00", borderColor: "#C6FF00" },
-  commentBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  commentBtnTextActive: { color: "#1a1a10" },
-  postPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
+  commentBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
+  commentBtnActive: { backgroundColor: "#D9F24E", borderColor: "#D9F24E" },
+  commentBtnText: { color: "#fff", fontSize: 13, fontWeight: "500" },
+  commentBtnTextActive: { color: "#13131a", fontWeight: "700" },
+  postPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
   postPillText: { color: "#fff", fontSize: 13, fontWeight: "500" },
-  commentsLabel: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: "700", letterSpacing: 0.5, marginTop: 16, marginBottom: 10 },
+  commentsLabel: { color: "rgba(255,255,255,0.9)", fontSize: 15, fontWeight: "700", marginBottom: 14 },
+  postImage: { width: 130, aspectRatio: 3 / 4, borderRadius: 10, backgroundColor: "#fff" },
 });
 
 const np = StyleSheet.create({
-  sheet: { flex: 1, backgroundColor: "#1a1a24" },
-  noteTitle: { color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: "600" },
-  noteSub: { color: "rgba(255,255,255,0.45)", fontSize: 12, marginTop: 2 },
-  field: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, color: "#fff", fontSize: 14 },
-  photoBox: { height: 200, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 12, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  photoLabel: { color: "rgba(255,255,255,0.35)", fontSize: 14 },
-  postBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 20, paddingHorizontal: 28, paddingVertical: 9 },
+  title: { color: "#fff", fontSize: 30, fontWeight: "800", letterSpacing: -0.5, marginTop: 6, marginBottom: 18 },
+  field: { borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: "#fff", fontSize: 14, marginTop: 12 },
+  copyField: { minHeight: 150, paddingTop: 14 },
+  photoBox: { width: "48%", aspectRatio: 3 / 4, backgroundColor: "#ffffff", borderRadius: 10, alignItems: "center", justifyContent: "center", overflow: "hidden", marginTop: 16 },
+  photoLabel: { color: "rgba(19,19,26,0.4)", fontSize: 11 },
+  postBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 22, paddingHorizontal: 22, paddingVertical: 10 },
   postBtnText: { color: "#fff", fontSize: 14, fontWeight: "500" },
 });
 
@@ -1122,18 +1157,22 @@ const ct = StyleSheet.create({
 
 const CORAL_GRAD = ["#F2533A", "#F07D40", "#F5C840"] as const;
 
-const MENU = [
-  { key: "news",        label: "Industry News",    dim: false },
-  { key: "chat",        label: "General Chat",     dim: false },
-  { key: "support",     label: "Contact + Support",dim: false },
-  { key: "interviews",  label: "Interviews",       dim: true  },
-  { key: "marketplace", label: "Marketplace",      dim: true  },
-  { key: "formulas",    label: "Formula Forum",    dim: true  },
-  { key: "directory",   label: "Directory",        dim: true  },
-  { key: "glossary",    label: "Glossary",         dim: true  },
+const AVAILABLE = [
+  { key: "news",    label: "Industry News" },
+  { key: "chat",    label: "Fragrance Chat" },
+  { key: "support", label: "SPILS Support" },
 ] as const;
 
-type SectionKey = typeof MENU[number]["key"];
+const COMING = [
+  { key: "interviews",  label: "Interviews" },
+  { key: "events",      label: "Events" },
+  { key: "marketplace", label: "Marketplace" },
+  { key: "formulas",    label: "Formula Forum" },
+  { key: "directory",   label: "Directory" },
+] as const;
+
+type SectionKey = typeof AVAILABLE[number]["key"] | typeof COMING[number]["key"];
+const AVAILABLE_KEYS = AVAILABLE.map((m) => m.key) as string[];
 
 const AVATARS = [
   { letter: "C", bg: "#4A9BE8" },
@@ -1142,29 +1181,39 @@ const AVATARS = [
   { letter: "C", bg: "#9B4AE8" },
 ];
 
-function CommunityWrapper({ children, onBack }: { children: React.ReactNode; onBack?: () => void }) {
+function CommunityWrapper({ children, onBack, showSub }: { children: React.ReactNode; onBack?: () => void; showSub?: boolean }) {
   return (
     <LinearGradient colors={CORAL_GRAD} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        {/* Top nav — always SP/LS. + profile */}
+        {/* Top nav — SP/LS. + profile */}
         <View style={ls.topNav}>
-          {onBack ? (
-            <TouchableOpacity onPress={onBack} style={{ paddingRight: 8 }}>
-              <Text style={ls.backBtn}>← Back</Text>
-            </TouchableOpacity>
-          ) : (
-            <SpilsLogo height={22} color="#edff8d" />
-          )}
+          <SpilsLogo height={22} color="#edff8d" />
           <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={ls.iconBtnText}>👤</Text>
           </TouchableOpacity>
         </View>
 
-        {/* COMMUNITY BETA — always visible */}
-        <View style={ls.titleRow}>
-          <Text style={ls.pageTitle}>COMMUNITY</Text>
-          <View style={ls.betaBadge}><Text style={ls.betaText}>BETA</Text></View>
-        </View>
+        {/* Back carrot (sub-sections) */}
+        {onBack ? (
+          <View style={ls.backRow}>
+            <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={ls.backCarrot}>‹</Text>
+            </TouchableOpacity>
+            <Text style={ls.pageTitle}>Community</Text>
+          </View>
+        ) : (
+          <View style={ls.titleRow}>
+            <Text style={ls.pageTitle}>Community</Text>
+            <View style={ls.betaBadge}><Text style={ls.betaText}>Beta</Text></View>
+          </View>
+        )}
+
+        {/* Subheadline (landing only) */}
+        {showSub ? (
+          <Text style={ls.subheadline}>
+            EXPLORE, DISCOVER, & CONNECT{"\n"}WITH FRAGRANCE ENTHUSIASTS{"\n"}AROUND THE WORLD
+          </Text>
+        ) : null}
 
         {/* Page content */}
         <View style={{ flex: 1 }}>
@@ -1176,9 +1225,187 @@ function CommunityWrapper({ children, onBack }: { children: React.ReactNode; onB
   );
 }
 
+// ─── My Posts / My Comments (dark) ────────────────────────────────────────────
+
+interface MyComment {
+  id: string; content: string; created_at: string; thread_id: string;
+  forum_threads?: { name: string | null } | null;
+}
+
+function MyPostsScreen({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth();
+  const [posts, setPosts] = useState<ForumThread[]>([]);
+  const [comments, setComments] = useState<MyComment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewThread, setViewThread] = useState<ForumThread | null>(null);
+
+  // Post edit
+  const [editPost, setEditPost] = useState<ForumThread | null>(null);
+  const [eName, setEName] = useState("");
+  const [eTopic, setETopic] = useState("");
+  const [eSource, setESource] = useState("");
+  const [eDesc, setEDesc] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Comment edit
+  const [editComment, setEditComment] = useState<MyComment | null>(null);
+  const [ecText, setEcText] = useState("");
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    const [{ data: p }, { data: c }] = await Promise.all([
+      (supabase as any).from("forum_threads")
+        .select("id,name,description,category,is_pinned,view_count,created_at,user_id,source_url,is_draft")
+        .eq("user_id", user?.id).order("created_at", { ascending: false }),
+      (supabase as any).from("forum_comments")
+        .select("id,content,created_at,thread_id, forum_threads(name)")
+        .eq("user_id", user?.id).order("created_at", { ascending: false }),
+    ]);
+    setPosts(p ?? []); setComments(c ?? []); setLoading(false);
+  }, [user?.id]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const openView = async (threadId: string) => {
+    const { data } = await (supabase as any).from("forum_threads").select("*, profiles(username)").eq("id", threadId).single();
+    if (data) setViewThread(data);
+  };
+
+  const openEditPost = (t: ForumThread) => {
+    setEditPost(t); setEName(t.name); setETopic(t.category ?? ""); setESource((t as any).source_url ?? ""); setEDesc(t.description ?? "");
+  };
+  const saveEditPost = async () => {
+    if (!editPost) return;
+    setSaving(true);
+    await (supabase as any).from("forum_threads").update({
+      name: eName.trim(), category: eTopic.trim() || "General", source_url: eSource.trim() || null, description: eDesc.trim() || "",
+    }).eq("id", editPost.id);
+    setSaving(false); setEditPost(null); fetchAll();
+  };
+  const deletePost = (t: ForumThread) => Alert.alert("Delete Post", "Delete this post permanently?", [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: async () => { await (supabase as any).from("forum_threads").delete().eq("id", t.id); fetchAll(); } },
+  ]);
+
+  const saveEditComment = async () => {
+    if (!editComment) return;
+    await (supabase as any).from("forum_comments").update({ content: ecText.trim() }).eq("id", editComment.id);
+    setEditComment(null); fetchAll();
+  };
+  const deleteComment = (c: MyComment) => Alert.alert("Delete Comment", "Delete this comment?", [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: async () => { await (supabase as any).from("forum_comments").delete().eq("id", c.id); fetchAll(); } },
+  ]);
+
+  const Row = ({ title, onOpen, onEdit, onDelete }: { title: string; onOpen: () => void; onEdit: () => void; onDelete: () => void }) => (
+    <TouchableOpacity style={mp.row} activeOpacity={0.8} onPress={onOpen}>
+      <Text style={mp.rowTitle} numberOfLines={1}>{title}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onEdit(); }} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}><Text style={mp.rowAction}>Edit</Text></TouchableOpacity>
+        <Text style={mp.rowSep}> | </Text>
+        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}><Text style={mp.rowAction}>Delete</Text></TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <LinearGradient colors={["#000000", "#000000", "#B5501F"]} locations={[0, 0.78, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={ls.topNav}>
+          <SpilsLogo height={22} color="#edff8d" />
+          <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <Text style={ls.iconBtnText}>👤</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={ls.backRow}>
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={ls.backCarrot}>‹</Text>
+          </TouchableOpacity>
+          <Text style={ls.pageTitle}>Community</Text>
+        </View>
+
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          <Text style={mp.heading}>My Posts</Text>
+          {loading ? <ActivityIndicator color="#fff" style={{ marginTop: 12 }} /> : (
+            posts.length === 0 ? <Text style={mp.empty}>You haven't posted yet.</Text> :
+            posts.map((p) => (
+              <Row key={p.id} title={p.name} onOpen={() => openView(p.id)} onEdit={() => openEditPost(p)} onDelete={() => deletePost(p)} />
+            ))
+          )}
+
+          <Text style={[mp.heading, { marginTop: 28 }]}>My Comments</Text>
+          {loading ? null : (
+            comments.length === 0 ? <Text style={mp.empty}>No comments yet.</Text> :
+            comments.map((c) => (
+              <Row
+                key={c.id}
+                title={c.forum_threads?.name || c.content}
+                onOpen={() => openView(c.thread_id)}
+                onEdit={() => { setEditComment(c); setEcText(c.content); }}
+                onDelete={() => deleteComment(c)}
+              />
+            ))
+          )}
+        </ScrollView>
+
+        {/* View post/comment */}
+        <ThreadDetailModal thread={viewThread} visible={!!viewThread} onClose={() => setViewThread(null)} />
+
+        {/* Edit post */}
+        <Modal visible={!!editPost} transparent animationType="fade" onRequestClose={() => setEditPost(null)}>
+          <View style={mp.editBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setEditPost(null)} />
+            <View style={mp.editCard}>
+              <Text style={mp.editTitle}>Edit Post</Text>
+              <TextInput style={np.field} placeholder="Title" placeholderTextColor="rgba(255,255,255,0.4)" value={eName} onChangeText={setEName} />
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <TextInput style={[np.field, { flex: 1, marginTop: 0 }]} placeholder="Topic" placeholderTextColor="rgba(255,255,255,0.4)" value={eTopic} onChangeText={setETopic} />
+                <TextInput style={[np.field, { flex: 1.4, marginTop: 0 }]} placeholder="Source Link (optional)" placeholderTextColor="rgba(255,255,255,0.4)" value={eSource} onChangeText={setESource} autoCapitalize="none" />
+              </View>
+              <TextInput style={[np.field, np.copyField]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={eDesc} onChangeText={setEDesc} multiline textAlignVertical="top" />
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+                <TouchableOpacity style={np.postBtn} onPress={() => setEditPost(null)}><Text style={np.postBtnText}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={[np.postBtn, (!eName.trim() || saving) && { opacity: 0.4 }]} onPress={saveEditPost} disabled={!eName.trim() || saving}>
+                  {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={np.postBtnText}>Save</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Edit comment */}
+        <Modal visible={!!editComment} transparent animationType="fade" onRequestClose={() => setEditComment(null)}>
+          <View style={mp.editBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setEditComment(null)} />
+            <View style={mp.editCard}>
+              <Text style={mp.editTitle}>Edit Comment</Text>
+              <TextInput style={[np.field, { minHeight: 100, marginTop: 4 }]} placeholder="Comment" placeholderTextColor="rgba(255,255,255,0.4)" value={ecText} onChangeText={setEcText} multiline textAlignVertical="top" />
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+                <TouchableOpacity style={np.postBtn} onPress={() => setEditComment(null)}><Text style={np.postBtnText}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={[np.postBtn, !ecText.trim() && { opacity: 0.4 }]} onPress={saveEditComment} disabled={!ecText.trim()}><Text style={np.postBtnText}>Save</Text></TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+const mp = StyleSheet.create({
+  heading: { color: "#fff", fontSize: 26, fontWeight: "800", letterSpacing: -0.5, marginBottom: 14 },
+  empty: { color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 8 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10 },
+  rowTitle: { color: "#fff", fontSize: 14, fontWeight: "600", flex: 1, marginRight: 12 },
+  rowAction: { color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: "600" },
+  rowSep: { color: "rgba(255,255,255,0.4)", fontSize: 12 },
+  editBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 24 },
+  editCard: { backgroundColor: "#141414", borderRadius: 16, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", padding: 20 },
+  editTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 8 },
+});
+
 export default function Community() {
   const [section, setSection] = useState<SectionKey | null>(null);
-  const [highlighted, setHighlighted] = useState<SectionKey>("news");
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
   const [myPostsOnly, setMyPostsOnly] = useState(false);
 
@@ -1190,28 +1417,30 @@ export default function Community() {
   );
 
   const handleMenu = (key: SectionKey) => {
-    const item = MENU.find((m) => m.key === key);
-    if (item?.dim) {
+    if (!AVAILABLE_KEYS.includes(key)) {
       setComingSoonVisible(true);
       return;
     }
-    setHighlighted(key);
     setMyPostsOnly(false);
-    setTimeout(() => setSection(key), 150);
+    setSection(key);
   };
+
+  // ── My Posts / My Comments (dark, standalone) ─────────────────────────────
+  if (section !== null && myPostsOnly) {
+    return <MyPostsScreen onBack={() => setMyPostsOnly(false)} />;
+  }
 
   // ── Sub-section view ──────────────────────────────────────────────────────
   if (section !== null) {
     return (
-      <CommunityWrapper onBack={() => myPostsOnly ? setMyPostsOnly(false) : setSection(null)}>
+      <CommunityWrapper onBack={() => setSection(null)}>
         <View style={{ flex: 1 }}>
           {section === "news"        && <NewsTab />}
-          {section === "chat"        && <ForumTab title="General Chat" myPostsOnly={myPostsOnly} setMyPostsOnly={setMyPostsOnly} />}
+          {section === "chat"        && <ForumTab title="Fragrance Chat" myPostsOnly={myPostsOnly} setMyPostsOnly={setMyPostsOnly} />}
           {section === "support"     && <SupportTab />}
           {section === "marketplace" && <MarketplaceTab />}
           {section === "formulas"    && <ForumTab categoryFilter="Formula" title="Formula Forum" myPostsOnly={myPostsOnly} setMyPostsOnly={setMyPostsOnly} />}
           {section === "directory"   && <DirectoryTab />}
-          {section === "glossary"    && <GlossaryTab />}
         </View>
       </CommunityWrapper>
     );
@@ -1219,27 +1448,26 @@ export default function Community() {
 
   // ── Landing page ──────────────────────────────────────────────────────────
   return (
-    <CommunityWrapper>
-      {/* Menu list — centered */}
-      <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 24 }}>
-        {MENU.map((item) => {
-          const active = highlighted === item.key;
-          return (
-            <TouchableOpacity
-              key={item.key}
-              onPress={() => handleMenu(item.key)}
-              activeOpacity={0.7}
-              style={[ls.menuItem, active && ls.menuItemActive]}
-            >
-              <Text style={[ls.menuText, item.dim && ls.menuTextDim]} numberOfLines={1} adjustsFontSizeToFit>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+    <CommunityWrapper showSub>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        {/* Available Now */}
+        <Text style={ls.groupLabel}>AVAILABLE NOW</Text>
+        {AVAILABLE.map((item) => (
+          <TouchableOpacity key={item.key} onPress={() => handleMenu(item.key)} activeOpacity={0.7} style={ls.availRow}>
+            <Text style={ls.availText}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
 
-      {/* Coming Soon modal — transparent so coral gradient shows through */}
+        {/* Coming Soon */}
+        <Text style={[ls.groupLabel, { marginTop: 34 }]}>COMING SOON</Text>
+        {COMING.map((item) => (
+          <TouchableOpacity key={item.key} onPress={() => handleMenu(item.key)} activeOpacity={0.7} style={ls.comingRow}>
+            <Text style={ls.comingText}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Welcome pop-up */}
       <Modal visible={comingSoonVisible} transparent animationType="fade" onRequestClose={() => setComingSoonVisible(false)}>
         <TouchableOpacity
           style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}
@@ -1250,9 +1478,8 @@ export default function Community() {
             <TouchableOpacity style={ls.csClose} onPress={() => setComingSoonVisible(false)}>
               <Text style={ls.csCloseText}>✕</Text>
             </TouchableOpacity>
-            <Text style={ls.csTitle}>Welcome to the Spils Community</Text>
-            <View style={ls.csBetaPill}><Text style={ls.csBetaText}>BETA</Text></View>
-            <Text style={ls.csSub}>This is the Beta Version. Full version coming soon!</Text>
+            <Text style={ls.csTitle}>Welcome to the{"\n"}SPILS© Community [Beta].</Text>
+            <Text style={ls.csSub}>Full Version Coming Soon!</Text>
           </BlurView>
         </TouchableOpacity>
       </Modal>
@@ -1263,36 +1490,29 @@ export default function Community() {
 // ─── Landing page styles ──────────────────────────────────────────────────────
 
 const ls = StyleSheet.create({
-  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  logo: { color: "#C6FF00", fontSize: 20, fontWeight: "800", letterSpacing: 1 },
-  backBtn: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 8, paddingBottom: 4 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.55)", alignItems: "center", justifyContent: "center" },
   iconBtnText: { color: "#fff", fontSize: 20, fontWeight: "300", lineHeight: 24, marginTop: -1 },
 
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 20, paddingTop: 2, paddingBottom: 0 },
-  pageTitle: { color: "#fff", fontSize: 18, fontWeight: "800", letterSpacing: 2 },
-  betaBadge: { borderWidth: 1, borderColor: "rgba(255,255,255,0.65)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  betaText: { color: "rgba(255,255,255,0.75)", fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 30, paddingTop: 22, paddingBottom: 0 },
+  backRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 30, paddingTop: 22, paddingBottom: 0 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -4 },
+  pageTitle: { color: "#fff", fontSize: 26, fontWeight: "700", letterSpacing: -0.3 },
+  betaBadge: { backgroundColor: "#F2533A", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 },
+  betaText: { color: "#fff", fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
+  subheadline: { color: "#FBE38A", fontSize: 11, fontWeight: "700", letterSpacing: 1, lineHeight: 18, paddingHorizontal: 30, marginTop: 12 },
 
-  menuItem: { paddingVertical: 5, paddingHorizontal: 14, borderRadius: 50, borderWidth: 1.5, borderColor: "transparent", marginBottom: 0, alignSelf: "flex-start" },
-  menuItemActive: { borderColor: "#edff8d" },
-  menuText: { color: "#fff", fontSize: 34, fontWeight: "800", letterSpacing: -0.5 },
-  menuTextDim: { opacity: 0.38 },
+  groupLabel: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 12 },
+  availRow: { marginBottom: 8 },
+  availText: { color: "#fff", fontSize: 30, fontWeight: "800", letterSpacing: -0.5 },
+  comingRow: { marginBottom: 6 },
+  comingText: { color: "#fff", fontSize: 19, fontWeight: "700", letterSpacing: -0.2 },
 
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  circleBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.5)", alignItems: "center", justifyContent: "center" },
-  circleBtnIcon: { color: "#fff", fontSize: 20, lineHeight: 24 },
-  avatarRow: { flexDirection: "row", gap: 8 },
-  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  avatarLetter: { color: "#fff", fontSize: 13, fontWeight: "700" },
-
-  csCard: { width: "100%", borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 20, overflow: "hidden", paddingVertical: 36, paddingHorizontal: 24, alignItems: "center", gap: 16 },
+  csCard: { width: "100%", borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 20, overflow: "hidden", paddingVertical: 40, paddingHorizontal: 24, alignItems: "center", gap: 16 },
   csClose: { position: "absolute" as const, top: 12, right: 12, width: 28, height: 28, alignItems: "center", justifyContent: "center" },
   csCloseText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  csTitle: { color: "#fff", fontSize: 16, fontWeight: "700", textAlign: "center" },
-  csBetaPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 5 },
-  csBetaText: { color: "#fff", fontSize: 12, fontWeight: "700", letterSpacing: 1 },
-  csSub: { color: "#fff", fontSize: 15, fontWeight: "700", textAlign: "center" },
+  csTitle: { color: "#fff", fontSize: 17, fontWeight: "700", textAlign: "center", lineHeight: 24 },
+  csSub: { color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" },
 });
 
 // ─── Sub-section shared styles ────────────────────────────────────────────────

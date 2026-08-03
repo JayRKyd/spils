@@ -99,7 +99,7 @@ function FormulaCard({ formula, onToggleFavorite }: {
           <View style={c.statusPill}>
             <Text style={c.statusPillText}>{status.toUpperCase()}</Text>
           </View>
-          <Text style={c.meta}>{formula.material_count ?? 0} MATERIALS</Text>
+          <Text style={c.meta}>{formula.material_count ?? 0} MATERIAL{(formula.material_count ?? 0) === 1 ? "" : "S"}</Text>
           <Text style={c.sep}>  |  </Text>
           <TouchableOpacity onPress={openVersions}>
             <Text style={c.versionsLink}>VERSIONS</Text>
@@ -137,7 +137,7 @@ function FormulaCard({ formula, onToggleFavorite }: {
           <View style={c.statusPill}>
             <Text style={c.statusPillText}>{status.toUpperCase()}</Text>
           </View>
-          <Text style={c.meta}>{formula.material_count ?? 0} MATERIALS</Text>
+          <Text style={c.meta}>{formula.material_count ?? 0} MATERIAL{(formula.material_count ?? 0) === 1 ? "" : "S"}</Text>
           <Text style={c.sep}>  |  </Text>
           <TouchableOpacity onPress={openVersions}>
             <Text style={c.versionsLink}>VERSIONS</Text>
@@ -274,13 +274,12 @@ export default function Formulas() {
           </TouchableOpacity>
         </View>
 
-        {/* Search */}
+        {/* Search — button lives inside the bar */}
         <View style={s.searchRow}>
           <View style={s.searchWrap}>
-            <Text style={s.searchIcon}>⌕</Text>
             <TextInput
               style={s.searchInput}
-              placeholder="Search projects..."
+              placeholder=""
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={search}
               onChangeText={setSearch}
@@ -290,24 +289,24 @@ export default function Formulas() {
                 <Text style={s.searchClear}>✕</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity style={s.searchBtn} onPress={() => {}}>
+              <Text style={s.searchBtnText}>Search</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={s.searchBtn} onPress={() => {}}>
-            <Text style={s.searchBtnText}>Search</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Chips */}
         <View style={s.filterRow}>
-          <TouchableOpacity style={s.secureBadge} onPress={() => setSecureVisible(true)}>
+          <TouchableOpacity style={[s.secureBadge, { flex: 1.1 }]} onPress={() => setSecureVisible(true)}>
             <Text style={s.secureBadgeText}>Your Formulas are Secure</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.ifraPill} onPress={() => setIfraVisible(true)}>
+          <TouchableOpacity style={[s.ifraPill, { flex: 1 }]} onPress={() => setIfraVisible(true)}>
             <Text style={s.ifraPillText}>IFRA</Text>
           </TouchableOpacity>
         </View>
 
         {/* Section label */}
-        <Text style={s.sectionLabel}>Your Formulas</Text>
+        <Text style={s.sectionLabel}>Your Formulas...</Text>
 
         {/* List */}
         {loading ? (
@@ -438,58 +437,59 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 30,
     marginBottom: 14,
-    gap: 8,
   },
   searchWrap: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    paddingLeft: 16,
+    paddingRight: 5,
+    paddingVertical: 5,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
   },
-  searchIcon: { fontSize: 15, marginRight: 8, color: "rgba(255,255,255,0.5)" },
-  searchInput: { flex: 1, fontSize: 14, color: "#fff" },
-  searchClear: { color: "rgba(255,255,255,0.4)", fontSize: 15, paddingLeft: 8 },
+  searchInput: { flex: 1, fontSize: 14, color: "#fff", paddingVertical: 7 },
+  searchClear: { color: "rgba(255,255,255,0.4)", fontSize: 15, paddingHorizontal: 6 },
   searchBtn: {
     backgroundColor: "#fff",
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
   },
-  searchBtnText: { fontSize: 14, fontWeight: "700", color: "#13131a" },
+  searchBtnText: { fontSize: 12, fontWeight: "600", color: "#13131a" },
 
   filterRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 30,
-    marginBottom: 18,
+    marginBottom: 22,
   },
   secureBadge: {
     backgroundColor: "#edff8d",
     borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
+    alignItems: "center",
   },
   secureBadgeText: { fontSize: 12, fontWeight: "700", color: "#13131a" },
   ifraPill: {
     backgroundColor: "transparent",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
+    borderColor: "rgba(255,255,255,0.5)",
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 9,
+    alignItems: "center",
   },
   ifraPillText: { fontSize: 12, fontWeight: "700", color: "#fff" },
   sortText: { fontSize: 14, fontWeight: "600", color: "#fff" },
   sortTextActive: { fontWeight: "700", textDecorationLine: "underline", color: ACCENT },
   sectionLabel: {
-    fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.6)",
-    paddingHorizontal: 30, marginBottom: 10, letterSpacing: 0.3,
+    fontSize: 14, fontWeight: "700", color: "#fff",
+    paddingHorizontal: 30, marginBottom: 12, letterSpacing: 0.2,
   },
   pickerBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
   pickerSheet: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
@@ -597,7 +597,7 @@ const c = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
-  name: { fontSize: 16, fontWeight: "700", color: "#fff", flex: 1, marginRight: 8 },
+  name: { fontSize: 15, fontWeight: "700", color: "#fff", flex: 1, marginRight: 8 },
   heart: { fontSize: 22, color: "rgba(255,255,255,0.4)" },
   heartActive: { color: HEART },
 

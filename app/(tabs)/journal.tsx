@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
+import { Video, ResizeMode } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
@@ -591,12 +592,15 @@ export default function Journal() {
           </View>
         </View>
 
-        {/* Hero image — always mounted so it's decoded and ready instantly */}
+        {/* Hero video — always mounted so it's loaded and ready instantly */}
         <View style={[s.heroWrap, view !== "landing" && { display: "none" }]}>
-          <Image
-            source={require("../../assets/bedroom scene_02_resized.png")}
+          <Video
+            source={require("../../assets/JOURNAL VIDEO - ORB.mp4")}
             style={s.heroImage}
-            resizeMode="cover"
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={view === "landing"}
+            isLooping
+            isMuted
           />
         </View>
 
@@ -620,7 +624,7 @@ export default function Journal() {
                 onSubmitEditing={handleSotdSave}
               />
               <TouchableOpacity
-                style={[s.sotdSaveBtn, (!sotdInput.trim() || sotdSaving) && { opacity: 0.4 }]}
+                style={s.sotdSaveBtn}
                 onPress={handleSotdSave}
                 disabled={!sotdInput.trim() || sotdSaving}
               >

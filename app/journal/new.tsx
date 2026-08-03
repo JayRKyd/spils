@@ -11,6 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { stripMarkdown } from "@/lib/text";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
 import ColorPicker from "react-native-wheel-color-picker";
@@ -341,7 +342,7 @@ export default function JournalNew() {
         },
       });
       if (resp.error) throw resp.error;
-      setAiResult(resp.data?.text ?? "No result returned.");
+      setAiResult(stripMarkdown(resp.data?.text ?? "No result returned."));
     } catch {
       setAiResult("AI request failed. Please try again.");
     } finally {
@@ -384,25 +385,39 @@ export default function JournalNew() {
   const handleAddToCollection = async () => {
     setMoreVisible(false);
     try {
-      const { error } = await (supabase as any).from("collection_items").insert([{
-        fragrance: title.trim() || "Untitled",
-        brand: brand.trim() || "",
+      const { error } = await (supabase as any).from("perfumes").insert([{
+        user_id: user?.id,
+        name: title.trim() || "Untitled",
+        brand: brand.trim() || null,
+        nose: perfumer.trim() || null,
+        gender: gender.trim() || null,
+        price: priceText ? (parseFloat(priceText) || null) : null,
+        size_ml: sizeText ? (parseFloat(sizeText) || null) : null,
         rating: rating ? parseFloat(rating) : null,
+        reminds_me_of: remindsMeOf.trim() || null,
+        temperature: temperatureVal,
+        season: seasons.length ? seasons : null,
+        concentration: concentration || null,
+        category: category || null,
+        status: "Owned",
+        top_notes: notesTop.length ? notesTop : null,
+        heart_notes: notesHeart.length ? notesHeart : null,
+        base_notes: notesBase.length ? notesBase : null,
+        accords: families.length ? families : null,
+        projection: String(projectionVal),
         sillage: String(sillageVal),
         longevity: String(longevityVal),
-        gender: gender.trim() || null,
-        color_tags: colors.length ? colors : [],
-        accords: families.length ? families : [],
-        top_notes: notesTop.length ? notesTop : [],
-        heart_notes: notesHeart.length ? notesHeart : [],
-        base_notes: notesBase.length ? notesBase : [],
-        notes: description.trim() || null,
+        dry_down: dryDownText.trim() || null,
+        colors: colors.length ? colors : null,
+        music: musicUrl.trim() || null,
         image_url: bottleBase64 ?? null,
+        inspiration_image_url: inspirationImage ?? null,
+        notes: description.trim() || null,
       }]);
       if (error) throw error;
-      Alert.alert("Added to Collection", `${title || "Entry"} was added to your collection.`);
-    } catch {
-      Alert.alert("Error", "Could not add to collection. Please try again.");
+      Alert.alert("Added to Collection", `"${title || "Entry"}" is now in your Collection.`);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not add to collection. Please try again.");
     }
   };
 
@@ -474,7 +489,7 @@ export default function JournalNew() {
     <LinearGradient colors={["#000000", "#000000", "#C9F24D"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <>
-          <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={20} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
+          <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
 
             {/* Top nav */}
             <View style={s.topNav}>
@@ -949,7 +964,7 @@ const s = StyleSheet.create({
 
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
   sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#C9F24D" },
-  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  sliderThumb: { position: "absolute", width: 42, height: 42, borderRadius: 21, backgroundColor: "#fff", top: 1, transform: [{ translateX: -34 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 
   colorWheelWrap: { height: 320, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 18, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", padding: 12, marginBottom: 14 },
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },

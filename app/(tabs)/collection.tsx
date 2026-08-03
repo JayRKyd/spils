@@ -254,7 +254,7 @@ const s = StyleSheet.create({
   profileBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
   profileIcon: { fontSize: 16 },
 
-  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 10, paddingBottom: 16 },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 73, paddingBottom: 16 },
   pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
   viewSortBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   viewSortText: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "500" },

@@ -189,8 +189,8 @@ function PendingLineRow({ line, totalG, onDelete, onUpdateAmount }: {
         )}
         <Text style={s.linePct}>{pct}%</Text>
       </View>
-      <TouchableOpacity style={{ padding: 6, marginLeft: 4 }} onPress={onDelete}>
-        <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 18 }}>×</Text>
+      <TouchableOpacity style={{ padding: 6, marginLeft: 4, alignSelf: "flex-start" }} onPress={onDelete}>
+        <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 18, lineHeight: 18 }}>×</Text>
       </TouchableOpacity>
     </View>
   );
@@ -205,6 +205,7 @@ export default function NewFormula() {
   const [concPercent, setConcPercent] = useState(20);
   const [diluent, setDiluent] = useState("Ethanol (EtOH)");
   const [diluentPickerVisible, setDiluentPickerVisible] = useState(false);
+  const [concFocused, setConcFocused] = useState(false);
   const [moodOpen, setMoodOpen] = useState(false);
   const [paramsOpen, setParamsOpen] = useState(false);
   const [formulaOpen, setFormulaOpen] = useState(false);
@@ -213,6 +214,7 @@ export default function NewFormula() {
   const [pendingMoodItems, setPendingMoodItems] = useState<PendingMoodItem[]>([]);
   const [addMoodVisible, setAddMoodVisible] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [statusVal, setStatusVal] = useState<string | null>(null);
 
   // Material inline add
   const [search, setSearch] = useState("");
@@ -264,6 +266,7 @@ export default function NewFormula() {
           description: description.trim() || null,
           user_id: user?.id,
           notes: notesStr,
+          status: statusVal,
         }])
         .select()
         .single();
@@ -329,6 +332,9 @@ export default function NewFormula() {
   const canAdd = !!(selected || search.trim());
   const moodImages = pendingMoodItems.filter((i) => i.type === "image");
   const sortedLines = [...lines].sort((a, b) => symbolRank(a.material?.type) - symbolRank(b.material?.type));
+  const catG = (t: string) => lines.filter((l) => l.material?.type === t).reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0);
+  const topG = catG("Top"), midG = catG("Mid"), baseG = catG("Base");
+  const pctOf = (g: number) => (totalG > 0 ? Math.round((g / totalG) * 100) : 0);
 
   return (
     <DarkScreen>
@@ -454,8 +460,10 @@ export default function NewFormula() {
                   <Text style={s.paramLabel}>Concentration (%)</Text>
                   <TextInput
                     style={s.paramInput}
-                    value={String(concPercent)}
+                    value={concFocused ? String(concPercent) : `${concPercent}%`}
                     onChangeText={(v) => setConcPercent(parseFloat(v) || 0)}
+                    onFocus={() => setConcFocused(true)}
+                    onBlur={() => setConcFocused(false)}
                     keyboardType="decimal-pad"
                     placeholderTextColor="rgba(255,255,255,0.3)"
                   />
@@ -490,43 +498,16 @@ export default function NewFormula() {
             </TouchableOpacity>
             {formulaOpen && (
             <View style={s.sectionBody}>
-              {/* Search + Add */}
+              {/* Search + Add (pill inside the bar) */}
               <View style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                  <View style={{ flex: 1 }}>
-                    <TextInput
-                      style={s.searchBarInline}
-                      placeholder="Search Materials..."
-                      placeholderTextColor="rgba(255,255,255,0.4)"
-                      value={search}
-                      onChangeText={(v) => { setSearch(v); setSelected(null); }}
-                    />
-                    {/* Dropdown */}
-                    {showDropdown && (
-                      <View style={s.dropdown}>
-                        {searchResults.map((item) => (
-                          <TouchableOpacity
-                            key={item.id}
-                            style={s.dropdownRow}
-                            onPress={() => { setSelected(item); setSearch(item.name); setSearchResults([]); }}
-                          >
-                            <Text style={s.dropdownName}>{item.name}</Text>
-                            {item.type ? (
-                              <Text style={s.dropdownType}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text>
-                            ) : null}
-                          </TouchableOpacity>
-                        ))}
-                        {!exactMatch && (
-                          <TouchableOpacity
-                            style={[s.dropdownRow, { borderTopWidth: searchResults.length > 0 ? 1 : 0, borderTopColor: "rgba(255,255,255,0.1)" }]}
-                            onPress={() => { setSearchResults([]); }}
-                          >
-                            <Text style={s.dropdownNew}>+ Add "{search}" to your Organ</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-                  </View>
+                <View style={s.searchPillWrap}>
+                  <TextInput
+                    style={s.searchPillInput}
+                    placeholder="Search Materials..."
+                    placeholderTextColor="rgba(255,255,255,0.4)"
+                    value={search}
+                    onChangeText={(v) => { setSearch(v); setSelected(null); }}
+                  />
                   <TouchableOpacity
                     style={[s.searchAddBtn, !canAdd && { opacity: 0.4 }]}
                     onPress={handleAddLine}
@@ -535,6 +516,31 @@ export default function NewFormula() {
                     <Text style={s.searchAddText}>Add</Text>
                   </TouchableOpacity>
                 </View>
+                {/* Dropdown */}
+                {showDropdown && (
+                  <View style={s.dropdown}>
+                    {searchResults.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={s.dropdownRow}
+                        onPress={() => { setSelected(item); setSearch(item.name); setSearchResults([]); }}
+                      >
+                        <Text style={s.dropdownName}>{item.name}</Text>
+                        {item.type ? (
+                          <Text style={s.dropdownType}>{SYMBOL_ICONS[item.type] ?? ""} {item.type}</Text>
+                        ) : null}
+                      </TouchableOpacity>
+                    ))}
+                    {!exactMatch && (
+                      <TouchableOpacity
+                        style={[s.dropdownRow, { borderTopWidth: searchResults.length > 0 ? 1 : 0, borderTopColor: "rgba(255,255,255,0.1)" }]}
+                        onPress={() => { setSearchResults([]); }}
+                      >
+                        <Text style={s.dropdownNew}>+ Add "{search}" to your Organ</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
                 {selected && (
                   <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
                     <Text style={{ color: ACCENT, fontSize: 13 }}>✓ {selected.name} (from Organ)</Text>
@@ -589,28 +595,59 @@ export default function NewFormula() {
           <View style={s.section}>
             <TouchableOpacity style={s.sectionHead} activeOpacity={0.8} onPress={() => setSummaryOpen((v) => !v)}>
               <Text style={s.sectionHeadTitle}>Summary</Text>
-              <Text style={s.sectionShow}>{summaryOpen ? "Hide" : "Show"}</Text>
+              {!summaryOpen && <Text style={s.sectionShow}>Show</Text>}
             </TouchableOpacity>
             {summaryOpen && (
             <View style={s.sectionBody}>
-            <View style={{ flexDirection: "row" }}>
-              <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={s.statVal}>{totalG.toFixed(3)}g</Text>
-                <Text style={s.statLabel}>Current Total</Text>
+              <View style={{ flexDirection: "row" }}>
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={s.statVal}>{totalG.toFixed(3)}g</Text>
+                  <Text style={s.statLabel}>CONCENTRATE TOTAL</Text>
+                </View>
+                <View style={s.statDivider} />
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={s.statVal}>{targetConcentrateG.toFixed(3)}g</Text>
+                  <Text style={s.statLabel}>TARGET CONCENTRATE</Text>
+                </View>
+                <View style={s.statDivider} />
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={s.statVal}>{diluentMl}ml</Text>
+                  <Text style={s.statLabel}>DILUENT</Text>
+                </View>
               </View>
-              <View style={s.statDivider} />
-              <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={s.statVal}>{targetConcentrateG.toFixed(3)}g</Text>
-                <Text style={s.statLabel}>Target Concentrate</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={{ flex: 1, alignItems: "center" }}>
-                <Text style={s.statVal}>{diluentMl} mL</Text>
-                <Text style={s.statLabel}>Base/Diluent Needed</Text>
-              </View>
-            </View>
+
+              {lines.length > 0 && (
+                <View style={s.breakdownRow}>
+                  {topG > 0 && <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>▲ {pctOf(topG)}%</Text></View>}
+                  {midG > 0 && <View style={[s.bdPill, { backgroundColor: "#F06CA6" }]}><Text style={s.bdPillDark}>● {pctOf(midG)}%</Text></View>}
+                  {baseG > 0 && <View style={[s.bdPill, { backgroundColor: "#4C7DF0" }]}><Text style={s.bdPillLight}>■ {pctOf(baseG)}%</Text></View>}
+                </View>
+              )}
+
+              <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 16 }} onPress={() => setSummaryOpen(false)}>
+                <Text style={s.sectionShow}>Hide</Text>
+              </TouchableOpacity>
             </View>
             )}
+          </View>
+
+          {/* ── Set Status ── */}
+          <View style={{ paddingHorizontal: 30, marginTop: 4, marginBottom: 8 }}>
+            <Text style={s.setStatusLabel}>Set Status</Text>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {["Draft", "In Progress", "Final"].map((st) => {
+                const active = statusVal === st;
+                return (
+                  <TouchableOpacity
+                    key={st}
+                    style={[s.statusChip, active && s.statusChipActive]}
+                    onPress={() => setStatusVal(active ? null : st)}
+                  >
+                    <Text style={[s.statusChipText, active && s.statusChipTextActive]}>{st.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
         </KeyboardAwareScrollView>
@@ -627,7 +664,7 @@ export default function NewFormula() {
               disabled={saving || !name.trim()}
             >
               {saving
-                ? <ActivityIndicator color="#fff" size="small" />
+                ? <ActivityIndicator color="#13131a" size="small" />
                 : <Text style={s.saveBtnText}>Create</Text>}
             </TouchableOpacity>
           </View>
@@ -756,14 +793,16 @@ const s = StyleSheet.create({
   searchBarInline: { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11, color: "#fff", fontSize: 14 },
   amountInline: { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 11, color: "#fff", fontSize: 14, width: 72, textAlign: "center" },
 
-  dropdown: { position: "absolute", top: "100%", left: 0, right: 0, backgroundColor: "#1a1a1a", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", zIndex: 99, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, marginTop: 4 },
+  dropdown: { backgroundColor: "#1a1a1a", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", marginTop: 6, overflow: "hidden" },
   dropdownRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
   dropdownName: { color: "#fff", fontSize: 14, flex: 1 },
   dropdownType: { color: "rgba(255,255,255,0.45)", fontSize: 12 },
   dropdownNew: { color: ACCENT, fontSize: 14, fontWeight: "600" },
 
-  searchAddBtn: { backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
-  searchAddText: { color: "#13131a", fontSize: 14, fontWeight: "700" },
+  searchPillWrap: { flexDirection: "row", alignItems: "center", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 24, paddingLeft: 16, paddingRight: 5, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.04)" },
+  searchPillInput: { flex: 1, fontSize: 14, color: "#fff", paddingVertical: 7, marginRight: 8 },
+  searchAddBtn: { backgroundColor: "#fff", borderRadius: 18, paddingHorizontal: 16, paddingVertical: 7 },
+  searchAddText: { color: "#13131a", fontSize: 12, fontWeight: "600" },
   tableHeader: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.15)" },
   tableHeaderText: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
   tableRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
@@ -782,9 +821,19 @@ const s = StyleSheet.create({
   statLabel: { color: "rgba(255,255,255,0.45)", fontSize: 11, textAlign: "center" },
   statDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.15)", marginVertical: 4 },
 
+  breakdownRow: { flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "center" },
+  bdPill: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 6 },
+  bdPillDark: { color: "#13131a", fontSize: 13, fontWeight: "700" },
+  bdPillLight: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  setStatusLabel: { color: "#fff", fontSize: 16, fontWeight: "600", marginBottom: 12 },
+  statusChip: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
+  statusChipActive: { backgroundColor: "#fff", borderColor: "#fff" },
+  statusChipText: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+  statusChipTextActive: { color: "#13131a" },
+
   bottomRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 40, paddingVertical: 16 },
   cancelBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
   cancelBtnText: { color: "#fff", fontSize: 15, fontWeight: "500" },
-  saveBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  saveBtn: { backgroundColor: "#D9F24E", borderRadius: 26, paddingHorizontal: 40, paddingVertical: 14 },
+  saveBtnText: { color: "#13131a", fontSize: 15, fontWeight: "700" },
 });

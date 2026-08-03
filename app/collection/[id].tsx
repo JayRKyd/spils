@@ -57,6 +57,19 @@ function temperatureColor(t: number): string {
   return "#E8503B";
 }
 
+// Legacy performance words → 0–10 scale (matches Journal's numeric display)
+const PERF_WORDS: Record<string, string> = {
+  "VW": "1", "VERY WEAK": "1", "SKIN": "2", "CLOSE TO SKIN": "2",
+  "W": "3", "WEAK": "3", "MOD": "5", "MODERATE": "5",
+  "STRONG": "8", "BEAST": "10", "BEAST MODE": "10",
+};
+function perfNum(v?: string | null): string {
+  if (!v) return "—";
+  const t = v.trim();
+  if (/^\d+(\.\d+)?$/.test(t)) return t;
+  return PERF_WORDS[t.toUpperCase()] ?? t;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
@@ -116,11 +129,11 @@ const em = StyleSheet.create({
   organDropdownHint: { color: "#00AEEF", fontSize: 11, fontWeight: "600" },
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
   sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#00AEEF" },
-  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  sliderThumb: { position: "absolute", width: 42, height: 42, borderRadius: 21, backgroundColor: "#fff", top: 1, transform: [{ translateX: -34 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
   addBtn: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, justifyContent: "center" as const, marginBottom: 10 },
   addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" as const },
-  chooser: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 10 },
+  chooser: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 10 },
   chooserEmpty: { color: "rgba(255,255,255,0.4)", fontSize: 14 },
   chooserFilled: { color: "#fff", fontSize: 14 },
   chevron: { color: "rgba(255,255,255,0.5)", fontSize: 20 },
@@ -525,15 +538,6 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
               </View>
             )}
 
-            <Text style={em.label}>Status</Text>
-            <View style={em.chipRow}>
-              {STATUS_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[em.chip, status === opt && em.chipActive]} onPress={() => setStatus(opt)}>
-                  <Text style={[em.chipText, status === opt && em.chipTextActive]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
             <Text style={em.label}>Olfactive Profile</Text>
             <TagInput tags={accords} inputVal={accordInput} placeholder="Add profile…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
 
@@ -600,6 +604,16 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <View style={[em.sectionBox, { minHeight: 170 }]}>
               <Text style={em.boxLabel}>NOTES</Text>
               <TextInput style={[em.boxInput, { minHeight: 120 }]} placeholder="Write your notes..." placeholderTextColor="rgba(255,255,255,0.3)" value={notes} onChangeText={setNotes} multiline />
+            </View>
+
+            {/* Status */}
+            <Text style={em.label}>Status</Text>
+            <View style={em.chipRow}>
+              {STATUS_OPTIONS.map((opt) => (
+                <TouchableOpacity key={opt} style={[em.chip, status === opt && em.chipActive]} onPress={() => setStatus(opt)}>
+                  <Text style={[em.chipText, status === opt && em.chipTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </ScrollView>
           </KeyboardAvoidingView>
@@ -770,9 +784,9 @@ export default function CollectionDetail() {
 
         {/* Performance — 3-column */}
         <View style={[d.card, d.perfCard]}>
-          <View style={d.perfCol}><Text style={d.perfLabel}>PROJECTION</Text><Text style={d.perfValue}>{perfume.projection ?? "—"}</Text></View>
-          <View style={d.perfCol}><Text style={d.perfLabel}>SILLAGE</Text><Text style={d.perfValue}>{perfume.sillage ?? "—"}</Text></View>
-          <View style={d.perfCol}><Text style={d.perfLabel}>LONGEVITY</Text><Text style={d.perfValue}>{perfume.longevity ?? "—"}</Text></View>
+          <View style={d.perfCol}><Text style={d.perfLabel}>PROJECTION</Text><Text style={d.perfValue}>{perfNum(perfume.projection)}</Text></View>
+          <View style={d.perfCol}><Text style={d.perfLabel}>SILLAGE</Text><Text style={d.perfValue}>{perfNum(perfume.sillage)}</Text></View>
+          <View style={d.perfCol}><Text style={d.perfLabel}>LONGEVITY</Text><Text style={d.perfValue}>{perfNum(perfume.longevity)}</Text></View>
         </View>
 
         {/* Drydown */}
@@ -906,7 +920,7 @@ const d = StyleSheet.create({
   blockTextEmpty: { color: "rgba(255,255,255,0.3)" },
 
   inspRow: { flexDirection: "row", gap: 12, marginBottom: 12, alignItems: "stretch" },
-  inspBox: { flex: 1.25, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
+  inspBox: { flex: 1.25, minHeight: 230, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
   inspLabel: { position: "absolute", top: 12, left: 12, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, zIndex: 2 },
   inspRight: { flex: 1, gap: 12 },
   colorsBox: { marginBottom: 0, paddingHorizontal: 12 },

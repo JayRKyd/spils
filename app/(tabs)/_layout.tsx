@@ -120,7 +120,7 @@ const ROUTE_ACTIVE_COLORS: Record<string, string> = {
   journal: "#edff8d",
   collection: "#00AEEF",
   formulas: "#EC008C",
-  materials: "#C6FF00",
+  materials: "#33FF00",
   community: "#F2533A",
 };
 

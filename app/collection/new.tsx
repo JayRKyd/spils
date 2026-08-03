@@ -272,9 +272,21 @@ export default function CollectionNew() {
         if (!title && a.perfume) setTitle(a.perfume);
         if (!brand && a.brand) setBrand(a.brand);
         if (!perfumer && a.perfumer) setPerfumer(a.perfumer);
+        if (a.gender) setGender(a.gender);
+        if (Array.isArray(a.seasons) && !seasons.length) {
+          const validSeasons = ["Spring", "Summer", "Fall", "Winter"];
+          const valid = a.seasons.filter((x: any) => typeof x === "string" && validSeasons.includes(x));
+          if (valid.length) setSeasons(valid);
+        }
+        if (Array.isArray(a.fragrance_families) && !families.length) {
+          setFamilies(a.fragrance_families.filter((x: any) => typeof x === "string"));
+        }
+        if (Array.isArray(a.top_notes) && !notesTop.length) setNotesTop(a.top_notes.filter((x: any) => typeof x === "string"));
+        if (Array.isArray(a.heart_notes) && !notesHeart.length) setNotesHeart(a.heart_notes.filter((x: any) => typeof x === "string"));
+        if (Array.isArray(a.base_notes) && !notesBase.length) setNotesBase(a.base_notes.filter((x: any) => typeof x === "string"));
         setAiStatus("✦ Auto-filled from label");
       } else {
-        setAiStatus(null);
+        setAiStatus("Couldn't read the label.");
       }
     } catch {
       setAiStatus(null);
@@ -495,7 +507,7 @@ export default function CollectionNew() {
 
               {/* Olfactive Profile */}
               <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-                <TouchableOpacity style={s.chooserField} onPress={() => setFamilyPickerVisible(true)}>
+                <TouchableOpacity style={[s.chooserField, { flex: 1 }]} onPress={() => setFamilyPickerVisible(true)}>
                   <Text style={pendingFamily ? s.chooserFilled : s.chooserEmpty}>{pendingFamily || "OLFACTIVE PROFILE"}</Text>
                   <Text style={s.chevron}>▾</Text>
                 </TouchableOpacity>
@@ -852,7 +864,7 @@ const s = StyleSheet.create({
 
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
   sliderFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#00AEEF" },
-  sliderThumb: { position: "absolute", width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  sliderThumb: { position: "absolute", width: 42, height: 42, borderRadius: 21, backgroundColor: "#fff", top: 1, transform: [{ translateX: -34 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
 

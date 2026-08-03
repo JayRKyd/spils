@@ -5,11 +5,13 @@ import {
   Linking, Share, PanResponder, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
+import { stripMarkdown } from "@/lib/text";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
 
@@ -129,7 +131,7 @@ const em = StyleSheet.create({
   colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
   addBtn: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, justifyContent: "center" as const, marginBottom: 10 },
   addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" as const },
-  chooser: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 10 },
+  chooser: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13, marginBottom: 10 },
   chooserEmpty: { color: "rgba(255,255,255,0.4)", fontSize: 14 },
   chooserFilled: { color: "#fff", fontSize: 14 },
   chevron: { color: "rgba(255,255,255,0.5)", fontSize: 20 },
@@ -147,7 +149,7 @@ const em = StyleSheet.create({
 
   sliderTrack: { height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", overflow: "hidden", justifyContent: "center" },
   sliderFill: { position: "absolute" as const, left: 0, top: 0, bottom: 0, borderRadius: 22, backgroundColor: "#C9F24D" },
-  sliderThumb: { position: "absolute" as const, width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", top: 4, transform: [{ translateX: -28 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  sliderThumb: { position: "absolute" as const, width: 42, height: 42, borderRadius: 21, backgroundColor: "#fff", top: 1, transform: [{ translateX: -34 }], shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
 
   sectionBox: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
   boxLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 },
@@ -315,7 +317,6 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [remindsMeOf, setRemindsMeOf] = useState("");
   const [seasons, setSeasons] = useState<string[]>([]);
   const [isPublic, setIsPublic] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
   const [colors, setColors] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState("#a78bfa");
   const [temperature, setTemperature] = useState(5);
@@ -462,7 +463,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
         },
       });
       if (resp.error) throw resp.error;
-      setAiResult(resp.data?.text ?? "No result returned.");
+      setAiResult(stripMarkdown(resp.data?.text ?? "No result returned."));
     } catch {
       setAiResult("AI request failed. Please try again.");
     } finally {
@@ -487,8 +488,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             </TouchableOpacity>
           </View>
 
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 200 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 200 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0}>
             {/* Back carrot + header */}
             <View style={em.titleRow}>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -594,7 +594,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
 
             {/* Olfactive Profile */}
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity style={em.chooser} onPress={() => setFamilyOpen((v) => !v)}>
+              <TouchableOpacity style={[em.chooser, { flex: 1 }]} onPress={() => setFamilyOpen((v) => !v)}>
                 <Text style={pendingFamily ? em.chooserFilled : em.chooserEmpty}>{pendingFamily || "OLFACTIVE PROFILE"}</Text>
                 <Text style={em.chevron}>▾</Text>
               </TouchableOpacity>
@@ -627,9 +627,9 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             )}
 
             {/* Pyramid */}
-            <TagInput tags={notesTop} inputVal={topInput} placeholder="TOP NOTES" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
-            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="MIDDLE NOTES" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
-            <TagInput tags={notesBase} inputVal={baseInput} placeholder="BASE NOTES" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} onScrollRequest={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            <TagInput tags={notesTop} inputVal={topInput} placeholder="TOP NOTES" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
+            <TagInput tags={notesHeart} inputVal={heartInput} placeholder="MIDDLE NOTES" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
+            <TagInput tags={notesBase} inputVal={baseInput} placeholder="BASE NOTES" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
 
             {/* Performance */}
             <View style={{ marginTop: 8 }}>
@@ -641,7 +641,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             {/* Drydown */}
             <View style={em.sectionBox}>
               <Text style={em.boxLabel}>DRYDOWN</Text>
-              <TextInput style={em.boxInput} placeholder="Describe the dry down..." placeholderTextColor="rgba(255,255,255,0.3)" value={dryDown} onChangeText={setDryDown} multiline onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+              <TextInput style={em.boxInput} placeholder="Describe the dry down..." placeholderTextColor="rgba(255,255,255,0.3)" value={dryDown} onChangeText={setDryDown} multiline />
             </View>
 
             {/* Color(s) */}
@@ -666,7 +666,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             <TemperatureSlider value={temperature} onChange={setTemperature} />
 
             {/* Music */}
-            <F placeholder="MUSIC (URL, Spotify, YouTube Links...)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" style={{ marginBottom: 10 }} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+            <F placeholder="MUSIC (URL, Spotify, YouTube Links...)" value={musicUrl} onChangeText={setMusicUrl} keyboardType="url" autoCapitalize="none" style={{ marginBottom: 10 }} />
 
             {/* Inspiration */}
             <Text style={[em.boxLabel, { marginTop: 4 }]}>INSPIRATION</Text>
@@ -689,7 +689,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             {/* Notes */}
             <View style={[em.sectionBox, { minHeight: 170 }]}>
               <Text style={em.boxLabel}>NOTES</Text>
-              <TextInput style={[em.boxInput, { minHeight: 120 }]} placeholder="Write your notes..." placeholderTextColor="rgba(255,255,255,0.3)" value={description} onChangeText={setDescription} multiline onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)} />
+              <TextInput style={[em.boxInput, { minHeight: 120 }]} placeholder="Write your notes..." placeholderTextColor="rgba(255,255,255,0.3)" value={description} onChangeText={setDescription} multiline />
             </View>
 
             {/* Public toggle */}
@@ -709,8 +709,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
               </TouchableOpacity>
             ))}
             <TextInput style={em.aiAnswerBox} placeholder="(ANSWERS SHOW UP HERE)" placeholderTextColor="rgba(255,255,255,0.4)" value={aiResult ?? ""} editable={false} multiline />
-          </ScrollView>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScrollView>
           <View style={em.bottomBar}>
             <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
               <Text style={em.cancelBtnText}>Cancel</Text>
@@ -754,6 +753,7 @@ const ms = StyleSheet.create({
 
 export default function JournalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [editVisible, setEditVisible] = useState(false);
@@ -791,25 +791,39 @@ export default function JournalDetail() {
     if (!entry) return;
     setMoreVisible(false);
     try {
-      const { error } = await (supabase as any).from("collection_items").insert([{
-        fragrance: entry.title || "Untitled",
-        brand: entry.brand || "",
+      const { error } = await (supabase as any).from("perfumes").insert([{
+        user_id: user?.id,
+        name: entry.title || "Untitled",
+        brand: entry.brand || null,
+        nose: entry.perfumer || null,
+        gender: entry.gender || null,
+        price: entry.price_text ? (parseFloat(entry.price_text) || null) : null,
+        size_ml: entry.size ? (parseFloat(entry.size) || null) : null,
         rating: entry.rating_10 ?? null,
+        reminds_me_of: entry.reminds_me_of || null,
+        temperature: entry.temperature ?? null,
+        season: entry.seasons?.length ? entry.seasons : null,
+        concentration: entry.concentration || null,
+        category: entry.category || null,
+        status: "Owned",
+        top_notes: entry.notes_top?.length ? entry.notes_top : null,
+        heart_notes: entry.notes_heart?.length ? entry.notes_heart : null,
+        base_notes: entry.notes_base?.length ? entry.notes_base : null,
+        accords: entry.accords?.length ? entry.accords : null,
+        projection: entry.projection ?? null,
         sillage: entry.sillage ?? null,
         longevity: entry.longevity ?? null,
-        gender: entry.gender ?? null,
-        color_tags: entry.colors ?? [],
-        accords: entry.accords ?? [],
-        top_notes: entry.notes_top ?? [],
-        heart_notes: entry.notes_heart ?? [],
-        base_notes: entry.notes_base ?? [],
-        notes: entry.description ?? null,
+        dry_down: entry.dry_down || null,
+        colors: entry.colors?.length ? entry.colors : null,
+        music: entry.music_url || null,
         image_url: entry.image_url ?? null,
+        inspiration_image_url: entry.inspiration_image_url ?? null,
+        notes: entry.description || null,
       }]);
       if (error) throw error;
-      Alert.alert("Added to Collection", `${entry.title || "Entry"} added to your collection.`);
-    } catch {
-      Alert.alert("Error", "Could not add to collection.");
+      Alert.alert("Added to Collection", `"${entry.title || "Entry"}" is now in your Collection.`);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not add to collection.");
     }
   };
 
@@ -1075,7 +1089,7 @@ const d = StyleSheet.create({
 
   // Inspiration + Colors + Temperature row
   inspRow: { flexDirection: "row", gap: 12, marginBottom: 12, alignItems: "stretch" },
-  inspBox: { flex: 1.25, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
+  inspBox: { flex: 1.25, minHeight: 230, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
   inspLabel: { position: "absolute", top: 12, left: 12, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, zIndex: 2 },
   inspRight: { flex: 1, gap: 12 },
   colorsBox: { marginBottom: 0, paddingHorizontal: 12 },

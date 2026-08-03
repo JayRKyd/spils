@@ -30,11 +30,13 @@ type Material = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+const ACCENT = "#33FF00";
+
 const SYMBOL_ICONS: Record<string, string> = {
-  Top: "▲", Mid: "■", Base: "●", Solvent: "★", Other: "✱",
+  Top: "▲", Mid: "●", Base: "■", Diluent: "★", Solvent: "★",
 };
 
-const TYPE_OPTIONS = ["Top", "Mid", "Base", "Solvent", "Other"] as const;
+const TYPE_OPTIONS = ["Top", "Mid", "Base", "Diluent"] as const;
 const ALPHA_RANGES = [
   { label: "A–D", from: "a", to: "d" },
   { label: "E–I", from: "e", to: "i" },
@@ -97,6 +99,7 @@ function MaterialModal({
   const [types, setTypes] = useState<string[]>([]);
   const [casNumber, setCasNumber] = useState("");
   const [stockG, setStockG] = useState("");
+  const [unit, setUnit] = useState<"g" | "mL">("g");
   const [ifraLimit, setIfraLimit] = useState("");
   const [density, setDensity] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
@@ -111,12 +114,16 @@ function MaterialModal({
   const handleEmailShare = () => { closeMore(); Linking.openURL(`mailto:?subject=${encodeURIComponent(name || "Material")}&body=${encodeURIComponent(shareText)}`); };
   const handleSMSShare = () => { closeMore(); Linking.openURL(`sms:?body=${encodeURIComponent(shareText)}`); };
   const handleCopyLink = async () => { await Clipboard.setStringAsync(shareText); closeMore(); Alert.alert("Copied!", "Material text copied to clipboard."); };
-  const handleClearAll = () => {
-    setName(""); setDescription(""); setTypes([]);
-    setCasNumber(""); setStockG(""); setIfraLimit(""); setDensity(""); setIsFavorite(false);
+  // Delete: removes the material when editing; discards the draft when adding
+  const handleDeleteConfirmed = async () => {
     closeMore();
+    if (isEdit && initial?.id) {
+      await supabase.from("materials").delete().eq("id", initial.id);
+      onSaved();
+    } else {
+      onClose();
+    }
   };
-  const handleDiscard = () => { closeMore(); onClose(); };
 
   useEffect(() => {
     if (!visible) return;
@@ -125,6 +132,7 @@ function MaterialModal({
     setTypes(initial?.types ?? (initial?.type ? [initial.type] : []));
     setCasNumber(initial?.cas_number ?? "");
     setStockG(initial?.stock_g?.toString() ?? "");
+    setUnit(((initial as any)?.stock_entered_unit === "ml" ? "mL" : "g"));
     setIfraLimit(initial?.ifra_limit ?? "");
     setDensity(initial?.density_g_per_ml?.toString() ?? "");
     setIsFavorite(initial?.is_favorite ?? false);
@@ -140,6 +148,7 @@ function MaterialModal({
       type: types[0] ?? null,
       cas_number: casNumber.trim() || null,
       stock_g: stockG ? parseFloat(stockG) : null,
+      stock_entered_unit: unit === "mL" ? "ml" : "g",
       ifra_limit: ifraLimit.trim() || null,
       density_g_per_ml: density ? parseFloat(density) : null,
       is_favorite: isFavorite,
@@ -158,39 +167,40 @@ function MaterialModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <LinearGradient
-        colors={["#E8FF70", "#C6FF00", "#A3D900"]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
+        colors={["#000000", "#000000", ACCENT]}
+        locations={[0, 0.82, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
         style={{ flex: 1 }}
       >
         <SafeAreaView style={{ flex: 1 }}>
           {/* Top nav */}
           <View style={mo.topNav}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <TouchableOpacity style={mo.backBtn} onPress={onClose}>
-                <Text style={mo.backIcon}>‹</Text>
-              </TouchableOpacity>
-              <SpilsLogo height={22} />
-            </View>
+            <SpilsLogo height={22} color="#edff8d" />
             <TouchableOpacity style={mo.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
               <Text style={mo.profileIcon}>👤</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Title */}
-          <Text style={mo.pageTitle}>Organ</Text>
+          {/* Back carrot + title */}
+          <View style={mo.headerRow}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={mo.backCarrot}>‹</Text>
+            </TouchableOpacity>
+            <Text style={mo.pageTitle}>Organ</Text>
+          </View>
 
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+            contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 120, paddingTop: 48 }}
             keyboardShouldPersistTaps="handled"
           >
             {/* Name + heart */}
-            <View style={mo.nameWrap}>
+            <View style={mo.nameBox}>
               <TextInput
                 style={mo.nameInput}
-                placeholder="Material"
-                placeholderTextColor="rgba(0,0,0,0.35)"
+                placeholder="Type Material Name Here"
+                placeholderTextColor="rgba(255,255,255,0.4)"
                 value={name}
                 onChangeText={setName}
               />
@@ -203,79 +213,81 @@ function MaterialModal({
             </View>
 
             {/* Description */}
-            <View style={mo.descWrap}>
-              <Text style={mo.descLabel}>Description</Text>
-              <TextInput
-                style={mo.descInput}
-                placeholder="Descripton...Lorem ipsum dolor sit amet..."
-                placeholderTextColor="rgba(0,0,0,0.3)"
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
+            <TextInput
+              style={mo.descBox}
+              placeholder="Description..."
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              textAlignVertical="top"
+            />
 
-            {/* Type chips */}
-            <View style={mo.chipsRow}>
-              {TYPE_OPTIONS.map((opt) => {
-                const active = types.includes(opt);
-                return (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[mo.chip, active && mo.chipActive]}
-                    onPress={() => setTypes((prev) => active ? prev.filter((t) => t !== opt) : [...prev, opt])}
-                  >
-                    <Text style={[mo.chipText, active && mo.chipTextActive]}>
-                      {SYMBOL_ICONS[opt]} {opt}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* CAS | IFRA | Stock row */}
+            {/* CAS | Stock (g/mL) | IFRA row */}
             <View style={mo.threeRow}>
               <TextInput
                 style={mo.threeInput}
-                placeholder="CAS Number"
-                placeholderTextColor="rgba(0,0,0,0.35)"
+                placeholder="CAS #"
+                placeholderTextColor="rgba(255,255,255,0.4)"
                 value={casNumber}
                 onChangeText={setCasNumber}
               />
-              <TextInput
-                style={mo.threeInput}
-                placeholder="IFRA Limit %"
-                placeholderTextColor="rgba(0,0,0,0.35)"
-                value={ifraLimit}
-                onChangeText={setIfraLimit}
-              />
-              <TextInput
-                style={mo.threeInput}
-                placeholder="Stock (g)"
-                placeholderTextColor="rgba(0,0,0,0.35)"
-                value={stockG}
-                onChangeText={setStockG}
-                keyboardType="decimal-pad"
-              />
+              <View style={[mo.threeInput, mo.stockField]}>
+                <TextInput
+                  style={mo.stockInput}
+                  placeholder="Stock"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  value={stockG}
+                  onChangeText={setStockG}
+                  keyboardType="decimal-pad"
+                />
+                <TouchableOpacity style={mo.unitToggle} onPress={() => setUnit((u) => (u === "g" ? "mL" : "g"))}>
+                  <Text style={mo.unitToggleText}>{unit}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={[mo.threeInput, mo.ifraDisabled]}>
+                <TextInput
+                  style={mo.threeInputText}
+                  placeholder="IFRA %"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={ifraLimit}
+                  editable={false}
+                />
+              </View>
+            </View>
+
+            {/* Symbol / composition selector */}
+            <View style={mo.symbolRow}>
+              {[{ v: "Top", l: "TOP" }, { v: "Mid", l: "MIDDLE" }, { v: "Base", l: "BASE" }, { v: "Diluent", l: "DILUENT" }].map(({ v, l }) => {
+                const active = types[0] === v;
+                return (
+                  <View key={v} style={mo.symbolCol}>
+                    <TouchableOpacity
+                      style={[mo.symbolBox, active && mo.symbolBoxActive]}
+                      onPress={() => setTypes(active ? [] : [v])}
+                    >
+                      <Text style={[mo.symbolGlyph, active && mo.symbolGlyphActive]}>{SYMBOL_ICONS[v]}</Text>
+                    </TouchableOpacity>
+                    <Text style={[mo.symbolLabel, active && mo.symbolLabelActive]}>{l}</Text>
+                  </View>
+                );
+              })}
             </View>
           </ScrollView>
 
           {/* Bottom buttons */}
           <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "transparent" }}>
             <View style={mo.bottomRow}>
-              {!isEdit ? (
-                <TouchableOpacity style={mo.moreBtn} onPress={() => setMoreVisible(true)}>
-                  <Text style={mo.moreBtnText}>More</Text>
-                </TouchableOpacity>
-              ) : <View />}
+              <TouchableOpacity style={mo.moreBtn} onPress={() => setMoreVisible(true)}>
+                <Text style={mo.moreBtnText}>More</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[mo.saveBtn, !name.trim() && { opacity: 0.4 }]}
                 onPress={handleSave}
                 disabled={saving || !name.trim()}
               >
                 {saving
-                  ? <ActivityIndicator color="#13131a" size="small" />
+                  ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={mo.saveBtnText}>Save</Text>}
               </TouchableOpacity>
             </View>
@@ -289,34 +301,15 @@ function MaterialModal({
                 <View style={ms.handle} />
                 {moreView === "main" && (
                   <>
-                    <TouchableOpacity style={[ms.btn, ms.btnDark]} onPress={handleClearAll}>
-                      <Text style={[ms.btnText, ms.btnTextLight]}>Clear All</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[ms.btn, ms.btnDelete]} onPress={() => setMoreView("delete")}>
-                      <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
-                    </TouchableOpacity>
                     <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={() => setMoreView("share")}>
                       <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
-                      <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
+                    <TouchableOpacity style={[ms.btn, ms.btnBeige]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
+                      <Text style={[ms.btnText, { color: "rgba(19,19,26,0.55)" }]}>Print</Text>
                     </TouchableOpacity>
-                  </>
-                )}
-                {moreView === "delete" && (
-                  <>
-                    <View style={[ms.btn, ms.btnDelete]}>
+                    <TouchableOpacity style={[ms.btn, ms.btnMagenta]} onPress={() => setMoreView("delete")}>
                       <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
-                    </View>
-                    <Text style={ms.confirmText}>Are you sure?</Text>
-                    <View style={ms.confirmRow}>
-                      <TouchableOpacity style={[ms.btn, { flex: 1 }]} onPress={handleDiscard}>
-                        <Text style={ms.btnText}>Yes</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[ms.btn, { flex: 1 }]} onPress={() => setMoreView("main")}>
-                        <Text style={ms.btnText}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   </>
                 )}
                 {moreView === "share" && (
@@ -325,7 +318,7 @@ function MaterialModal({
                       <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
                     </View>
                     <TouchableOpacity style={ms.btn} onPress={handleOSShare}>
-                      <Text style={ms.btnText}>Share</Text>
+                      <Text style={ms.btnText}>OS Share</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={ms.btn} onPress={handleEmailShare}>
                       <Text style={ms.btnText}>Email</Text>
@@ -336,6 +329,22 @@ function MaterialModal({
                     <TouchableOpacity style={ms.btn} onPress={handleCopyLink}>
                       <Text style={ms.btnText}>Copy Link</Text>
                     </TouchableOpacity>
+                  </>
+                )}
+                {moreView === "delete" && (
+                  <>
+                    <View style={[ms.btn, ms.btnMagenta]}>
+                      <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
+                    </View>
+                    <Text style={ms.confirmText}>Are you sure?</Text>
+                    <View style={{ flexDirection: "row", gap: 12 }}>
+                      <TouchableOpacity style={[ms.btn, { flex: 1 }]} onPress={handleDeleteConfirmed}>
+                        <Text style={ms.btnText}>Yes</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[ms.btn, { flex: 1 }]} onPress={() => setMoreView("main")}>
+                        <Text style={ms.btnText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
                   </>
                 )}
               </View>
@@ -350,13 +359,13 @@ function MaterialModal({
 // ─── Material Card ────────────────────────────────────────────────────────────
 
 function MaterialCard({
-  item, onEdit, onDelete, onToggleFavorite,
+  item, onEdit, onToggleFavorite,
 }: {
   item: Material;
   onEdit: () => void;
-  onDelete: () => void;
   onToggleFavorite: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const isLowStock = item.stock_g != null && item.stock_g <= LOW_STOCK_THRESHOLD;
   const allTypes = item.types?.length ? item.types : (item.type ? [item.type] : []);
   const casIfra = [
@@ -365,8 +374,7 @@ function MaterialCard({
   ].filter(Boolean).join("  |  ");
 
   return (
-    <BlurView intensity={55} tint="light" style={cd.card}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.55)", borderRadius: 16 }]} />
+    <TouchableOpacity style={cd.card} activeOpacity={0.85} onPress={() => setExpanded((v) => !v)}>
       {/* Top row: symbol + name + heart */}
       <View style={cd.topRow}>
         <View style={cd.nameRow}>
@@ -374,43 +382,39 @@ function MaterialCard({
           <Text style={cd.name} numberOfLines={1}>{item.name}</Text>
         </View>
         <TouchableOpacity
-          onPress={onToggleFavorite}
+          onPress={(e) => { e.stopPropagation?.(); onToggleFavorite(); }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={[cd.heart, item.is_favorite && cd.heartActive]}>{item.is_favorite ? "♥" : "♡"}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Description */}
-      {item.description ? (
-        <Text style={cd.desc} numberOfLines={3}>{item.description}</Text>
+      {/* Notes (drawer) */}
+      {expanded ? (
+        <Text style={cd.desc} numberOfLines={4}>
+          {item.description || "One line of notes will go here…"}
+        </Text>
       ) : null}
 
-      {/* Bottom meta row: left group + right Edit|Delete */}
+      {/* Bottom meta row: stock pill + CAS | IFRA + Edit (when open) */}
       <View style={cd.metaRow}>
         <View style={cd.metaLeft}>
           {item.stock_g != null ? (
             <View style={[cd.stockPill, isLowStock && cd.stockPillLow]}>
-              <Text style={[cd.stockText, isLowStock && cd.stockTextLow]}>
-                {isLowStock ? `Low ${item.stock_g}g` : `${item.stock_g}g`}
-              </Text>
+              <Text style={[cd.stockText, isLowStock && cd.stockTextLow]}>{item.stock_g}g</Text>
             </View>
           ) : null}
           {casIfra ? (
             <Text style={cd.casText} numberOfLines={1}>{casIfra}</Text>
           ) : null}
         </View>
-        <View style={cd.actions}>
-          <TouchableOpacity onPress={onEdit}>
+        {expanded ? (
+          <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onEdit(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={cd.editBtn}>Edit</Text>
           </TouchableOpacity>
-          <Text style={cd.actionSep}> | </Text>
-          <TouchableOpacity onPress={onDelete}>
-            <Text style={cd.deleteBtn}>Delete</Text>
-          </TouchableOpacity>
-        </View>
+        ) : null}
       </View>
-    </BlurView>
+    </TouchableOpacity>
   );
 }
 
@@ -458,7 +462,8 @@ export default function Materials() {
     ) return false;
     if (compFilter !== "All") {
       const matTypes = m.types?.length ? m.types : (m.type ? [m.type] : []);
-      if (!matTypes.includes(compFilter)) return false;
+      const wanted = compFilter === "Diluent" ? ["Diluent", "Solvent"] : [compFilter];
+      if (!matTypes.some((t) => wanted.includes(t))) return false;
     }
     if (indexFilter === "Favorites") {
       if (!m.is_favorite) return false;
@@ -560,21 +565,22 @@ export default function Materials() {
   };
 
   const compOptions = ["All", ...TYPE_OPTIONS];
-  const indexOptions = ["All", "Favorites", "Recently Added", ...ALPHA_RANGES.map((r) => r.label)];
+  const indexOptions = ["All", "Recently Added", "Favorites", ...ALPHA_RANGES.map((r) => r.label)];
   const compActive = compFilter !== "All";
   const indexActive = indexFilter !== "All";
 
   return (
     <LinearGradient
-      colors={["#E8FF70", "#C6FF00", "#A3D900"]}
-      start={{ x: 0.1, y: 0 }}
-      end={{ x: 0.9, y: 1 }}
+      colors={["#000000", "#000000", ACCENT]}
+      locations={[0, 0.82, 1]}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
       style={{ flex: 1 }}
     >
       <SafeAreaView style={{ flex: 1 }}>
         {/* Top nav */}
         <View style={s.topNav}>
-          <SpilsLogo height={22} />
+          <SpilsLogo height={22} color="#edff8d" />
           <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
             <Text style={s.profileIcon}>👤</Text>
           </TouchableOpacity>
@@ -583,45 +589,47 @@ export default function Materials() {
         {/* Page title */}
         <Text style={s.pageTitle}>Organ</Text>
 
-        {/* Search bar */}
-        <View style={s.searchWrap}>
-          <Text style={s.searchIconText}>⌕</Text>
-          <TextInput
-            style={s.searchInput}
-            placeholder="Search by name of CAS..."
-            placeholderTextColor="rgba(0,0,0,0.38)"
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <Text style={s.searchClear}>✕</Text>
+        {/* Search bar — pill inside */}
+        <View style={s.searchRow}>
+          <View style={s.searchWrap}>
+            <TextInput
+              style={s.searchInput}
+              placeholder="Search by name or CAS..."
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch("")}>
+                <Text style={s.searchClear}>✕</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={s.searchBtn} onPress={() => {}}>
+              <Text style={s.searchBtnText}>Search</Text>
             </TouchableOpacity>
-          )}
+          </View>
         </View>
 
         {/* Filter row */}
         <View style={s.filterRow}>
-          <View style={s.filterLeft}>
-            <TouchableOpacity
-              style={[s.filterChip, compActive && s.filterChipActive]}
-              onPress={() => setCompDropVisible(true)}
-            >
-              <Text style={[s.filterChipText, compActive && s.filterChipTextActive]}>
-                {compActive ? compFilter : "Composition"} ▾
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.filterChip, indexActive && s.filterChipActive]}
-              onPress={() => setIndexDropVisible(true)}
-            >
-              <Text style={[s.filterChipText, indexActive && s.filterChipTextActive]}>
-                {indexActive ? indexFilter : "Index"} ▾
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[s.filterChip, compActive && s.filterChipActive]}
+            onPress={() => setCompDropVisible(true)}
+          >
+            <Text style={[s.filterChipText, compActive && s.filterChipTextActive]} numberOfLines={1}>
+              {compActive ? compFilter : "Composition"}  ⌄
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.filterChip, indexActive && s.filterChipActive]}
+            onPress={() => setIndexDropVisible(true)}
+          >
+            <Text style={[s.filterChipText, indexActive && s.filterChipTextActive]} numberOfLines={1}>
+              {indexActive ? indexFilter : "Index"}  ⌄
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity style={s.importBtn} onPress={() => { setCsvPreview(null); setCsvImportVisible(true); }}>
-            <Text style={s.importBtnText}>Import .CSV</Text>
+            <Text style={s.importBtnText}>Import</Text>
           </TouchableOpacity>
         </View>
 
@@ -644,13 +652,13 @@ export default function Materials() {
 
         {/* List */}
         {loading ? (
-          <ActivityIndicator color="#13131a" style={{ marginTop: 48 }} />
+          <ActivityIndicator color={ACCENT} style={{ marginTop: 48 }} />
         ) : (
           <FlatList
             data={displayed}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 }}
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100 }}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             ListEmptyComponent={
               <Text style={s.empty}>
                 {search || compActive || indexActive
@@ -662,7 +670,6 @@ export default function Materials() {
               <MaterialCard
                 item={item}
                 onEdit={() => { setEditTarget(item); setModalVisible(true); }}
-                onDelete={() => handleDelete(item.id, item.name)}
                 onToggleFavorite={() => handleToggleFavorite(item)}
               />
             )}
@@ -696,10 +703,10 @@ export default function Materials() {
                 <>
                   <Text style={s.bannerBody}>
                     Expected columns (first row = headers):{"\n\n"}
-                    <Text style={{ color: "#C6FF00", fontFamily: "monospace" }}>
+                    <Text style={{ color: ACCENT, fontFamily: "monospace" }}>
                       name, type, cas_number,{"\n"}ifra_limit, stock_g, description
                     </Text>
-                    {"\n\n"}Type must be: Top, Mid, Base, Solvent, or Other.
+                    {"\n\n"}Type must be: Top, Mid, Base, or Diluent.
                   </Text>
                   <TouchableOpacity
                     style={[mo.saveBtn, { alignSelf: "center", marginTop: 20 }]}
@@ -784,83 +791,95 @@ const s = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 2,
   },
-  logo: { fontSize: 20, fontWeight: "900", color: "#13131a", letterSpacing: -0.5 },
+  logo: { fontSize: 20, fontWeight: "900", color: "#edff8d", letterSpacing: -0.5 },
   profileCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(0,0,0,0.12)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
   profileIcon: { fontSize: 16 },
 
   pageTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#13131a",
-    letterSpacing: -1,
+    fontSize: 30,
+    fontWeight: "700",
+    color: "#fff",
+    letterSpacing: -0.5,
     paddingHorizontal: 20,
-    marginTop: 6,
-    marginBottom: 12,
+    marginTop: 73,
+    marginBottom: 16,
   },
 
-  searchWrap: {
+  searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.55)",
-    borderRadius: 24,
-    marginHorizontal: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.12)",
+    paddingHorizontal: 20,
+    marginBottom: 14,
   },
-  searchIconText: { fontSize: 15, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: "#13131a" },
-  searchClear: { color: "rgba(0,0,0,0.3)", fontSize: 15, paddingLeft: 8 },
+  searchWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 24,
+    paddingLeft: 16,
+    paddingRight: 5,
+    paddingVertical: 5,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
+  },
+  searchInput: { flex: 1, fontSize: 14, color: "#fff", paddingVertical: 7 },
+  searchClear: { color: "rgba(255,255,255,0.4)", fontSize: 15, paddingHorizontal: 6 },
+  searchBtn: { backgroundColor: "#fff", borderRadius: 18, paddingHorizontal: 16, paddingVertical: 7 },
+  searchBtnText: { fontSize: 12, fontWeight: "600", color: "#13131a" },
 
   filterRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    marginBottom: 10,
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
-  filterLeft: { flexDirection: "row", gap: 8 },
   filterChip: {
+    flex: 1,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.12)",
+    borderColor: "rgba(255,255,255,0.35)",
+    alignItems: "center",
   },
   filterChipActive: {
-    backgroundColor: "#13131a",
-    borderColor: "#13131a",
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
   },
-  filterChipText: { fontSize: 13, fontWeight: "600", color: "#13131a" },
-  filterChipTextActive: { color: "#C6FF00" },
+  filterChipText: { fontSize: 13, fontWeight: "600", color: "#fff" },
+  filterChipTextActive: { color: "#13131a" },
 
   importBtn: {
+    flex: 1,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.12)",
+    borderColor: "rgba(255,255,255,0.35)",
+    alignItems: "center",
   },
-  importBtnText: { fontSize: 13, fontWeight: "600", color: "#13131a" },
+  importBtnText: { fontSize: 13, fontWeight: "600", color: "#fff" },
 
-  lowStockBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginBottom: 8, backgroundColor: "#fff3cd", borderRadius: 12, borderWidth: 1, borderColor: "#f5c542", paddingHorizontal: 14, paddingVertical: 10 },
-  lowStockIcon: { fontSize: 18, color: "#b45309" },
-  lowStockTitle: { fontSize: 13, fontWeight: "700", color: "#92400e" },
-  lowStockNames: { fontSize: 11, color: "#b45309", marginTop: 2 },
+  lowStockBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 20, marginBottom: 10, backgroundColor: "rgba(229,53,53,0.12)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(229,53,53,0.4)", paddingHorizontal: 14, paddingVertical: 10 },
+  lowStockIcon: { fontSize: 18, color: "#ff6b6b" },
+  lowStockTitle: { fontSize: 13, fontWeight: "700", color: "#ff8f8f" },
+  lowStockNames: { fontSize: 11, color: "rgba(255,143,143,0.85)", marginTop: 2 },
 
   empty: {
-    color: "rgba(0,0,0,0.45)",
+    color: "rgba(255,255,255,0.5)",
     textAlign: "center",
     marginTop: 56,
     fontSize: 14,
@@ -909,37 +928,31 @@ const s = StyleSheet.create({
 // Card
 const cd = StyleSheet.create({
   card: {
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.7)",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
+    backgroundColor: "transparent",
   },
   topRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 14,
   },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, marginRight: 8 },
-  symbol: { fontSize: 13, color: "#13131a", marginTop: 1 },
-  name: { fontSize: 15, fontWeight: "700", color: "#13131a", flex: 1 },
-  heart: { fontSize: 20, color: "rgba(19,19,26,0.4)" },
-  heartActive: { color: "#13131a" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, marginRight: 8 },
+  symbol: { fontSize: 13, color: "#fff", marginTop: 1 },
+  name: { fontSize: 15, fontWeight: "700", color: "#fff", flexShrink: 1 },
+  heart: { fontSize: 20, color: "rgba(255,255,255,0.4)" },
+  heartActive: { color: ACCENT },
 
   desc: {
     fontSize: 13,
-    color: "#13131a",
-    lineHeight: 18,
-    marginBottom: 10,
+    color: "rgba(255,255,255,0.6)",
+    lineHeight: 19,
+    marginBottom: 14,
   },
-
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -948,33 +961,30 @@ const cd = StyleSheet.create({
   metaLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
     flex: 1,
     marginRight: 8,
   },
+  editBtn: { fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: "600" },
   stockPill: {
     backgroundColor: "transparent",
     borderRadius: 20,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "#13131a",
+    borderColor: "rgba(255,255,255,0.5)",
   },
   stockPillLow: {
     backgroundColor: "#e53535",
     borderColor: "#e53535",
   },
-  stockText: { fontSize: 11, fontWeight: "600", color: "#13131a" },
+  stockText: { fontSize: 11, fontWeight: "600", color: "rgba(255,255,255,0.85)" },
   stockTextLow: { color: "#ffffff" },
   casText: {
     fontSize: 11,
-    color: "#13131a",
+    color: "rgba(255,255,255,0.5)",
     flexShrink: 1,
   },
-  actions: { flexDirection: "row", alignItems: "center" },
-  editBtn: { fontSize: 13, color: "#13131a", fontWeight: "600" },
-  actionSep: { fontSize: 13, color: "#cccccc" },
-  deleteBtn: { fontSize: 13, color: "#13131a", fontWeight: "600" },
 });
 
 // Dropdown modal
@@ -986,20 +996,22 @@ const dd = StyleSheet.create({
     alignItems: "center",
   },
   sheet: {
-    backgroundColor: "#fff",
+    backgroundColor: "#151515",
     borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.4)",
     paddingVertical: 8,
     paddingHorizontal: 0,
     width: 260,
     shadowColor: "#000",
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 8,
   },
   sheetTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "rgba(0,0,0,0.4)",
+    color: "rgba(255,255,255,0.45)",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     paddingHorizontal: 20,
@@ -1013,156 +1025,108 @@ const dd = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 13,
   },
-  optionActive: { backgroundColor: "rgba(198,255,0,0.15)" },
-  optionText: { fontSize: 15, color: "#13131a" },
-  optionTextActive: { fontWeight: "700", color: "#13131a" },
-  check: { fontSize: 15, color: "#7AAD00", fontWeight: "700" },
+  optionActive: { backgroundColor: "rgba(51,255,0,0.15)" },
+  optionText: { fontSize: 15, color: "#fff" },
+  optionTextActive: { fontWeight: "700", color: ACCENT },
+  check: { fontSize: 15, color: ACCENT, fontWeight: "700" },
 });
 
 // Add/Edit modal
 const mo = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#f5f5f5" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.08)",
-    backgroundColor: "#fff",
-  },
-  title: { fontSize: 17, fontWeight: "700", color: "#13131a" },
-  cancel: { fontSize: 16, color: "rgba(0,0,0,0.4)" },
-  save: { fontSize: 16, fontWeight: "700", color: "#7AAD00" },
   topNav: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 4,
+    paddingHorizontal: 30,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
-  backBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.08)",
-    borderWidth: 1, borderColor: "rgba(0,0,0,0.12)",
-    alignItems: "center", justifyContent: "center",
-  },
-  backIcon: { color: "#13131a", fontSize: 24, fontWeight: "300", lineHeight: 28, marginTop: -2 },
-  logo: { fontSize: 20, fontWeight: "800", color: "#13131a", letterSpacing: 1 },
   profileCircle: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.08)",
-    borderWidth: 1, borderColor: "rgba(0,0,0,0.12)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center", justifyContent: "center",
   },
   profileIcon: { fontSize: 16 },
-  pageTitle: {
-    fontSize: 32, fontWeight: "800", color: "#13131a",
-    letterSpacing: -1, paddingHorizontal: 20, marginTop: 6, marginBottom: 16,
-  },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 30, paddingTop: 24, paddingBottom: 4 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -4 },
+  pageTitle: { fontSize: 30, fontWeight: "700", color: "#fff", letterSpacing: -0.5 },
 
-  nameWrap: {
+  nameBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.6)",
-    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.8)",
+    borderColor: "rgba(255,255,255,0.35)",
+    borderRadius: 14,
     paddingHorizontal: 18,
-    paddingVertical: 14,
-    marginBottom: 12,
+    paddingVertical: 16,
+    marginBottom: 14,
   },
-  nameInput: { flex: 1, fontSize: 15, color: "#13131a", fontWeight: "500" },
-  heart: { fontSize: 22, color: "rgba(19,19,26,0.4)" },
-  heartActive: { color: "#13131a" },
+  nameInput: { flex: 1, fontSize: 15, color: "#fff", fontWeight: "500", marginRight: 10 },
+  heart: { fontSize: 22, color: "rgba(255,255,255,0.45)" },
+  heartActive: { color: ACCENT },
 
-  descWrap: {
-    backgroundColor: "rgba(255,255,255,0.6)",
-    borderRadius: 16,
+  descBox: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.8)",
+    borderColor: "rgba(255,255,255,0.35)",
+    borderRadius: 14,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingVertical: 14,
+    color: "#fff",
+    fontSize: 14,
+    minHeight: 120,
     marginBottom: 16,
   },
-  descLabel: { fontSize: 12, fontWeight: "600", color: "rgba(0,0,0,0.45)", marginBottom: 6 },
-  descInput: { fontSize: 14, color: "#13131a", minHeight: 80 },
 
-  chipsRow: {
-    flexDirection: "row",
-    flexWrap: "nowrap",
-    gap: 6,
-    marginBottom: 16,
-  },
-  chip: {
-    flex: 1,
-    paddingHorizontal: 6, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.25)",
-    backgroundColor: "rgba(255,255,255,0.35)",
-    alignItems: "center",
-  },
-  chipActive: { backgroundColor: "#13131a", borderColor: "#13131a" },
-  chipText: { fontSize: 12, color: "#13131a", textAlign: "center" },
-  chipTextActive: { color: "#C6FF00", fontWeight: "600" },
-
-  threeRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  threeRow: { flexDirection: "row", gap: 8, marginBottom: 20 },
   threeInput: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.6)",
-    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.8)",
-    paddingHorizontal: 10,
-    paddingVertical: 14,
-    fontSize: 12,
-    color: "#13131a",
-    textAlign: "center",
+    borderColor: "rgba(255,255,255,0.35)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 13,
+    fontSize: 13,
+    color: "#fff",
   },
+  threeInputText: { color: "#fff", fontSize: 13, padding: 0 },
+  stockField: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 0, paddingRight: 6 },
+  stockInput: { flex: 1, color: "#fff", fontSize: 13, paddingVertical: 13 },
+  unitToggle: { backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 4 },
+  unitToggleText: { color: "#13131a", fontSize: 11, fontWeight: "700" },
+  ifraDisabled: { opacity: 0.45 },
+
+  symbolRow: { flexDirection: "row", gap: 10 },
+  symbolCol: { flex: 1, alignItems: "center" },
+  symbolBox: { width: "100%", borderWidth: 1, borderColor: "rgba(255,255,255,0.45)", borderRadius: 22, paddingVertical: 10, alignItems: "center" },
+  symbolBoxActive: { backgroundColor: ACCENT, borderColor: ACCENT },
+  symbolGlyph: { color: "#fff", fontSize: 16 },
+  symbolGlyphActive: { color: "#13131a" },
+  symbolLabel: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "600", letterSpacing: 0.5, marginTop: 6 },
+  symbolLabelActive: { color: "#fff" },
 
   bottomRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
+    paddingHorizontal: 40,
     paddingVertical: 16,
   },
-  moreBtn: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.15)",
-    borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-  },
-  moreBtnText: { color: "#13131a", fontSize: 14 },
-  saveBtn: {
-    backgroundColor: "#C6FF00",
-    borderRadius: 24,
-    paddingHorizontal: 28,
-    paddingVertical: 13,
-    borderWidth: 1.5,
-    borderColor: "#fff",
-  },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  moreBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
+  moreBtnText: { color: "#fff", fontSize: 15, fontWeight: "500" },
+  saveBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 26, paddingHorizontal: 34, paddingVertical: 14 },
+  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
 });
 
 const ms = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
   sheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 10 },
   handle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
-  btn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
-  btnDark: { backgroundColor: "#13131a", borderColor: "#13131a" },
+  btn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
   btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
   btnBeige: { backgroundColor: "#EDE5D8", borderColor: "#EDE5D8" },
-  btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
-  btnDelete: { backgroundColor: "#FF2D55", borderColor: "#FF2D55" },
+  btnMagenta: { backgroundColor: "#EC008C", borderColor: "#EC008C" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },
-  btnTextLight: { color: "#fff" },
-  confirmText: { color: "#13131a", fontSize: 17, fontWeight: "600", textAlign: "center", marginVertical: 16 },
-  confirmRow: { flexDirection: "row", gap: 12 },
+  btnTextLight: { color: "#fff", fontWeight: "600" },
+  confirmText: { color: "#13131a", fontSize: 16, fontWeight: "600", textAlign: "center", marginVertical: 10 },
 });
