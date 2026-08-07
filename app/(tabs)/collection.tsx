@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import { useFocusEffect } from "@react-navigation/native";
 import { SpilsLogo } from "../../components/SpilsLogo";
 import {
@@ -9,6 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,6 +81,7 @@ function CollectionCard({ item, onFavoriteToggle }: { item: Perfume; onFavoriteT
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function Collection() {
+  const { user } = useAuth();
   const [items, setItems] = useState<Perfume[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -89,9 +92,29 @@ export default function Collection() {
   const [sortOrder, setSortOrder] = useState<"A-Z" | "Z-A" | "Recently Added">("A-Z");
   const [sortPickerVisible, setSortPickerVisible] = useState(false);
 
+  // One-time: copy the shared starter bottles into this user's own collection
+  // so they fully own them (favorite/delete work — RLS only allows owner writes).
+  const seedStarters = useCallback(async () => {
+    if (!user?.id) return;
+    const { data: prof } = await supabase.from("profiles").select("starter_seeded").eq("id", user.id).single();
+    if (!prof || (prof as any).starter_seeded) return;
+    const { data: starters } = await supabase.from("perfumes").select("*").eq("is_starter", true);
+    const { data: mine } = await supabase.from("perfumes").select("name").eq("user_id", user.id);
+    const myNames = new Set((mine ?? []).map((m: any) => m.name));
+    const clones = (starters ?? [])
+      .filter((st: any) => !myNames.has(st.name) && st.user_id !== user.id)
+      .map(({ id: _id, created_at: _c, ...rest }: any) => ({ ...rest, user_id: user.id, is_starter: false, is_favorite: false }));
+    if (clones.length) await supabase.from("perfumes").insert(clones);
+    await supabase.from("profiles").update({ starter_seeded: true }).eq("id", user.id);
+  }, [user?.id]);
+
   const fetchPerfumes = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
-    let query = supabase.from("perfumes").select("id,name,brand,year,status,category,is_favorite,concentration,size_ml,rating,image_url,created_at,nose,accords,top_notes,heart_notes,base_notes");
+    await seedStarters();
+    let query = supabase.from("perfumes")
+      .select("id,name,brand,year,status,category,is_favorite,concentration,size_ml,rating,image_url,created_at,nose,accords,top_notes,heart_notes,base_notes")
+      .eq("user_id", user.id);
     if (sortOrder === "A-Z") query = query.order("name", { ascending: true });
     else if (sortOrder === "Z-A") query = query.order("name", { ascending: false });
     else query = query.order("created_at", { ascending: false });
@@ -101,7 +124,7 @@ export default function Collection() {
     const { data } = await query;
     setItems((data as Perfume[]) ?? []);
     setLoading(false);
-  }, [activeFilter, categoryFilter, sortOrder]);
+  }, [activeFilter, categoryFilter, sortOrder, user?.id, seedStarters]);
 
   useFocusEffect(useCallback(() => { fetchPerfumes(); }, [fetchPerfumes]));
 
@@ -131,8 +154,8 @@ export default function Collection() {
         {/* Top nav */}
         <View style={s.topNav}>
           <SpilsLogo height={22} color="#edff8d" />
-          <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-            <Text style={s.profileIcon}>👤</Text>
+          <TouchableOpacity style={[s.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <ProfileIcon size={34} />
           </TouchableOpacity>
         </View>
 
@@ -152,7 +175,6 @@ export default function Collection() {
 
         {/* Search */}
         <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>⌕</Text>
           <TextInput
             style={s.searchInput}
             placeholder="Search..."
@@ -262,7 +284,6 @@ const s = StyleSheet.create({
   viewSortSep: { color: "rgba(255,255,255,0.35)", fontSize: 13 },
 
   searchWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", borderRadius: 50, marginHorizontal: 30, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, marginBottom: 14, gap: 8 },
-  searchIcon: { color: "rgba(255,255,255,0.5)", fontSize: 18 },
   searchInput: { flex: 1, color: "#fff", fontSize: 14, paddingVertical: 6 },
   searchBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8 },
   searchBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },

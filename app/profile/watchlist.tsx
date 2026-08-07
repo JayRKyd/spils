@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import GradientScreen from "@/components/GradientScreen";
 import { GlassRow } from "@/components/GlassCard";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 interface WatchItem {
   id: string;
@@ -18,6 +19,7 @@ interface WatchItem {
 }
 
 export default function Watchlist() {
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const { user } = useAuth();
   const [items, setItems] = useState<WatchItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,10 +39,12 @@ export default function Watchlist() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const handleRemove = (id: string) => {
-    Alert.alert("Remove from Watchlist", "Remove this item?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: async () => { await (supabase as any).from("marketplace_watchlist").delete().eq("id", id); fetch(); } },
-    ]);
+    setConfirm({
+      title: "Remove from Watchlist",
+      message: "Remove this item?",
+      confirmLabel: "Remove",
+      onConfirm: async () => { await (supabase as any).from("marketplace_watchlist").delete().eq("id", id); fetch(); },
+    });
   };
 
   return (
@@ -72,6 +76,7 @@ export default function Watchlist() {
           )}
         />
       )}
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
     </GradientScreen>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, StyleSheet, Image, TextInput, Modal, Alert,
@@ -12,6 +13,7 @@ import { decode } from "base64-arraybuffer";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -262,6 +264,7 @@ function EditableLine({ line, pct, onUpdate, onDelete }: {
 
 export default function FormulaVersionDetail() {
   const { versionId } = useLocalSearchParams<{ versionId: string }>();
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState<VersionRow | null>(null);
@@ -366,9 +369,11 @@ export default function FormulaVersionDetail() {
   };
 
   const handleDeleteMoodItem = (itemId: string) => {
-    Alert.alert("Remove Image", "Remove this mood board image?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: async () => {
+    setConfirm({
+      title: "Remove Image",
+      message: "Remove this mood board image?",
+      confirmLabel: "Remove",
+      onConfirm: async () => {
         const item = moodItems.find((i) => i.id === itemId);
         if (item && item.media_type !== "note") {
           const path = extractStoragePath(item.file_url);
@@ -376,21 +381,20 @@ export default function FormulaVersionDetail() {
         }
         await supabase.from("formula_moodboard_assets").delete().eq("id", itemId);
         setMoodItems((prev) => prev.filter((i) => i.id !== itemId));
-      }},
-    ]);
+      },
+    });
   };
 
   const handleDelete = () => {
     setMoreVisible(false);
-    Alert.alert("Delete Version", "Delete this version? This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete", style: "destructive", onPress: async () => {
-          await supabase.from("formula_versions").delete().eq("id", versionId);
-          router.back();
-        },
+    setConfirm({
+      title: "Delete Version",
+      message: "Delete this version? This cannot be undone.",
+      onConfirm: async () => {
+        await supabase.from("formula_versions").delete().eq("id", versionId);
+        router.back();
       },
-    ]);
+    });
   };
 
   const handleSave = async () => {
@@ -420,8 +424,8 @@ export default function FormulaVersionDetail() {
         {/* Top nav */}
         <View style={s.topNav}>
           <SpilsLogo height={22} color="#edff8d" />
-          <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-            <Text style={s.profileIcon}>👤</Text>
+          <TouchableOpacity style={[s.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <ProfileIcon size={34} />
           </TouchableOpacity>
         </View>
 
@@ -745,6 +749,7 @@ export default function FormulaVersionDetail() {
             </ScrollView>
           </SafeAreaView>
         </Modal>
+        <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
       </SafeAreaView>
     </LinearGradient>
   );

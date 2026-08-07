@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, StyleSheet, Alert, Image,
@@ -6,6 +7,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -17,15 +19,22 @@ import ColorPicker from "react-native-wheel-color-picker";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FRAGRANCE_FAMILIES = [
-  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Aquatic",
-  "Aromatic", "Aromatic Fougère", "Chypre", "Citrus", "Citrus Woods",
-  "Floral", "Fresh", "Fougère", "Fruity", "Gourmand", "Green",
-  "Leather", "Mossy Woods", "Musky", "Oriental", "Oriental Floral",
-  "Oriental Woody", "Spicy", "Umami", "Woody", "Woody Aromatic",
-  "Woody Green", "Woody Spicy",
+  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Animalic",
+  "Aquatic", "Aromatic", "Aromatic Fougère", "Aromatic Green", "Balsamic",
+  "Boozy", "Camphorous", "Chypre", "Citrus", "Citrus Aromatic",
+  "Citrus Floral", "Citrus Gourmand", "Citrus Woody", "Dry Woods", "Earthy",
+  "Floral", "Floral Aldehydic", "Floral Aquatic", "Floral Fruity", "Floral Green",
+  "Floral Woody", "Fougère", "Fresh", "Fresh Spicy", "Fruity",
+  "Fruity Floral", "Gourmand", "Green", "Green Aromatic", "Honeyed",
+  "Incense", "Lactonic", "Leather", "Leather Floral", "Leather Woody",
+  "Marine", "Metallic", "Mineral", "Mossy Woods", "Musky",
+  "Musky Floral", "Ozonic", "Powdery", "Resinous", "Salty",
+  "Smoky", "Solar", "Spicy", "Tea", "Tobacco",
+  "Umami", "White Floral", "Woody", "Woody Aromatic", "Woody Floral",
+  "Woody Green", "Woody Musky", "Woody Spicy",
 ];
 
-const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "EDC", "Cologne", "Oil"];
+const CONCENTRATION_OPTIONS = ["Extrait", "Parfum", "EDP", "EDT", "Cologne", "Oil", "Other"];
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass Market", "Private Collection", "Classic/Vintage", "Limited Edition", "Discontinued", "Other"];
 const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
 const SEASON_LIST = ["Spring", "Summer", "Fall", "Winter"];
@@ -193,6 +202,7 @@ export default function CollectionNew() {
 
   const [families, setFamilies] = useState<string[]>([]);
   const [pendingFamily, setPendingFamily] = useState("");
+  const [customFamily, setCustomFamily] = useState("");
   const [familyPickerVisible, setFamilyPickerVisible] = useState(false);
   const [genderPickerVisible, setGenderPickerVisible] = useState(false);
   const [seasonPickerVisible, setSeasonPickerVisible] = useState(false);
@@ -422,14 +432,13 @@ export default function CollectionNew() {
   return (
     <LinearGradient colors={["#000000", "#000000", "#00AEEF"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
 
             {/* Top nav */}
             <View style={s.topNav}>
               <SpilsLogo height={22} color="#edff8d" />
-              <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-                <Text style={s.profileIcon}>👤</Text>
+              <TouchableOpacity style={[s.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+                <ProfileIcon size={34} />
               </TouchableOpacity>
             </View>
 
@@ -613,9 +622,7 @@ export default function CollectionNew() {
               </View>
 
             </View>
-          </ScrollView>
-
-          {/* Bottom action bar */}
+          {/* Cancel / Save — at the end of the form */}
           <View style={s.bottomBar}>
             <TouchableOpacity style={s.moreBtn} onPress={() => router.back()}>
               <Text style={s.moreBtnText}>Cancel</Text>
@@ -624,7 +631,7 @@ export default function CollectionNew() {
               {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
 
         {/* More Bottom Sheet */}
         <Modal visible={moreVisible} transparent animationType="slide" onRequestClose={closeMore}>
@@ -707,7 +714,7 @@ export default function CollectionNew() {
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setGenderPickerVisible(false)} />
             <View style={ms.sheet}>
               <View style={ms.handle} />
-              {["Female", "Male", "Unisex"].map((g) => (
+              {["Male", "Female", "Unisex", "Genderless"].map((g) => (
                 <TouchableOpacity key={g} style={[ms.btn, gender === g && ms.btnDark]} onPress={() => { setGender(g); setGenderPickerVisible(false); }}>
                   <Text style={[ms.btnText, gender === g && ms.btnTextLight]}>{g}</Text>
                 </TouchableOpacity>
@@ -791,6 +798,32 @@ export default function CollectionNew() {
               <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>Olfactive Profile</Text>
               <TouchableOpacity onPress={() => setFamilyPickerVisible(false)}>
                 <Text style={{ color: "#00AEEF", fontSize: 15 }}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Custom profile input */}
+            <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
+              <TextInput
+                style={{
+                  flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)",
+                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: "#fff", fontSize: 15,
+                }}
+                placeholder="Type a custom profile…"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                value={customFamily}
+                onChangeText={setCustomFamily}
+                onSubmitEditing={() => {
+                  if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyPickerVisible(false); }
+                }}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                style={[s.addBtn, !customFamily.trim() && { opacity: 0.4 }]}
+                disabled={!customFamily.trim()}
+                onPress={() => {
+                  if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyPickerVisible(false); }
+                }}
+              >
+                <Text style={s.addBtnText}>Use</Text>
               </TouchableOpacity>
             </View>
             <ScrollView>

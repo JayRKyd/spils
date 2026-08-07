@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Modal, StyleSheet, Image,
@@ -14,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { stripMarkdown } from "@/lib/text";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,15 +68,22 @@ function temperatureColor(t: number): string {
   return "#E8503B";
 }
 const FRAGRANCE_FAMILIES = [
-  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Aquatic",
-  "Aromatic", "Aromatic Fougère", "Chypre", "Citrus", "Citrus Woods",
-  "Floral", "Fresh", "Fougère", "Fruity", "Gourmand", "Green",
-  "Leather", "Mossy Woods", "Musky", "Oriental", "Oriental Floral",
-  "Oriental Woody", "Spicy", "Umami", "Woody", "Woody Aromatic",
-  "Woody Green", "Woody Spicy",
+  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Animalic",
+  "Aquatic", "Aromatic", "Aromatic Fougère", "Aromatic Green", "Balsamic",
+  "Boozy", "Camphorous", "Chypre", "Citrus", "Citrus Aromatic",
+  "Citrus Floral", "Citrus Gourmand", "Citrus Woody", "Dry Woods", "Earthy",
+  "Floral", "Floral Aldehydic", "Floral Aquatic", "Floral Fruity", "Floral Green",
+  "Floral Woody", "Fougère", "Fresh", "Fresh Spicy", "Fruity",
+  "Fruity Floral", "Gourmand", "Green", "Green Aromatic", "Honeyed",
+  "Incense", "Lactonic", "Leather", "Leather Floral", "Leather Woody",
+  "Marine", "Metallic", "Mineral", "Mossy Woods", "Musky",
+  "Musky Floral", "Ozonic", "Powdery", "Resinous", "Salty",
+  "Smoky", "Solar", "Spicy", "Tea", "Tobacco",
+  "Umami", "White Floral", "Woody", "Woody Aromatic", "Woody Floral",
+  "Woody Green", "Woody Musky", "Woody Spicy",
 ];
-const CATEGORY_OPTIONS = ["Designer", "Niche", "Luxury", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
-const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "EDC", "Cologne", "Oil"];
+const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass Market", "Private Collection", "Classic/Vintage", "Limited Edition", "Discontinued", "Other"];
+const CONCENTRATION_OPTIONS = ["Extrait", "Parfum", "EDP", "EDT", "Cologne", "Oil", "Other"];
 
 // ─── Edit Modal Styles (hoisted so TagInput + F can reference em) ────────────
 
@@ -327,6 +336,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
   const [aiActionLoading, setAiActionLoading] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<string | null>(null);
   const [pendingFamily, setPendingFamily] = useState("");
+  const [customFamily, setCustomFamily] = useState("");
   const [entryDate, setEntryDate] = useState("");
   const [notesTop, setNotesTop] = useState<string[]>([]);
   const [notesHeart, setNotesHeart] = useState<string[]>([]);
@@ -483,12 +493,12 @@ function EditModal({ visible, entry, onClose, onSaved }: {
           {/* Top nav */}
           <View style={em.topNav}>
             <SpilsLogo height={22} color="#edff8d" />
-            <TouchableOpacity style={em.profileBtn} onPress={onClose}>
-              <Text style={em.profileIcon}>👤</Text>
+            <TouchableOpacity style={[em.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={onClose}>
+              <ProfileIcon size={34} />
             </TouchableOpacity>
           </View>
 
-          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 200 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0}>
+          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
             {/* Back carrot + header */}
             <View style={em.titleRow}>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -568,7 +578,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
                 </TouchableOpacity>
                 {genderOpen && (
                   <View style={em.inlineList}>
-                    {["Female", "Male", "Unisex"].map((g) => (
+                    {["Male", "Female", "Unisex", "Genderless"].map((g) => (
                       <TouchableOpacity key={g} style={[em.inlineRow, gender === g && em.inlineRowActive]} onPress={() => { setGender(g); setGenderOpen(false); }}>
                         <Text style={[em.inlineRowText, gender === g && em.inlineRowTextActive]}>{g}</Text>
                         {gender === g ? <Text style={{ color: "#edff8d" }}>✓</Text> : null}
@@ -608,6 +618,25 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             </View>
             {familyOpen && (
               <View style={em.inlineList}>
+                {/* Custom profile input */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" }}>
+                  <TextInput
+                    style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: "#fff", fontSize: 13 }}
+                    placeholder="Type a custom profile…"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={customFamily}
+                    onChangeText={setCustomFamily}
+                    onSubmitEditing={() => { if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyOpen(false); } }}
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity
+                    style={[em.addBtn, { marginBottom: 0, paddingVertical: 8, paddingHorizontal: 14 }, !customFamily.trim() && { opacity: 0.4 }]}
+                    disabled={!customFamily.trim()}
+                    onPress={() => { if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyOpen(false); } }}
+                  >
+                    <Text style={em.addBtnText}>Use</Text>
+                  </TouchableOpacity>
+                </View>
                 {FRAGRANCE_FAMILIES.map((f) => (
                   <TouchableOpacity key={f} style={[em.inlineRow, pendingFamily === f && em.inlineRowActive]} onPress={() => { setPendingFamily(f); setFamilyOpen(false); }}>
                     <Text style={[em.inlineRowText, pendingFamily === f && em.inlineRowTextActive]}>{f}</Text>
@@ -692,11 +721,6 @@ function EditModal({ visible, entry, onClose, onSaved }: {
               <TextInput style={[em.boxInput, { minHeight: 120 }]} placeholder="Write your notes..." placeholderTextColor="rgba(255,255,255,0.3)" value={description} onChangeText={setDescription} multiline />
             </View>
 
-            {/* Public toggle */}
-            <TouchableOpacity style={em.publicRow} onPress={() => setIsPublic((v) => !v)}>
-              <Text style={em.publicLabel}>{isPublic ? "🌐 Public" : "🔒 Private"}</Text>
-              <Text style={em.publicSub}>Tap to toggle visibility</Text>
-            </TouchableOpacity>
 
             {/* Ask Scent Somm AI */}
             <View style={em.aiHeaderRow}>
@@ -709,15 +733,17 @@ function EditModal({ visible, entry, onClose, onSaved }: {
               </TouchableOpacity>
             ))}
             <TextInput style={em.aiAnswerBox} placeholder="(ANSWERS SHOW UP HERE)" placeholderTextColor="rgba(255,255,255,0.4)" value={aiResult ?? ""} editable={false} multiline />
+
+            {/* Cancel / Save — at the end of the form */}
+            <View style={em.bottomBar}>
+              <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
+                <Text style={em.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[em.savePill, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.savePillText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
           </KeyboardAwareScrollView>
-          <View style={em.bottomBar}>
-            <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
-              <Text style={em.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[em.savePill, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.savePillText}>Save</Text>}
-            </TouchableOpacity>
-          </View>
         </SafeAreaView>
       </LinearGradient>
     </Modal>
@@ -754,7 +780,9 @@ const ms = StyleSheet.create({
 export default function JournalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const [entry, setEntry] = useState<JournalEntry | null>(null);
+  const [inspAspect, setInspAspect] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [editVisible, setEditVisible] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
@@ -774,17 +802,22 @@ export default function JournalDetail() {
 
   useEffect(() => { fetchEntry(); }, [fetchEntry]);
 
+  // Size the inspiration panel to the photo's own aspect ratio so it fills uncropped
+  useEffect(() => {
+    if (entry?.inspiration_image_url) {
+      Image.getSize(entry.inspiration_image_url, (w, h) => { if (w > 0 && h > 0) setInspAspect(w / h); }, () => setInspAspect(null));
+    } else setInspAspect(null);
+  }, [entry?.inspiration_image_url]);
+
   const handleDelete = () => {
-    Alert.alert("Delete Entry", "Remove this journal entry? This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete", style: "destructive",
-        onPress: async () => {
-          await (supabase as any).from("journal_entries").delete().eq("id", id);
-          router.back();
-        },
+    setConfirm({
+      title: "Delete Entry",
+      message: "Remove this journal entry? This cannot be undone.",
+      onConfirm: async () => {
+        await (supabase as any).from("journal_entries").delete().eq("id", id);
+        router.back();
       },
-    ]);
+    });
   };
 
   const handleAddToCollection = async () => {
@@ -858,8 +891,8 @@ export default function JournalDetail() {
       {/* Top Nav */}
       <View style={d.topNav}>
         <SpilsLogo height={22} color="#edff8d" />
-        <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-          <Text style={d.profileIcon}>👤</Text>
+        <TouchableOpacity style={[d.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+          <ProfileIcon size={34} />
         </TouchableOpacity>
       </View>
 
@@ -948,7 +981,7 @@ export default function JournalDetail() {
 
         {/* Inspiration + Colors + Temperature */}
         <View style={d.inspRow}>
-          <View style={d.inspBox}>
+          <View style={[d.inspBox, inspAspect ? { aspectRatio: inspAspect } : null]}>
             {entry.inspiration_image_url
               ? <Image source={{ uri: entry.inspiration_image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
               : null}
@@ -1039,6 +1072,8 @@ export default function JournalDetail() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
     </Wrapper>
   );
 }
@@ -1092,9 +1127,9 @@ const d = StyleSheet.create({
   inspBox: { flex: 1.25, minHeight: 230, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
   inspLabel: { position: "absolute", top: 12, left: 12, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, zIndex: 2 },
   inspRight: { flex: 1, gap: 12 },
-  colorsBox: { marginBottom: 0, paddingHorizontal: 12 },
+  colorsBox: { flex: 1, marginBottom: 0, paddingHorizontal: 12 },
   tempBox: { marginBottom: 0 },
-  colorGrid: { flexDirection: "row", flexWrap: "wrap-reverse", gap: 12, justifyContent: "center", alignContent: "center", alignItems: "center", paddingTop: 6, paddingBottom: 24 },
+  colorGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap-reverse", gap: 12, justifyContent: "center", alignContent: "center", alignItems: "center", paddingVertical: 6, marginBottom: 10 },
   colorCircle: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
   tempCircleWrap: { alignItems: "center", justifyContent: "center", paddingTop: 4, paddingBottom: 18 },
 

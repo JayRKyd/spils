@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import GradientScreen from "@/components/GradientScreen";
 import { GlassRow } from "@/components/GlassCard";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 interface Listing {
   id: string;
@@ -23,6 +24,7 @@ const TYPE_BG: Record<string, { bg: string; border: string; text: string }> = {
 };
 
 export default function MyListings() {
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const { user } = useAuth();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,10 +40,11 @@ export default function MyListings() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const handleDelete = (id: string, title: string) => {
-    Alert.alert("Delete Listing", `Remove "${title}"?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await (supabase as any).from("marketplace_listings").delete().eq("id", id); fetch(); } },
-    ]);
+    setConfirm({
+      title: "Delete Listing",
+      message: `Remove "${title}"?`,
+      onConfirm: async () => { await (supabase as any).from("marketplace_listings").delete().eq("id", id); fetch(); },
+    });
   };
 
   return (
@@ -81,6 +84,7 @@ export default function MyListings() {
           }}
         />
       )}
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
     </GradientScreen>
   );
 }

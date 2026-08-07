@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Modal, StyleSheet, Image, Share, Linking,
   KeyboardAvoidingView, Platform, PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -12,6 +14,7 @@ import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,11 +75,27 @@ function perfNum(v?: string | null): string {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+const FRAGRANCE_FAMILIES = [
+  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Animalic",
+  "Aquatic", "Aromatic", "Aromatic Fougère", "Aromatic Green", "Balsamic",
+  "Boozy", "Camphorous", "Chypre", "Citrus", "Citrus Aromatic",
+  "Citrus Floral", "Citrus Gourmand", "Citrus Woody", "Dry Woods", "Earthy",
+  "Floral", "Floral Aldehydic", "Floral Aquatic", "Floral Fruity", "Floral Green",
+  "Floral Woody", "Fougère", "Fresh", "Fresh Spicy", "Fruity",
+  "Fruity Floral", "Gourmand", "Green", "Green Aromatic", "Honeyed",
+  "Incense", "Lactonic", "Leather", "Leather Floral", "Leather Woody",
+  "Marine", "Metallic", "Mineral", "Mossy Woods", "Musky",
+  "Musky Floral", "Ozonic", "Powdery", "Resinous", "Salty",
+  "Smoky", "Solar", "Spicy", "Tea", "Tobacco",
+  "Umami", "White Floral", "Woody", "Woody Aromatic", "Woody Floral",
+  "Woody Green", "Woody Musky", "Woody Spicy",
+];
+
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
-const GENDER_OPTIONS = ["Female", "Male", "Unisex"];
-const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
-const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "Cologne", "Oil"];
+const GENDER_OPTIONS = ["Male", "Female", "Unisex", "Genderless"];
+const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass Market", "Private Collection", "Classic/Vintage", "Limited Edition", "Discontinued", "Other"];
+const CONCENTRATION_OPTIONS = ["Extrait", "Parfum", "EDP", "EDT", "Cologne", "Oil", "Other"];
 const STATUS_OPTIONS = ["Favorite", "Wishlist", "Sell/Trade"];
 
 const TEAL: [string, string, string] = ["#008fc4", "#00AEEF", "#33c1f2"];
@@ -341,6 +360,9 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
   const [heartInput, setHeartInput] = useState("");
   const [baseInput, setBaseInput] = useState("");
   const [accordInput, setAccordInput] = useState("");
+  const [familyOpen, setFamilyOpen] = useState(false);
+  const [pendingFamily, setPendingFamily] = useState("");
+  const [customFamily, setCustomFamily] = useState("");
   const [saving, setSaving] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [inspirationImage, setInspirationImage] = useState<string | null>(null);
@@ -445,13 +467,12 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
         <SafeAreaView style={{ flex: 1 }}>
           <View style={em.topNav}>
             <SpilsLogo height={22} color="#edff8d" />
-            <TouchableOpacity style={em.profileBtn} onPress={onClose}>
-              <Text style={em.profileIcon}>👤</Text>
+            <TouchableOpacity style={[em.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={onClose}>
+              <ProfileIcon size={34} />
             </TouchableOpacity>
           </View>
 
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
             <View style={em.titleRow}>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={em.backCarrot}>‹</Text>
@@ -485,63 +506,129 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
               </View>
             </View>
 
+            {/* Category | Concentration */}
+            <View style={[em.row, { alignItems: "flex-start" }]}>
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity style={em.chooser} onPress={() => setCategoryOpen((v) => !v)}>
+                  <Text style={category ? em.chooserFilled : em.chooserEmpty}>{category || "Category"}</Text>
+                  <Text style={em.chevron}>▾</Text>
+                </TouchableOpacity>
+                {categoryOpen && (
+                  <View style={em.inlineList}>
+                    {CATEGORY_OPTIONS.map((o) => (
+                      <TouchableOpacity key={o} style={[em.inlineRow, category === o && em.inlineRowActive]} onPress={() => { setCategory(o); setCategoryOpen(false); }}>
+                        <Text style={[em.inlineRowText, category === o && em.inlineRowTextActive]}>{o}</Text>
+                        {category === o ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity style={em.chooser} onPress={() => setConcentrationOpen((v) => !v)}>
+                  <Text style={concentration ? em.chooserFilled : em.chooserEmpty}>{concentration || "Concentration"}</Text>
+                  <Text style={em.chevron}>▾</Text>
+                </TouchableOpacity>
+                {concentrationOpen && (
+                  <View style={em.inlineList}>
+                    {CONCENTRATION_OPTIONS.map((o) => (
+                      <TouchableOpacity key={o} style={[em.inlineRow, concentration === o && em.inlineRowActive]} onPress={() => { setConcentration(o); setConcentrationOpen(false); }}>
+                        <Text style={[em.inlineRowText, concentration === o && em.inlineRowTextActive]}>{o}</Text>
+                        {concentration === o ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Gender | Season icons */}
+            <View style={[em.row, { alignItems: "flex-start" }]}>
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity style={em.chooser} onPress={() => setGenderOpen((v) => !v)}>
+                  <Text style={gender ? em.chooserFilled : em.chooserEmpty}>{gender || "Gender"}</Text>
+                  <Text style={em.chevron}>▾</Text>
+                </TouchableOpacity>
+                {genderOpen && (
+                  <View style={em.inlineList}>
+                    {GENDER_OPTIONS.map((g) => (
+                      <TouchableOpacity key={g} style={[em.inlineRow, gender === g && em.inlineRowActive]} onPress={() => { setGender(g); setGenderOpen(false); }}>
+                        <Text style={[em.inlineRowText, gender === g && em.inlineRowTextActive]}>{g}</Text>
+                        {gender === g ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <View style={em.seasonIcons}>
+                {SEASONS.map((sn) => {
+                  const active = seasons.includes(sn);
+                  return (
+                    <TouchableOpacity key={sn} style={[em.seasonIcon, active && em.seasonIconActive]} onPress={() => toggleSeason(sn)}>
+                      <Text style={em.seasonIconText}>{SEASON_ICONS[sn]}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* Reminds me of */}
             <F placeholder="Reminds me of..." value={remindsMeOf} onChangeText={setRemindsMeOf} style={{ marginBottom: 10 }} />
 
-            <Text style={em.label}>Gender</Text>
-            <View style={em.chipRow}>
-              {GENDER_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[em.chip, gender === opt && em.chipActive]} onPress={() => setGender(gender === opt ? "" : opt)}>
-                  <Text style={[em.chipText, gender === opt && em.chipTextActive]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
+            {/* Olfactive Profile */}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity style={[em.chooser, { flex: 1 }]} onPress={() => setFamilyOpen((v) => !v)}>
+                <Text style={pendingFamily ? em.chooserFilled : em.chooserEmpty}>{pendingFamily || "OLFACTIVE PROFILE"}</Text>
+                <Text style={em.chevron}>▾</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[em.addBtn, (!pendingFamily || accords.includes(pendingFamily)) && { opacity: 0.4 }]}
+                onPress={() => { if (pendingFamily && !accords.includes(pendingFamily)) { setAccords((p) => [...p, pendingFamily]); setPendingFamily(""); setFamilyOpen(false); } }}
+                disabled={!pendingFamily || accords.includes(pendingFamily)}
+              >
+                <Text style={em.addBtnText}>Add</Text>
+              </TouchableOpacity>
             </View>
-
-            <Text style={em.label}>Season(s)</Text>
-            <View style={em.chipRow}>
-              {SEASONS.map((s) => (
-                <TouchableOpacity key={s} style={[em.chip, seasons.includes(s) && em.chipActive]} onPress={() => toggleSeason(s)}>
-                  <Text style={[em.chipText, seasons.includes(s) && em.chipTextActive]}>{SEASON_ICONS[s]} {s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={em.label}>Concentration</Text>
-            <TouchableOpacity style={em.chooser} onPress={() => setConcentrationOpen((v) => !v)}>
-              <Text style={concentration ? em.chooserFilled : em.chooserEmpty}>{concentration || "Select concentration"}</Text>
-              <Text style={em.chevron}>{concentrationOpen ? "▴" : "▾"}</Text>
-            </TouchableOpacity>
-            {concentrationOpen && (
+            {familyOpen && (
               <View style={em.inlineList}>
-                {CONCENTRATION_OPTIONS.map((opt) => (
-                  <TouchableOpacity key={opt} style={[em.inlineRow, concentration === opt && em.inlineRowActive]} onPress={() => { setConcentration(opt); setConcentrationOpen(false); }}>
-                    <Text style={[em.inlineRowText, concentration === opt && em.inlineRowTextActive]}>{opt}</Text>
-                    {concentration === opt ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
+                {/* Custom profile input */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" }}>
+                  <TextInput
+                    style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, color: "#fff", fontSize: 13 }}
+                    placeholder="Type a custom profile…"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={customFamily}
+                    onChangeText={setCustomFamily}
+                    onSubmitEditing={() => { if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyOpen(false); } }}
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity
+                    style={[em.addBtn, { marginBottom: 0, paddingVertical: 8, paddingHorizontal: 14 }, !customFamily.trim() && { opacity: 0.4 }]}
+                    disabled={!customFamily.trim()}
+                    onPress={() => { if (customFamily.trim()) { setPendingFamily(customFamily.trim()); setCustomFamily(""); setFamilyOpen(false); } }}
+                  >
+                    <Text style={em.addBtnText}>Use</Text>
+                  </TouchableOpacity>
+                </View>
+                {FRAGRANCE_FAMILIES.map((f) => (
+                  <TouchableOpacity key={f} style={[em.inlineRow, pendingFamily === f && em.inlineRowActive]} onPress={() => { setPendingFamily(f); setFamilyOpen(false); }}>
+                    <Text style={[em.inlineRowText, pendingFamily === f && em.inlineRowTextActive]}>{f}</Text>
+                    {pendingFamily === f ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {accords.length > 0 && (
+              <View style={em.tagRow}>
+                {accords.map((f, i) => (
+                  <TouchableOpacity key={i} style={em.tag} onPress={() => setAccords((p) => p.filter((_, j) => j !== i))}>
+                    <Text style={em.tagText}>{f} ×</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
 
-            <Text style={em.label}>Category</Text>
-            <TouchableOpacity style={em.chooser} onPress={() => setCategoryOpen((v) => !v)}>
-              <Text style={category ? em.chooserFilled : em.chooserEmpty}>{category || "Select category"}</Text>
-              <Text style={em.chevron}>{categoryOpen ? "▴" : "▾"}</Text>
-            </TouchableOpacity>
-            {categoryOpen && (
-              <View style={em.inlineList}>
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <TouchableOpacity key={opt} style={[em.inlineRow, category === opt && em.inlineRowActive]} onPress={() => { setCategory(opt); setCategoryOpen(false); }}>
-                    <Text style={[em.inlineRowText, category === opt && em.inlineRowTextActive]}>{opt}</Text>
-                    {category === opt ? <Text style={{ color: "#00AEEF" }}>✓</Text> : null}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <Text style={em.label}>Olfactive Profile</Text>
-            <TagInput tags={accords} inputVal={accordInput} placeholder="Add profile…" onChangeInput={setAccordInput} onAdd={(v) => setAccords((p) => [...p, v])} onRemove={(i) => setAccords((p) => p.filter((_, j) => j !== i))} />
-
-            <Text style={[em.label, { marginTop: 18 }]}>Pyramid</Text>
+            {/* Pyramid */}
             <NoteInput tags={notesTop} inputVal={topInput} placeholder="TOP NOTES" onChangeInput={setTopInput} onAdd={(v) => setNotesTop((p) => [...p, v])} onRemove={(i) => setNotesTop((p) => p.filter((_, j) => j !== i))} />
             <NoteInput tags={notesHeart} inputVal={heartInput} placeholder="MIDDLE NOTES" onChangeInput={setHeartInput} onAdd={(v) => setNotesHeart((p) => [...p, v])} onRemove={(i) => setNotesHeart((p) => p.filter((_, j) => j !== i))} />
             <NoteInput tags={notesBase} inputVal={baseInput} placeholder="BASE NOTES" onChangeInput={setBaseInput} onAdd={(v) => setNotesBase((p) => [...p, v])} onRemove={(i) => setNotesBase((p) => p.filter((_, j) => j !== i))} />
@@ -615,17 +702,16 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                 </TouchableOpacity>
               ))}
             </View>
-          </ScrollView>
-          </KeyboardAvoidingView>
-
-          <View style={em.bottomBar}>
-            <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
-              <Text style={em.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[em.savePill, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.savePillText}>Save</Text>}
-            </TouchableOpacity>
-          </View>
+            {/* Cancel / Save — at the end of the form */}
+            <View style={em.bottomBar}>
+              <TouchableOpacity style={em.cancelBtn} onPress={onClose}>
+                <Text style={em.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[em.savePill, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={em.savePillText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </KeyboardAwareScrollView>
         </SafeAreaView>
       </LinearGradient>
     </Modal>
@@ -658,6 +744,8 @@ const ms = StyleSheet.create({
 // ─── Detail Screen ────────────────────────────────────────────────────────────
 
 export default function CollectionDetail() {
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
+  const [inspAspect, setInspAspect] = useState<number | null>(null);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [perfume, setPerfume] = useState<Perfume | null>(null);
@@ -673,14 +761,19 @@ export default function CollectionDetail() {
 
   useEffect(() => { fetchPerfume(); }, [fetchPerfume]);
 
+  // Size the inspiration panel to the photo's own aspect ratio so it fills uncropped
+  useEffect(() => {
+    if (perfume?.inspiration_image_url) {
+      Image.getSize(perfume.inspiration_image_url, (w, h) => { if (w > 0 && h > 0) setInspAspect(w / h); }, () => setInspAspect(null));
+    } else setInspAspect(null);
+  }, [perfume?.inspiration_image_url]);
+
   const handleDelete = () => {
-    Alert.alert("Delete Perfume", `Remove "${perfume?.name}"? This cannot be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete", style: "destructive",
-        onPress: async () => { await supabase.from("perfumes").delete().eq("id", id); router.back(); },
-      },
-    ]);
+    setConfirm({
+      title: "Delete Perfume",
+      message: `Remove "${perfume?.name}"? This cannot be undone.`,
+      onConfirm: async () => { await supabase.from("perfumes").delete().eq("id", id); router.back(); },
+    });
   };
 
   const handleToggleFavorite = async () => {
@@ -722,8 +815,8 @@ export default function CollectionDetail() {
       {/* Top Nav */}
       <View style={d.topNav}>
         <SpilsLogo height={22} color="#edff8d" />
-        <TouchableOpacity style={d.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-          <Text style={d.profileIcon}>👤</Text>
+        <TouchableOpacity style={[d.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+          <ProfileIcon size={34} />
         </TouchableOpacity>
       </View>
 
@@ -797,7 +890,7 @@ export default function CollectionDetail() {
 
         {/* Inspiration + Colors + Temperature */}
         <View style={d.inspRow}>
-          <View style={d.inspBox}>
+          <View style={[d.inspBox, inspAspect ? { aspectRatio: inspAspect } : null]}>
             {perfume.inspiration_image_url ? <Image source={{ uri: perfume.inspiration_image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" /> : null}
             <Text style={d.inspLabel}>INSPIRATION</Text>
           </View>
@@ -877,6 +970,8 @@ export default function CollectionDetail() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
     </Wrapper>
   );
 }
@@ -923,9 +1018,9 @@ const d = StyleSheet.create({
   inspBox: { flex: 1.25, minHeight: 230, borderRadius: 16, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", backgroundColor: "rgba(255,255,255,0.04)" },
   inspLabel: { position: "absolute", top: 12, left: 12, color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4, zIndex: 2 },
   inspRight: { flex: 1, gap: 12 },
-  colorsBox: { marginBottom: 0, paddingHorizontal: 12 },
+  colorsBox: { flex: 1, marginBottom: 0, paddingHorizontal: 12 },
   tempBox: { marginBottom: 0 },
-  colorGrid: { flexDirection: "row", flexWrap: "wrap-reverse", gap: 12, justifyContent: "center", alignContent: "center", alignItems: "center", paddingTop: 6, paddingBottom: 24 },
+  colorGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap-reverse", gap: 12, justifyContent: "center", alignContent: "center", alignItems: "center", paddingVertical: 6, marginBottom: 10 },
   colorCircle: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
   tempCircleWrap: { alignItems: "center", justifyContent: "center", paddingTop: 4, paddingBottom: 18 },
 

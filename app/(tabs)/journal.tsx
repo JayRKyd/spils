@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import { useFocusEffect } from "@react-navigation/native";
 import { SpilsLogo } from "../../components/SpilsLogo";
 import {
@@ -172,7 +173,15 @@ function FilterModal({
 
 const fm = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: "flex-end" },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, overflow: "hidden" },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.9)", borderBottomWidth: 0 },
+  confirmBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 36 },
+  confirmCard: { backgroundColor: "#141414", borderRadius: 20, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.9)", padding: 24 },
+  confirmTitle: { color: "#fff", fontSize: 17, fontWeight: "700", marginBottom: 8 },
+  confirmMsg: { color: "rgba(255,255,255,0.7)", fontSize: 14, lineHeight: 20, marginBottom: 20 },
+  confirmRow: { flexDirection: "row", gap: 12 },
+  confirmBtn: { flex: 1, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 100, paddingVertical: 13, alignItems: "center" },
+  confirmBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  confirmDeleteText: { color: "#ff5252", fontSize: 15, fontWeight: "600" },
   handle: { width: 40, height: 4, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, alignSelf: "center", marginBottom: 20 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   title: { color: "#fff", fontSize: 18, fontWeight: "700" },
@@ -433,6 +442,7 @@ export default function Journal() {
   const [sotdEditValue, setSotdEditValue] = useState("");
   const [sotdActionSaving, setSotdActionSaving] = useState(false);
   const [sotdEditGender, setSotdEditGender] = useState("");
+  const [sotdDeleteConfirm, setSotdDeleteConfirm] = useState(false);
 
   const handleSotdSave = async () => {
     if (!sotdInput.trim()) return;
@@ -468,22 +478,17 @@ export default function Journal() {
 
   const handleSotdDelete = () => {
     if (!sotdSelected) return;
-    Alert.alert(
-      "Delete Entry",
-      "Are you sure you want to delete this entry?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete", style: "destructive", onPress: async () => {
-            setSotdActionSaving(true);
-            await (supabase as any).from("scent_of_day").delete().eq("id", sotdSelected.id);
-            setSotdActionSaving(false);
-            setSotdSelected(null);
-            fetchSotdEntries();
-          },
-        },
-      ]
-    );
+    setSotdDeleteConfirm(true);
+  };
+
+  const confirmSotdDelete = async () => {
+    if (!sotdSelected) return;
+    setSotdDeleteConfirm(false);
+    setSotdActionSaving(true);
+    await (supabase as any).from("scent_of_day").delete().eq("id", sotdSelected.id);
+    setSotdActionSaving(false);
+    setSotdSelected(null);
+    fetchSotdEntries();
   };
 
   const fetchEntries = useCallback(async () => {
@@ -558,8 +563,8 @@ export default function Journal() {
         {/* Top nav */}
         <View style={s.topNav}>
           <SpilsLogo height={22} color="#edff8d" />
-          <TouchableOpacity onPress={() => router.push("/(tabs)/profile" as any)} style={s.profileBtn}>
-            <Text style={s.profileIcon}>👤</Text>
+          <TouchableOpacity onPress={() => router.push("/(tabs)/profile" as any)} style={[s.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]}>
+            <ProfileIcon size={34} />
           </TouchableOpacity>
         </View>
 
@@ -729,6 +734,25 @@ export default function Journal() {
             </BlurView>
           </View>
           </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Delete confirm — custom card w/ 0.5 white stroke */}
+        <Modal visible={sotdDeleteConfirm} transparent animationType="fade" onRequestClose={() => setSotdDeleteConfirm(false)}>
+          <View style={fm.confirmBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSotdDeleteConfirm(false)} />
+            <View style={fm.confirmCard}>
+              <Text style={fm.confirmTitle}>Delete Entry</Text>
+              <Text style={fm.confirmMsg}>Are you sure you want to delete this entry?</Text>
+              <View style={fm.confirmRow}>
+                <TouchableOpacity style={fm.confirmBtn} onPress={() => setSotdDeleteConfirm(false)}>
+                  <Text style={fm.confirmBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={fm.confirmBtn} onPress={confirmSotdDelete}>
+                  <Text style={fm.confirmDeleteText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </Modal>
       </SafeAreaView>
     </LinearGradient>

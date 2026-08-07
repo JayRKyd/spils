@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Share, Image, Linking,
@@ -16,6 +17,7 @@ import { decode } from "base64-arraybuffer";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 import { GlassRow } from "@/components/GlassCard";
 
 const ACCENT = "#EC008C";
@@ -294,6 +296,7 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
 
 export default function FormulaDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const formulaId = parseInt(id ?? "0");
   const { user } = useAuth();
 
@@ -461,10 +464,12 @@ export default function FormulaDetail() {
   };
 
   const handleDeleteLine = (lineId: number) => {
-    Alert.alert("Remove Material", "Remove this material from the formula?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: async () => { await supabase.from("formula_lines").delete().eq("id", lineId); fetchData(); } },
-    ]);
+    setConfirm({
+      title: "Remove Material",
+      message: "Remove this material from the formula?",
+      confirmLabel: "Remove",
+      onConfirm: async () => { await supabase.from("formula_lines").delete().eq("id", lineId); fetchData(); },
+    });
   };
 
   const handleUpdateAmount = async (lineId: number, amount_g: number) => {
@@ -494,20 +499,20 @@ export default function FormulaDetail() {
   };
 
   const handleDeleteMoodItem = (itemId: string) => {
-    Alert.alert("Remove Item", "Remove this mood board item?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove", style: "destructive", onPress: async () => {
-          const item = moodItems.find((i) => i.id === itemId);
-          if (item && item.media_type !== "note") {
-            const path = extractStoragePath(item.file_url);
-            if (path) await supabase.storage.from(MOOD_BUCKET).remove([path]);
-          }
-          await supabase.from("formula_moodboard_assets").delete().eq("id", itemId);
-          setMoodItems((prev) => prev.filter((i) => i.id !== itemId));
-        },
+    setConfirm({
+      title: "Remove Image",
+      message: "Remove this mood board image?",
+      confirmLabel: "Remove",
+      onConfirm: async () => {
+        const item = moodItems.find((i) => i.id === itemId);
+        if (item && item.media_type !== "note") {
+          const path = extractStoragePath(item.file_url);
+          if (path) await supabase.storage.from(MOOD_BUCKET).remove([path]);
+        }
+        await supabase.from("formula_moodboard_assets").delete().eq("id", itemId);
+        setMoodItems((prev) => prev.filter((i) => i.id !== itemId));
       },
-    ]);
+    });
   };
 
   const normalizeToTarget = async () => {
@@ -626,8 +631,8 @@ export default function FormulaDetail() {
       {/* Nav */}
       <View style={s.topNav}>
         <SpilsLogo height={22} color="#edff8d" />
-        <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-          <Text style={s.profileIcon}>👤</Text>
+        <TouchableOpacity style={[s.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+          <ProfileIcon size={34} />
         </TouchableOpacity>
       </View>
 
@@ -639,7 +644,7 @@ export default function FormulaDetail() {
         <Text style={s.pageTitle}>Lab</Text>
       </View>
 
-      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={20}>
+      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
 
         {/* ── Main Notes card (auto-open) ── */}
         <View style={s.notesCard}>
@@ -1179,6 +1184,8 @@ export default function FormulaDetail() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
     </DarkScreen>
   );
 }

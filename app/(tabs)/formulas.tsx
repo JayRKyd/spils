@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
@@ -261,8 +262,8 @@ export default function Formulas() {
         {/* Top nav */}
         <View style={s.topNav}>
           <SpilsLogo height={22} color="#edff8d" />
-          <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
-            <Text style={s.profileIcon}>👤</Text>
+          <TouchableOpacity style={[s.profileCircle, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <ProfileIcon size={34} />
           </TouchableOpacity>
         </View>
 
@@ -428,8 +429,8 @@ const s = StyleSheet.create({
     marginBottom: 14,
   },
   pageTitle: {
-    fontSize: 23, fontWeight: "700", color: "#fff",
-    letterSpacing: -0.3,
+    fontSize: 23, fontWeight: "800", color: "#fff",
+    letterSpacing: -0.5,
   },
 
   searchRow: {

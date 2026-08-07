@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Modal, StyleSheet, Alert, Image,
@@ -341,8 +342,8 @@ export default function NewFormula() {
       {/* Nav */}
       <View style={s.topNav}>
         <SpilsLogo height={22} color="#edff8d" />
-        <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-          <Text style={s.profileIcon}>👤</Text>
+        <TouchableOpacity style={[s.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+          <ProfileIcon size={34} />
         </TouchableOpacity>
       </View>
 
@@ -354,7 +355,7 @@ export default function NewFormula() {
         <Text style={s.pageTitle}>Lab</Text>
       </View>
 
-      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={20}>
+      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
 
           {/* ── Main Notes card ── */}
           <View style={s.notesCard}>

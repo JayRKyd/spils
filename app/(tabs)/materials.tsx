@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import { SpilsLogo } from "../../components/SpilsLogo";
 import { useLocalSearchParams, router } from "expo-router";
 import {
@@ -177,8 +178,8 @@ function MaterialModal({
           {/* Top nav */}
           <View style={mo.topNav}>
             <SpilsLogo height={22} color="#edff8d" />
-            <TouchableOpacity style={mo.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
-              <Text style={mo.profileIcon}>👤</Text>
+            <TouchableOpacity style={[mo.profileCircle, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+              <ProfileIcon size={34} />
             </TouchableOpacity>
           </View>
 
@@ -483,19 +484,6 @@ export default function Materials() {
     ? [...filtered].sort((a, b) => b.id - a.id).slice(0, 30)
     : filtered;
 
-  const handleDelete = (id: number, name: string) => {
-    Alert.alert("Delete Material", `Remove "${name}"?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete", style: "destructive",
-        onPress: async () => {
-          await supabase.from("materials").delete().eq("id", id);
-          fetchMaterials();
-        },
-      },
-    ]);
-  };
-
   const handleToggleFavorite = async (item: Material) => {
     const newVal = !item.is_favorite;
     setMaterials((prev) =>
@@ -581,8 +569,8 @@ export default function Materials() {
         {/* Top nav */}
         <View style={s.topNav}>
           <SpilsLogo height={22} color="#edff8d" />
-          <TouchableOpacity style={s.profileCircle} onPress={() => router.push("/(tabs)/profile" as any)}>
-            <Text style={s.profileIcon}>👤</Text>
+          <TouchableOpacity style={[s.profileCircle, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <ProfileIcon size={34} />
           </TouchableOpacity>
         </View>
 
@@ -657,7 +645,7 @@ export default function Materials() {
           <FlatList
             data={displayed}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100 }}
+            contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 8, paddingBottom: 100 }}
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             ListEmptyComponent={
               <Text style={s.empty}>
@@ -787,7 +775,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
     paddingTop: 6,
     paddingBottom: 2,
   },
@@ -805,11 +793,11 @@ const s = StyleSheet.create({
   profileIcon: { fontSize: 16 },
 
   pageTitle: {
-    fontSize: 30,
-    fontWeight: "700",
+    fontSize: 23,
+    fontWeight: "800",
     color: "#fff",
     letterSpacing: -0.5,
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
     marginTop: 73,
     marginBottom: 16,
   },
@@ -817,7 +805,7 @@ const s = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
     marginBottom: 14,
   },
   searchWrap: {
@@ -841,7 +829,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 30,
     marginBottom: 16,
   },
   filterChip: {
@@ -873,7 +861,7 @@ const s = StyleSheet.create({
   },
   importBtnText: { fontSize: 13, fontWeight: "600", color: "#fff" },
 
-  lowStockBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 20, marginBottom: 10, backgroundColor: "rgba(229,53,53,0.12)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(229,53,53,0.4)", paddingHorizontal: 14, paddingVertical: 10 },
+  lowStockBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 30, marginBottom: 10, backgroundColor: "rgba(229,53,53,0.12)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(229,53,53,0.4)", paddingHorizontal: 14, paddingVertical: 10 },
   lowStockIcon: { fontSize: 18, color: "#ff6b6b" },
   lowStockTitle: { fontSize: 13, fontWeight: "700", color: "#ff8f8f" },
   lowStockNames: { fontSize: 11, color: "rgba(255,143,143,0.85)", marginTop: 2 },

@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import GradientScreen from "@/components/GradientScreen";
 import { GlassRow } from "@/components/GlassCard";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 interface ProfileData {
   username: string | null;
@@ -129,6 +130,7 @@ function EditProfileModal({ visible, profile, onClose, onSaved }: {
 }
 
 export default function ProfileScreen() {
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [stats, setStats] = useState<Stats>({ listings: 0, messages: 0, watchlist: 0, perfumes: 0, formulas: 0, journal: 0, materials: 0 });
@@ -169,15 +171,15 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out", style: "destructive", onPress: async () => {
-          await signOut();
-          router.replace("/(auth)/login" as any);
-        },
+    setConfirm({
+      title: "Sign Out",
+      message: "Are you sure?",
+      confirmLabel: "Sign Out",
+      onConfirm: async () => {
+        await signOut();
+        router.replace("/(auth)/login" as any);
       },
-    ]);
+    });
   };
 
   if (loading) return (
@@ -263,6 +265,7 @@ export default function ProfileScreen() {
       {profile && (
         <EditProfileModal visible={editVisible} profile={profile} onClose={() => setEditVisible(false)} onSaved={() => { setEditVisible(false); fetchProfile(); }} />
       )}
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
     </GradientScreen>
   );
 }

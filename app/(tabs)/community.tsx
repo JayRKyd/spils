@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
@@ -12,6 +13,7 @@ import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { GlassRow } from "@/components/GlassCard";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -269,6 +271,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
   const [newDesc, setNewDesc] = useState("");
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
 
   // Inline expand state
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -376,13 +379,14 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
+    setConfirm({
+      title: "Delete Post",
+      message: "Are you sure you want to delete this post?",
+      onConfirm: async () => {
         await (supabase as any).from("forum_threads").delete().eq("id", id);
         fetchThreads();
-      }},
-    ]);
+      },
+    });
   };
 
   const closeModal = () => {
@@ -578,8 +582,8 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
             {/* Top nav */}
             <View style={ls.topNav}>
               <SpilsLogo height={22} color="#edff8d" />
-              <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-                <Text style={ls.iconBtnText}>👤</Text>
+              <TouchableOpacity style={[ls.iconBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+                <ProfileIcon size={34} />
               </TouchableOpacity>
             </View>
             {/* Back carrot */}
@@ -634,6 +638,8 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
           </SafeAreaView>
         </LinearGradient>
       </Modal>
+
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
     </View>
   );
 }
@@ -1188,8 +1194,8 @@ function CommunityWrapper({ children, onBack, showSub }: { children: React.React
         {/* Top nav — SP/LS. + profile */}
         <View style={ls.topNav}>
           <SpilsLogo height={22} color="#edff8d" />
-          <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-            <Text style={ls.iconBtnText}>👤</Text>
+          <TouchableOpacity style={[ls.iconBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <ProfileIcon size={34} />
           </TouchableOpacity>
         </View>
 
@@ -1238,6 +1244,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
   const [comments, setComments] = useState<MyComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewThread, setViewThread] = useState<ForumThread | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
 
   // Post edit
   const [editPost, setEditPost] = useState<ForumThread | null>(null);
@@ -1282,20 +1289,22 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
     }).eq("id", editPost.id);
     setSaving(false); setEditPost(null); fetchAll();
   };
-  const deletePost = (t: ForumThread) => Alert.alert("Delete Post", "Delete this post permanently?", [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: async () => { await (supabase as any).from("forum_threads").delete().eq("id", t.id); fetchAll(); } },
-  ]);
+  const deletePost = (t: ForumThread) => setConfirm({
+    title: "Delete Post",
+    message: "Delete this post permanently?",
+    onConfirm: async () => { await (supabase as any).from("forum_threads").delete().eq("id", t.id); fetchAll(); },
+  });
 
   const saveEditComment = async () => {
     if (!editComment) return;
     await (supabase as any).from("forum_comments").update({ content: ecText.trim() }).eq("id", editComment.id);
     setEditComment(null); fetchAll();
   };
-  const deleteComment = (c: MyComment) => Alert.alert("Delete Comment", "Delete this comment?", [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: async () => { await (supabase as any).from("forum_comments").delete().eq("id", c.id); fetchAll(); } },
-  ]);
+  const deleteComment = (c: MyComment) => setConfirm({
+    title: "Delete Comment",
+    message: "Delete this comment?",
+    onConfirm: async () => { await (supabase as any).from("forum_comments").delete().eq("id", c.id); fetchAll(); },
+  });
 
   const Row = ({ title, onOpen, onEdit, onDelete }: { title: string; onOpen: () => void; onEdit: () => void; onDelete: () => void }) => (
     <TouchableOpacity style={mp.row} activeOpacity={0.8} onPress={onOpen}>
@@ -1313,8 +1322,8 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
       <SafeAreaView style={{ flex: 1 }}>
         <View style={ls.topNav}>
           <SpilsLogo height={22} color="#edff8d" />
-          <TouchableOpacity style={ls.iconBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-            <Text style={ls.iconBtnText}>👤</Text>
+          <TouchableOpacity style={[ls.iconBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+            <ProfileIcon size={34} />
           </TouchableOpacity>
         </View>
         <View style={ls.backRow}>
@@ -1387,6 +1396,8 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
             </View>
           </View>
         </Modal>
+
+        <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
       </SafeAreaView>
     </LinearGradient>
   );

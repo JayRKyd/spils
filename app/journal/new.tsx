@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, StyleSheet, Alert, Image,
@@ -19,16 +20,23 @@ import ColorPicker from "react-native-wheel-color-picker";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FRAGRANCE_FAMILIES = [
-  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Aquatic",
-  "Aromatic", "Aromatic Fougère", "Chypre", "Citrus", "Citrus Woods",
-  "Floral", "Fresh", "Fougère", "Fruity", "Gourmand", "Green",
-  "Leather", "Mossy Woods", "Musky", "Oriental", "Oriental Floral",
-  "Oriental Woody", "Spicy", "Umami", "Woody", "Woody Aromatic",
-  "Woody Green", "Woody Spicy",
+  "Aldehydic", "Amber", "Amber Floral", "Amber Woody", "Animalic",
+  "Aquatic", "Aromatic", "Aromatic Fougère", "Aromatic Green", "Balsamic",
+  "Boozy", "Camphorous", "Chypre", "Citrus", "Citrus Aromatic",
+  "Citrus Floral", "Citrus Gourmand", "Citrus Woody", "Dry Woods", "Earthy",
+  "Floral", "Floral Aldehydic", "Floral Aquatic", "Floral Fruity", "Floral Green",
+  "Floral Woody", "Fougère", "Fresh", "Fresh Spicy", "Fruity",
+  "Fruity Floral", "Gourmand", "Green", "Green Aromatic", "Honeyed",
+  "Incense", "Lactonic", "Leather", "Leather Floral", "Leather Woody",
+  "Marine", "Metallic", "Mineral", "Mossy Woods", "Musky",
+  "Musky Floral", "Ozonic", "Powdery", "Resinous", "Salty",
+  "Smoky", "Solar", "Spicy", "Tea", "Tobacco",
+  "Umami", "White Floral", "Woody", "Woody Aromatic", "Woody Floral",
+  "Woody Green", "Woody Musky", "Woody Spicy",
 ];
 
-const CATEGORY_OPTIONS = ["Designer", "Niche", "Luxury", "Artisan/Indie", "Celebrity", "Mass/Drugstore", "Vintage", "Custom/Bespoke"];
-const CONCENTRATION_OPTIONS = ["Parfum", "Extrait", "EDP", "EDT", "EDC", "Cologne", "Oil"];
+const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass Market", "Private Collection", "Classic/Vintage", "Limited Edition", "Discontinued", "Other"];
+const CONCENTRATION_OPTIONS = ["Extrait", "Parfum", "EDP", "EDT", "Cologne", "Oil", "Other"];
 const SEASON_LIST = ["Spring", "Summer", "Fall", "Winter"];
 const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 
@@ -489,13 +497,13 @@ export default function JournalNew() {
     <LinearGradient colors={["#000000", "#000000", "#C9F24D"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <>
-          <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
+          <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
 
             {/* Top nav */}
             <View style={s.topNav}>
               <SpilsLogo height={22} color="#edff8d" />
-              <TouchableOpacity style={s.profileBtn} onPress={() => router.push("/(tabs)/profile" as any)}>
-                <Text style={s.profileIcon}>👤</Text>
+              <TouchableOpacity style={[s.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={() => router.push("/(tabs)/profile" as any)}>
+                <ProfileIcon size={34} />
               </TouchableOpacity>
             </View>
 
@@ -711,10 +719,8 @@ export default function JournalNew() {
                 multiline
               />
             </View>
-          </KeyboardAwareScrollView>
 
-          {/* Bottom action bar — lifted above keyboard */}
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+            {/* Cancel / Save — at the end of the form */}
             <View style={s.bottomBar}>
               <TouchableOpacity style={s.moreBtn} onPress={() => router.back()}>
                 <Text style={s.moreBtnText}>Cancel</Text>
@@ -723,7 +729,7 @@ export default function JournalNew() {
                 {saving ? <ActivityIndicator color="#13131a" size="small" /> : <Text style={s.saveBtnText}>Save</Text>}
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScrollView>
         </>
 
         {/* More Bottom Sheet */}
@@ -736,7 +742,7 @@ export default function JournalNew() {
               {moreView === "main" && (
                 <>
                   <TouchableOpacity style={ms.btn} onPress={handleAddToCollection}>
-                    <Text style={ms.btnText}>Add to Collection</Text>
+                    <Text style={ms.btnText}>+ Collection</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity style={[ms.btn, isWishlisted && ms.btnWishlisted]} onPress={handleAddToWishlist}>
@@ -755,8 +761,8 @@ export default function JournalNew() {
                     <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
-                    <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
+                  <TouchableOpacity style={[ms.btn, ms.btnBeige]} onPress={() => { closeMore(); Alert.alert("Print", "Print coming soon."); }}>
+                    <Text style={[ms.btnText, { color: "rgba(19,19,26,0.55)" }]}>Print</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -785,7 +791,7 @@ export default function JournalNew() {
                   </View>
 
                   <TouchableOpacity style={ms.btn} onPress={handleOSShare}>
-                    <Text style={ms.btnText}>Share</Text>
+                    <Text style={ms.btnText}>OS Share</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity style={ms.btn} onPress={handleEmailShare}>
@@ -811,7 +817,7 @@ export default function JournalNew() {
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setGenderPickerVisible(false)} />
             <View style={ms.sheet}>
               <View style={ms.handle} />
-              {["Female", "Male", "Unisex"].map((g) => (
+              {["Male", "Female", "Unisex", "Genderless"].map((g) => (
                 <TouchableOpacity
                   key={g}
                   style={[ms.btn, gender === g && ms.btnDark]}
@@ -1002,7 +1008,7 @@ const ms = StyleSheet.create({
   btnBeige: { backgroundColor: "#EDE5D8", borderColor: "#EDE5D8" },
   btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
   btnWishlisted: { backgroundColor: "#E5F772", borderColor: "#E5F772" },
-  btnDelete: { backgroundColor: "#FF2D55", borderColor: "#FF2D55" },
+  btnDelete: { backgroundColor: "#EC008C", borderColor: "#EC008C" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" },
   btnTextLight: { color: "#fff" },
   confirmText: { color: "#13131a", fontSize: 17, fontWeight: "600", textAlign: "center", marginVertical: 16 },
