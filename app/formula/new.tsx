@@ -61,7 +61,7 @@ function symbolRank(type?: string | null) {
   return SYMBOL_ORDER[type] ?? 5;
 }
 
-type Material = { id: number; name: string; type: string | null; };
+type Material = { id: number; name: string; type: string | null; density_g_per_ml?: number | null; };
 type PendingLine = { tempId: string; material: Material | null; name: string; amount: string; };
 
 type PendingMoodItem =
@@ -142,21 +142,26 @@ function LocalAddMoodModal({ visible, onClose, onAdd }: {
   );
 }
 
-function PendingLineRow({ line, totalG, onDelete, onUpdateAmount }: {
+function PendingLineRow({ line, totalG, unit, onDelete, onUpdateAmount }: {
   line: PendingLine;
   totalG: number;
+  unit: "g" | "mL";
   onDelete: () => void;
   onUpdateAmount: (amount: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(line.amount);
   const amt = parseFloat(line.amount) || 0;
+  const density = line.material?.density_g_per_ml || 1;
+  const shown = unit === "g" ? amt : amt / density;
   const pct = totalG > 0 ? ((amt / totalG) * 100).toFixed(1) : "0.0";
   const symbol = line.material?.type ? (SYMBOL_ICONS[line.material.type] ?? "") : "";
 
   const commit = () => {
     const n = parseFloat(val);
-    const final = Number.isFinite(n) && n >= 0 ? n.toFixed(3) : line.amount;
+    // Input is in the displayed unit; store grams
+    const grams = Number.isFinite(n) && n >= 0 ? (unit === "g" ? n : n * density) : NaN;
+    const final = Number.isFinite(grams) ? grams.toFixed(3) : line.amount;
     setVal(final);
     onUpdateAmount(final);
     setEditing(false);
@@ -184,8 +189,8 @@ function PendingLineRow({ line, totalG, onDelete, onUpdateAmount }: {
             selectTextOnFocus
           />
         ) : (
-          <TouchableOpacity onPress={() => { setVal(line.amount); setEditing(true); }}>
-            <Text style={s.tableRowAmount}>{amt.toFixed(3)}g</Text>
+          <TouchableOpacity onPress={() => { setVal(shown.toFixed(3)); setEditing(true); }}>
+            <Text style={s.tableRowAmount}>{shown.toFixed(3)}{unit}</Text>
           </TouchableOpacity>
         )}
         <Text style={s.linePct}>{pct}%</Text>
@@ -207,6 +212,7 @@ export default function NewFormula() {
   const [diluent, setDiluent] = useState("Ethanol (EtOH)");
   const [diluentPickerVisible, setDiluentPickerVisible] = useState(false);
   const [concFocused, setConcFocused] = useState(false);
+  const [amountUnit, setAmountUnit] = useState<"g" | "mL">("g");
   const [moodOpen, setMoodOpen] = useState(false);
   const [paramsOpen, setParamsOpen] = useState(false);
   const [formulaOpen, setFormulaOpen] = useState(false);
@@ -235,7 +241,7 @@ export default function NewFormula() {
     const timer = setTimeout(async () => {
       const { data } = await supabase
         .from("materials")
-        .select("id,name,type")
+        .select("id,name,type,density_g_per_ml")
         .eq("user_id", user?.id)
         .ilike("name", `%${search}%`)
         .limit(10);
@@ -336,6 +342,22 @@ export default function NewFormula() {
   const catG = (t: string) => lines.filter((l) => l.material?.type === t).reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0);
   const topG = catG("Top"), midG = catG("Mid"), baseG = catG("Base");
   const pctOf = (g: number) => (totalG > 0 ? Math.round((g / totalG) * 100) : 0);
+  const overTarget = totalG > targetConcentrateG;
+  const targetDiffLabel = Math.abs(totalG - targetConcentrateG).toFixed(3);
+
+  const normalizeToTarget = () => {
+    if (!lines.length || totalG <= 0 || atTarget) return;
+    const scale = targetConcentrateG / totalG;
+    const normalized = lines.map((l) => ({ ...l, amount: (+((parseFloat(l.amount) || 0) * scale).toFixed(3)).toFixed(3) }));
+    // Per-line rounding can leave the sum a few mg off target — absorb the remainder into the largest line
+    const sum = normalized.reduce((acc, l) => acc + (parseFloat(l.amount) || 0), 0);
+    const remainder = +(targetConcentrateG - sum).toFixed(3);
+    if (remainder !== 0 && normalized.length) {
+      const biggest = normalized.reduce((a, b) => ((parseFloat(b.amount) || 0) > (parseFloat(a.amount) || 0) ? b : a));
+      biggest.amount = ((parseFloat(biggest.amount) || 0) + remainder).toFixed(3);
+    }
+    setLines(normalized);
+  };
 
   return (
     <DarkScreen>
@@ -550,18 +572,15 @@ export default function NewFormula() {
                     </TouchableOpacity>
                   </View>
                 )}
-                {!selected && search.trim() && !showDropdown && (
-                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
-                    <Text style={{ color: ACCENT, fontSize: 13 }}>★ "{search}" will be added to your Organ</Text>
-                  </View>
-                )}
               </View>
 
               {/* Materials Table */}
               <View style={s.tableHeader}>
                 <Text style={[s.tableHeaderText, { width: 56 }]}>Symbol</Text>
                 <Text style={[s.tableHeaderText, { flex: 1 }]}>Material</Text>
-                <Text style={[s.tableHeaderText, { textAlign: "right" }]}>Amount (g)</Text>
+                <TouchableOpacity onPress={() => setAmountUnit((u) => (u === "g" ? "mL" : "g"))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[s.tableHeaderText, { textAlign: "right", textDecorationLine: "underline" }]}>Amount ({amountUnit})</Text>
+                </TouchableOpacity>
                 <View style={{ width: 26 }} />
               </View>
               {lines.length === 0 ? (
@@ -574,6 +593,7 @@ export default function NewFormula() {
                     key={line.tempId}
                     line={line}
                     totalG={totalG}
+                    unit={amountUnit}
                     onDelete={() => setLines((p) => p.filter((l) => l.tempId !== line.tempId))}
                     onUpdateAmount={(amt) => setLines((p) => p.map((l) => l.tempId === line.tempId ? { ...l, amount: amt } : l))}
                   />
@@ -581,7 +601,7 @@ export default function NewFormula() {
               )}
               <View style={s.tableTotalRow}>
                 <Text style={[s.tableTotalLabel, { flex: 1 }]}>Total Materials Concentrate</Text>
-                <Text style={s.tableTotalVal}>{totalG.toFixed(2)}g</Text>
+                <Text style={s.tableTotalVal}>{amountUnit === "g" ? `${totalG.toFixed(3)}g` : `${lines.reduce((sum, l) => sum + (parseFloat(l.amount) || 0) / (l.material?.density_g_per_ml || 1), 0).toFixed(3)}mL`}</Text>
                 <Text style={s.tableTotalPct}>  |  {lines.length > 0 ? "100%" : "0%"}</Text>
               </View>
 
@@ -618,16 +638,36 @@ export default function NewFormula() {
               </View>
 
               {lines.length > 0 && (
-                <View style={s.breakdownRow}>
-                  {topG > 0 && <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>▲ {pctOf(topG)}%</Text></View>}
-                  {midG > 0 && <View style={[s.bdPill, { backgroundColor: "#F06CA6" }]}><Text style={s.bdPillDark}>● {pctOf(midG)}%</Text></View>}
-                  {baseG > 0 && <View style={[s.bdPill, { backgroundColor: "#4C7DF0" }]}><Text style={s.bdPillLight}>■ {pctOf(baseG)}%</Text></View>}
-                </View>
+                <>
+                  <View style={s.breakdownRow}>
+                    {topG > 0 && <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>▲ {pctOf(topG)}%</Text></View>}
+                    {midG > 0 && <View style={[s.bdPill, { backgroundColor: "#F06CA6" }]}><Text style={s.bdPillDark}>● {pctOf(midG)}%</Text></View>}
+                    {baseG > 0 && <View style={[s.bdPill, { backgroundColor: "#4C7DF0" }]}><Text style={s.bdPillLight}>■ {pctOf(baseG)}%</Text></View>}
+                  </View>
+                  <View style={[s.breakdownRow, { marginTop: 10 }]}>
+                    {atTarget ? (
+                      <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>On Target</Text></View>
+                    ) : (
+                      <View style={[s.bdPill, { backgroundColor: "#E53935" }]}>
+                        <Text style={s.bdPillLight}>⚠ {overTarget ? "↓" : "↑"} {targetDiffLabel}g {overTarget ? "Over Target" : "To Target"}</Text>
+                      </View>
+                    )}
+                  </View>
+                </>
               )}
 
-              <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 16 }} onPress={() => setSummaryOpen(false)}>
-                <Text style={s.sectionShow}>Hide</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                <TouchableOpacity
+                  style={[s.normalizeBtn, (atTarget || totalG === 0) && { opacity: 0.4 }]}
+                  onPress={normalizeToTarget}
+                  disabled={atTarget || totalG === 0}
+                >
+                  <Text style={s.normalizeBtnText}>Normalize to Target</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSummaryOpen(false)}>
+                  <Text style={s.sectionShow}>Hide</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             )}
           </View>
@@ -734,7 +774,7 @@ const s = StyleSheet.create({
   cardNotes: { fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 19 },
   cardBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
   cardBottomLeft: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
-  statusPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginRight: 10 },
+  statusPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3, marginRight: 10 },
   statusPillText: { fontSize: 9, color: "rgba(255,255,255,0.8)", fontWeight: "700", letterSpacing: 0.6 },
   cardMeta: { fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: "600", letterSpacing: 0.5 },
 
@@ -822,6 +862,8 @@ const s = StyleSheet.create({
   statLabel: { color: "rgba(255,255,255,0.45)", fontSize: 11, textAlign: "center" },
   statDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.15)", marginVertical: 4 },
 
+  normalizeBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 },
+  normalizeBtnText: { color: "rgba(255,255,255,0.75)", fontWeight: "600", fontSize: 12 },
   breakdownRow: { flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "center" },
   bdPill: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 6 },
   bdPillDark: { color: "#13131a", fontSize: 13, fontWeight: "700" },

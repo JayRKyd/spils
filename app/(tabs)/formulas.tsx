@@ -241,7 +241,9 @@ export default function Formulas() {
     if (!matchesSearch) return false;
     if (activeFilter === "All") return true;
     if (activeFilter === "Favorites") return !!f.is_favorite;
-    return getStatus(f) === activeFilter;
+    // Plural menu labels map to singular status values
+    const statusFilter = activeFilter === "Drafts" ? "Draft" : activeFilter === "Finals" ? "Final" : activeFilter;
+    return getStatus(f) === statusFilter;
   });
 
   const handleToggleFavorite = async (formula: Formula) => {
@@ -339,7 +341,7 @@ export default function Formulas() {
             <TouchableOpacity style={StyleSheet.absoluteFill as any} onPress={() => setSortOpen(false)} />
             <View style={s.pickerSheet}>
               <View style={s.pickerHandle} />
-              {["All", "Favorites", "Draft", "In Progress", "Final"].map((opt) => (
+              {["All", "Favorites", "Drafts", "In Progress", "Finals"].map((opt) => (
                 <TouchableOpacity
                   key={opt}
                   style={s.pickerBtn}
@@ -383,15 +385,15 @@ export default function Formulas() {
         {/* IFRA notice modal */}
         <Modal visible={ifraVisible} transparent animationType="fade" onRequestClose={() => setIfraVisible(false)}>
           <View style={s.bannerOverlay}>
-            <BlurView intensity={60} tint="light" style={s.bannerCard}>
+            <View style={s.bannerCard}>
               <TouchableOpacity style={s.bannerClose} onPress={() => setIfraVisible(false)}>
                 <Text style={s.bannerCloseText}>✕</Text>
               </TouchableOpacity>
               <Text style={s.bannerHeading}>IFRA Compliance Coming Soon:</Text>
               <Text style={s.bannerBody}>
-                Always double-check your formulas against IFRA guidelines.{"\n"}Our full IFRA assistant will arrive in future updates.
+                Always double-check your formulas{"\n"}against IFRA guidelines.{"\n"}Our full IFRA assistant will arrive in future updates.
               </Text>
-            </BlurView>
+            </View>
           </View>
         </Modal>
 
@@ -512,9 +514,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
   bannerCard: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
-    borderRadius: 18,
+    backgroundColor: "#141414",
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
     overflow: "hidden",
     paddingHorizontal: 24,
     paddingTop: 20,
@@ -545,8 +548,10 @@ const s = StyleSheet.create({
   },
 
   secureCard: {
-    backgroundColor: "#13131a",
-    borderRadius: 18,
+    backgroundColor: "#141414",
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 28,
@@ -618,7 +623,7 @@ const c = StyleSheet.create({
   statusPill: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.4)",
-    borderRadius: 6,
+    borderRadius: 100,
     paddingHorizontal: 8,
     paddingVertical: 3,
     marginRight: 10,

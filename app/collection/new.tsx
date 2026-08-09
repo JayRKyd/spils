@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { SeasonIcon } from "@/components/SeasonIcon";
 import ColorPicker from "react-native-wheel-color-picker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -38,7 +39,6 @@ const CONCENTRATION_OPTIONS = ["Extrait", "Parfum", "EDP", "EDT", "Cologne", "Oi
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass Market", "Private Collection", "Classic/Vintage", "Limited Edition", "Discontinued", "Other"];
 const STATUS_OPTIONS = ["Owned", "Wishlist", "Sample", "Archived"];
 const SEASON_LIST = ["Spring", "Summer", "Fall", "Winter"];
-const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 
 const ACCENT = "#00AEEF";
 
@@ -504,7 +504,7 @@ export default function CollectionNew() {
                     const active = seasons.includes(sn);
                     return (
                       <TouchableOpacity key={sn} style={[s.seasonIcon, active && s.seasonIconActive]} onPress={() => setSeasons((p) => active ? p.filter((x) => x !== sn) : [...p, sn])}>
-                        <Text style={s.seasonIconText}>{SEASON_ICONS[sn]}</Text>
+                        <SeasonIcon season={sn} size={26} color={active ? "#edff8d" : "#fff"} />
                       </TouchableOpacity>
                     );
                   })}
@@ -881,9 +881,8 @@ const s = StyleSheet.create({
   addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
 
   seasonIcons: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 10 },
-  seasonIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
-  seasonIconActive: { backgroundColor: "#00AEEF", borderColor: "#00AEEF" },
-  seasonIconText: { fontSize: 14 },
+  seasonIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  seasonIconActive: {},
 
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   tag: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },

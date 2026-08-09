@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { GlassRow } from "@/components/GlassCard";
+import { SeasonIcon as SeasonSvgIcon } from "@/components/SeasonIcon";
 
 interface JournalEntry {
   id: string;
@@ -56,9 +57,6 @@ interface ScentOfDayEntry {
 }
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
-const SEASON_ICONS: Record<string, string> = {
-  Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️",
-};
 
 // ─── Glass Panel ─────────────────────────────────────────────────────────────
 
@@ -125,7 +123,7 @@ function FilterModal({
                   onPress={() => toggleSeason(s)}
                   style={[fm.seasonChip, local.seasons.includes(s) && fm.seasonChipActive]}
                 >
-                  <Text style={fm.seasonIcon}>{SEASON_ICONS[s]}</Text>
+                  <SeasonSvgIcon season={s} size={15} color={local.seasons.includes(s) ? "#fff" : "rgba(255,255,255,0.65)"} />
                   <Text style={[fm.seasonText, local.seasons.includes(s) && { color: "#fff" }]}>{s}</Text>
                 </TouchableOpacity>
               ))}
@@ -248,7 +246,8 @@ function EntryCard({ entry, light }: { entry: JournalEntry; light?: boolean }) {
             )}
             {entry.seasons?.slice(0, 2).map((season) => (
               <View key={season} style={s.seasonPill}>
-                <Text style={s.seasonPillText}>{SEASON_ICONS[season]} {season}</Text>
+                <SeasonSvgIcon season={season} size={12} color="rgba(19,19,26,0.6)" />
+                <Text style={s.seasonPillText}>{season}</Text>
               </View>
             ))}
           </View>
@@ -796,7 +795,7 @@ const s = StyleSheet.create({
   cardMetaText: { color: "rgba(19,19,26,0.4)", fontSize: 12 },
   ratingPill: { backgroundColor: "rgba(19,19,26,0.08)", borderWidth: 1, borderColor: "rgba(19,19,26,0.2)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   ratingText: { color: "#13131a", fontSize: 11, fontWeight: "600" },
-  seasonPill: { backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  seasonPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   seasonPillText: { color: "rgba(19,19,26,0.6)", fontSize: 11 },
   sotdInputRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 50, paddingLeft: 18, paddingRight: 6, paddingVertical: 6, marginBottom: 16 },
   sotdInput: { flex: 1, color: "#fff", fontSize: 14, paddingVertical: 6 },

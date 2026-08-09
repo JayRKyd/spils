@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -260,12 +261,12 @@ function MaterialModal({
             {/* Symbol / composition selector */}
             <View style={mo.symbolRow}>
               {[{ v: "Top", l: "TOP" }, { v: "Mid", l: "MIDDLE" }, { v: "Base", l: "BASE" }, { v: "Diluent", l: "DILUENT" }].map(({ v, l }) => {
-                const active = types[0] === v;
+                const active = types.includes(v);
                 return (
                   <View key={v} style={mo.symbolCol}>
                     <TouchableOpacity
                       style={[mo.symbolBox, active && mo.symbolBoxActive]}
-                      onPress={() => setTypes(active ? [] : [v])}
+                      onPress={() => setTypes((prev) => active ? prev.filter((t) => t !== v) : [...prev, v])}
                     >
                       <Text style={[mo.symbolGlyph, active && mo.symbolGlyphActive]}>{SYMBOL_ICONS[v]}</Text>
                     </TouchableOpacity>
@@ -453,7 +454,23 @@ export default function Materials() {
     setLoading(false);
   }, [user?.id]);
 
-  useEffect(() => { fetchMaterials(); }, [fetchMaterials]);
+  const seedStarterMaterials = useCallback(async () => {
+    if (!user?.id) return;
+    const { data: prof } = await supabase.from("profiles").select("organ_starter_seeded").eq("id", user.id).single();
+    if (!prof || (prof as any).organ_starter_seeded) return;
+    const { data: starters } = await supabase.from("materials").select("*").eq("is_starter", true);
+    const { data: mine } = await supabase.from("materials").select("name").eq("user_id", user.id);
+    const myNames = new Set((mine ?? []).map((m: any) => (m.name ?? "").toLowerCase()));
+    const clones = (starters ?? [])
+      .filter((st: any) => !myNames.has((st.name ?? "").toLowerCase()))
+      .map(({ id: _id, ...rest }: any) => ({ ...rest, user_id: user.id, is_starter: false, is_favorite: false }));
+    if (clones.length) await supabase.from("materials").insert(clones);
+    await supabase.from("profiles").update({ organ_starter_seeded: true }).eq("id", user.id);
+  }, [user?.id]);
+
+  useEffect(() => {
+    (async () => { await seedStarterMaterials(); await fetchMaterials(); })();
+  }, [seedStarterMaterials, fetchMaterials]);
 
   const filtered = materials.filter((m) => {
     if (
@@ -492,16 +509,68 @@ export default function Materials() {
     await supabase.from("materials").update({ is_favorite: newVal }).eq("id", item.id);
   };
 
+  // Quote-aware CSV field splitter (handles commas inside "quoted" cells + escaped "")
+  const parseCSVLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false;
+        } else cur += ch;
+      } else if (ch === '"') inQuotes = true;
+      else if (ch === ",") { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map((v) => v.trim());
+  };
+
+  // Accept both the SPILS template headers and the legacy ones
+  const CSV_HEADER_ALIASES: Record<string, string> = {
+    symbols: "symbols", symbol: "symbols",
+    name: "name",
+    notes: "description", description: "description",
+    cas: "cas_number", "cas number": "cas_number", cas_number: "cas_number",
+    ifra: "ifra_limit", "ifra limit": "ifra_limit", ifra_limit: "ifra_limit",
+    "stock (g/ml)": "stock", stock: "stock", stock_g: "stock",
+    type: "type",
+  };
+
   const parseCSV = (text: string): Record<string, string>[] => {
-    const lines = text.trim().split(/\r?\n/);
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
-    return lines.slice(1).map((line) => {
-      const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+    const lines = text.replace(/^﻿/, "").trim().split(/\r?\n/).filter((l) => l.trim().length); // strips UTF-8 BOM first
+    // Skip any preamble rows (e.g. a title line) — the header is the first row containing "name"
+    const headerIdx = lines.findIndex((l) => parseCSVLine(l).some((c) => c.toLowerCase() === "name"));
+    if (headerIdx === -1 || headerIdx === lines.length - 1) return [];
+    const headers = parseCSVLine(lines[headerIdx]).map((h) => CSV_HEADER_ALIASES[h.toLowerCase()] ?? h.toLowerCase());
+    return lines.slice(headerIdx + 1).map((line) => {
+      const values = parseCSVLine(line);
       const obj: Record<string, string> = {};
       headers.forEach((h, i) => { obj[h] = values[i] ?? ""; });
       return obj;
     }).filter((row) => row.name?.trim());
+  };
+
+  // BOM prefix so Excel renders the ▲●■★ symbols correctly when the template is opened there
+  const CSV_TEMPLATE =
+    "﻿" +
+    "Symbols,Name,Notes,CAS,IFRA,Stock (g/ml)\n" +
+    '▲,Bergamot Oil,"Fresh, zesty, and slightly floral citrus aroma.",8007-75-8,,100\n' +
+    '●,Jasmine Absolute,"Rich, opulent floral with deep jasmine character.",8007-01-0,,50\n' +
+    '■,Sandalwood Oil,"Creamy, smooth, woody fragrance with depth.",8006-87-9,,25\n' +
+    '★,Ethanol 95%,Common solvent and carrier for perfume blends.,64-17-5,,500\n' +
+    '▲●,Hedione,"Soft, fresh jasmine-like aroma with airy clarity.",24851-98-7,,100\n';
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const path = `${FileSystem.cacheDirectory}SPILS_Organ_Template.csv`;
+      await FileSystem.writeAsStringAsync(path, CSV_TEMPLATE);
+      await Share.share({ url: path, title: "SPILS Organ CSV Template" });
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "Could not create template");
+    }
   };
 
   const handlePickCSV = async () => {
@@ -527,24 +596,46 @@ export default function Materials() {
     if (!csvPreview) return;
     setCsvImporting(true);
     const VALID_TYPES = ["Top", "Mid", "Base", "Solvent", "Other"];
+    const SYMBOL_TO_TYPE: Record<string, string> = { "▲": "Top", "●": "Mid", "■": "Base", "★": "Solvent" };
     try {
-      for (const row of csvPreview) {
-        const typeVal = VALID_TYPES.find((t) => t.toLowerCase() === (row.type ?? "").toLowerCase()) ?? null;
-        await supabase.from("materials").insert([{
+      const existing = new Set(materials.map((m) => m.name.trim().toLowerCase()));
+      const rows = csvPreview.filter((row) => !existing.has(row.name.trim().toLowerCase()));
+      const skipped = csvPreview.length - rows.length;
+      const payload = rows.map((row) => {
+        const types: string[] = [];
+        for (const ch of row.symbols ?? "") {
+          const t = SYMBOL_TO_TYPE[ch];
+          if (t && !types.includes(t)) types.push(t);
+        }
+        if (!types.length && row.type) {
+          const legacyRaw = row.type.trim().toLowerCase();
+          const legacy = legacyRaw === "diluent" ? "Solvent" : VALID_TYPES.find((t) => t.toLowerCase() === legacyRaw);
+          if (legacy) types.push(legacy);
+        }
+        const stockNum = parseFloat(row.stock ?? "");
+        return {
           name: row.name.trim(),
           description: row.description?.trim() || null,
-          type: typeVal,
-          types: typeVal ? [typeVal] : null,
+          type: types[0] ?? null,
+          types: types.length ? types : null,
           cas_number: row.cas_number?.trim() || null,
           ifra_limit: row.ifra_limit?.trim() || null,
-          stock_g: row.stock_g ? parseFloat(row.stock_g) : null,
+          stock_g: Number.isFinite(stockNum) ? stockNum : null,
           user_id: user?.id,
-        }]);
+        };
+      });
+      if (payload.length) {
+        const { error } = await supabase.from("materials").insert(payload);
+        if (error) throw error;
       }
       setCsvImportVisible(false);
       setCsvPreview(null);
       fetchMaterials();
-      Alert.alert("Imported!", `${csvPreview.length} material${csvPreview.length !== 1 ? "s" : ""} added to your Organ.`);
+      Alert.alert(
+        "Imported!",
+        `${payload.length} material${payload.length !== 1 ? "s" : ""} added to your Organ.` +
+          (skipped ? `\n${skipped} skipped (already in your Organ).` : "")
+      );
     } catch (e: any) {
       Alert.alert("Import failed", e.message ?? "Something went wrong");
     } finally {
@@ -690,17 +781,25 @@ export default function Materials() {
               {!csvPreview ? (
                 <>
                   <Text style={s.bannerBody}>
-                    Expected columns (first row = headers):{"\n\n"}
+                    Upload your CSV file to auto-populate your Organ.{"\n"}
+                    The first row must contain column headers:{"\n\n"}
                     <Text style={{ color: ACCENT, fontFamily: "monospace" }}>
-                      name, type, cas_number,{"\n"}ifra_limit, stock_g, description
+                      Symbols, Name, Notes, CAS,{"\n"}IFRA, Stock (g/ml)
                     </Text>
-                    {"\n\n"}Type must be: Top, Mid, Base, or Diluent.
+                    {"\n\n"}Symbols:{"\n"}
+                    ▲ Top{"   "}● Mid{"   "}■ Base{"   "}★ Diluent
                   </Text>
                   <TouchableOpacity
                     style={[mo.saveBtn, { alignSelf: "center", marginTop: 20 }]}
                     onPress={handlePickCSV}
                   >
                     <Text style={mo.saveBtnText}>Choose File</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[mo.moreBtn, { alignSelf: "center", marginTop: 12 }]}
+                    onPress={handleDownloadTemplate}
+                  >
+                    <Text style={mo.moreBtnText}>Download Template</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -711,7 +810,7 @@ export default function Materials() {
                   <ScrollView style={{ maxHeight: 180 }}>
                     {csvPreview.map((row, i) => (
                       <Text key={i} style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginBottom: 4 }}>
-                        • {row.name}{row.type ? ` (${row.type})` : ""}
+                        • {row.symbols ? `${row.symbols} ` : ""}{row.name}
                       </Text>
                     ))}
                   </ScrollView>

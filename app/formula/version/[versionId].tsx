@@ -49,6 +49,7 @@ interface SnapshotLine {
   amount_g: number;
   name: string | null;
   type?: string | null;
+  density_g_per_ml?: number | null;
 }
 
 interface Snapshot {
@@ -80,6 +81,7 @@ interface MaterialResult {
   id: number;
   name: string;
   type: string | null;
+  density_g_per_ml?: number | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -211,17 +213,20 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
 
 // ─── Editable Line Row ────────────────────────────────────────────────────────
 
-function EditableLine({ line, pct, onUpdate, onDelete }: {
-  line: SnapshotLine; pct: string;
+function EditableLine({ line, pct, unit, onUpdate, onDelete }: {
+  line: SnapshotLine; pct: string; unit: "g" | "mL";
   onUpdate: (g: number) => void;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const density = line.density_g_per_ml || 1;
+  const shown = unit === "g" ? line.amount_g : line.amount_g / density;
   const [val, setVal] = useState(line.amount_g.toFixed(3));
 
   const commit = () => {
     const n = parseFloat(val);
-    if (Number.isFinite(n) && n >= 0) onUpdate(n);
+    // Input is in the displayed unit; store grams
+    if (Number.isFinite(n) && n >= 0) onUpdate(unit === "g" ? n : n * density);
     else setVal(line.amount_g.toFixed(3));
     setEditing(false);
   };
@@ -247,8 +252,8 @@ function EditableLine({ line, pct, onUpdate, onDelete }: {
             selectTextOnFocus
           />
         ) : (
-          <TouchableOpacity onPress={() => { setVal(line.amount_g.toFixed(3)); setEditing(true); }}>
-            <Text style={s.lineAmt}>{line.amount_g.toFixed(3)}g</Text>
+          <TouchableOpacity onPress={() => { setVal(shown.toFixed(3)); setEditing(true); }}>
+            <Text style={s.lineAmt}>{shown.toFixed(3)}{unit}</Text>
           </TouchableOpacity>
         )}
         <Text style={s.linePct}>{pct}%</Text>
@@ -283,6 +288,7 @@ export default function FormulaVersionDetail() {
   const [paramsOpen, setParamsOpen] = useState(false);
   const [formulaOpen, setFormulaOpen] = useState(false);
   const [concFocused, setConcFocused] = useState(false);
+  const [amountUnit, setAmountUnit] = useState<"g" | "mL">("g");
 
   // Add ingredient inline
   const [matSearch, setMatSearch] = useState("");
@@ -311,13 +317,14 @@ export default function FormulaVersionDetail() {
           // Resolve missing names + note types for the symbol column
           const ids = [...new Set(parsed.lines.map((l) => l.material_id).filter(Boolean))];
           if (ids.length) {
-            const { data: mats } = await supabase.from("materials").select("id,name,type").in("id", ids);
-            const matMap: Record<number, { name: string; type: string | null }> = {};
-            (mats ?? []).forEach((m: any) => { matMap[m.id] = { name: m.name, type: m.type }; });
+            const { data: mats } = await supabase.from("materials").select("id,name,type,density_g_per_ml").in("id", ids);
+            const matMap: Record<number, { name: string; type: string | null; density_g_per_ml?: number | null }> = {};
+            (mats ?? []).forEach((m: any) => { matMap[m.id] = { name: m.name, type: m.type, density_g_per_ml: m.density_g_per_ml }; });
             parsed.lines = parsed.lines.map((l) => ({
               ...l,
               name: l.name ?? matMap[l.material_id]?.name ?? null,
               type: l.type ?? matMap[l.material_id]?.type ?? null,
+              density_g_per_ml: l.density_g_per_ml ?? matMap[l.material_id]?.density_g_per_ml ?? null,
             }));
           }
           setSnapshot(parsed);
@@ -335,7 +342,7 @@ export default function FormulaVersionDetail() {
     if (!matSearch.trim() || matSelected) { setMatResults([]); return; }
     const timer = setTimeout(async () => {
       const { data } = await supabase.from("materials")
-        .select("id,name,type").eq("user_id", user?.id).ilike("name", `%${matSearch}%`).limit(8);
+        .select("id,name,type,density_g_per_ml").eq("user_id", user?.id).ilike("name", `%${matSearch}%`).limit(8);
       setMatResults((data ?? []) as MaterialResult[]);
     }, 250);
     return () => clearTimeout(timer);
@@ -638,7 +645,9 @@ export default function FormulaVersionDetail() {
                     <View style={s.tableHeader}>
                       <Text style={[s.tableHeaderText, { width: 56 }]}>Symbol</Text>
                       <Text style={[s.tableHeaderText, { flex: 1 }]}>Material</Text>
-                      <Text style={[s.tableHeaderText, { textAlign: "right" }]}>Amount (g)</Text>
+                      <TouchableOpacity onPress={() => setAmountUnit((u) => (u === "g" ? "mL" : "g"))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={[s.tableHeaderText, { textAlign: "right", textDecorationLine: "underline" }]}>Amount ({amountUnit})</Text>
+                      </TouchableOpacity>
                       <View style={{ width: 26 }} />
                     </View>
                     {snapshot.lines.length === 0 ? (
@@ -653,6 +662,7 @@ export default function FormulaVersionDetail() {
                             key={idx}
                             line={line}
                             pct={pct}
+                            unit={amountUnit}
                             onUpdate={(g) => updateLineAmount(idx, g)}
                             onDelete={() => deleteLine(idx)}
                           />
@@ -662,7 +672,7 @@ export default function FormulaVersionDetail() {
                     {/* Total row */}
                     <View style={s.tableTotalRow}>
                       <Text style={[s.tableTotalLabel, { flex: 1 }]}>Total Materials Concentrate</Text>
-                      <Text style={s.tableTotalVal}>{totalG.toFixed(2)}g</Text>
+                      <Text style={s.tableTotalVal}>{amountUnit === "g" ? `${totalG.toFixed(3)}g` : `${(snapshot?.lines ?? []).reduce((sum, l) => sum + l.amount_g / (l.density_g_per_ml || 1), 0).toFixed(3)}mL`}</Text>
                       <Text style={s.tableTotalPct}>  |  {snapshot.lines.length > 0 ? "100%" : "0%"}</Text>
                     </View>
 

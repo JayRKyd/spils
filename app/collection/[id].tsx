@@ -14,6 +14,7 @@ import ColorPicker from "react-native-wheel-color-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { SeasonIcon } from "@/components/SeasonIcon";
 import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -92,7 +93,6 @@ const FRAGRANCE_FAMILIES = [
 ];
 
 const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
-const SEASON_ICONS: Record<string, string> = { Spring: "🌸", Summer: "☀️", Fall: "🍂", Winter: "❄️" };
 const GENDER_OPTIONS = ["Male", "Female", "Unisex", "Genderless"];
 const CATEGORY_OPTIONS = ["Designer", "Luxury", "Niche", "Artisan/Indie", "Celebrity", "Mass Market", "Private Collection", "Classic/Vintage", "Limited Edition", "Discontinued", "Other"];
 const CONCENTRATION_OPTIONS = ["Extrait", "Parfum", "EDP", "EDT", "Cologne", "Oil", "Other"];
@@ -133,9 +133,8 @@ const em = StyleSheet.create({
   chipTextActive: { color: "#13131a" },
 
   seasonIcons: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.5)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 10 },
-  seasonIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
-  seasonIconActive: { backgroundColor: "#00AEEF", borderColor: "#00AEEF" },
-  seasonIconText: { fontSize: 14 },
+  seasonIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  seasonIconActive: {},
 
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   tag: { backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
@@ -565,7 +564,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                   const active = seasons.includes(sn);
                   return (
                     <TouchableOpacity key={sn} style={[em.seasonIcon, active && em.seasonIconActive]} onPress={() => toggleSeason(sn)}>
-                      <Text style={em.seasonIconText}>{SEASON_ICONS[sn]}</Text>
+                      <SeasonIcon season={sn} size={26} color={active ? "#edff8d" : "#fff"} />
                     </TouchableOpacity>
                   );
                 })}
@@ -842,7 +841,7 @@ export default function CollectionDetail() {
             {perfume.brand ? <Text style={d.summaryBrand} numberOfLines={1}>{perfume.brand}</Text> : null}
             <View style={d.summaryMeta}>
               {perfume.rating != null && <View style={d.ratingPill}><Text style={d.ratingText}>★ {perfume.rating}</Text></View>}
-              {perfume.season?.slice(0, 3).map((sn) => <Text key={sn} style={d.summaryMetaIcon}>{SEASON_ICONS[sn]}</Text>)}
+              {perfume.season?.slice(0, 3).map((sn) => <SeasonIcon key={sn} season={sn} size={16} color="#fff" />)}
             </View>
           </View>
         </View>
@@ -858,7 +857,13 @@ export default function CollectionDetail() {
           <Row label="Gender" value={perfume.gender ?? "—"} />
           <View style={d.row}>
             <Text style={d.rowLabel}>Season(s)</Text>
-            <Text style={d.rowValueIcons}>{perfume.season?.length ? perfume.season.map((sn) => SEASON_ICONS[sn]).join("  ") : "—"}</Text>
+            {perfume.season?.length ? (
+              <View style={{ flex: 2, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+                {perfume.season.map((sn) => <SeasonIcon key={sn} season={sn} size={18} color="#fff" />)}
+              </View>
+            ) : (
+              <Text style={d.rowValueIcons}>—</Text>
+            )}
           </View>
           <Row label="Reminds me of..." value={perfume.reminds_me_of ?? "—"} />
         </View>

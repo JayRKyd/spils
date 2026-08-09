@@ -103,6 +103,7 @@ interface Material {
   name: string;
   type: string | null;
   cas_number: string | null;
+  density_g_per_ml?: number | null;
 }
 
 interface FormulaLine {
@@ -161,16 +162,19 @@ async function resolveSignedUrl(path: string): Promise<string | null> {
 
 // ─── Line Row ─────────────────────────────────────────────────────────────────
 
-function LineRow({ line, totalG, onDelete, onUpdateAmount }: {
-  line: FormulaLine; totalG: number; onDelete: () => void; onUpdateAmount: (g: number) => void;
+function LineRow({ line, totalG, unit, onDelete, onUpdateAmount }: {
+  line: FormulaLine; totalG: number; unit: "g" | "mL"; onDelete: () => void; onUpdateAmount: (g: number) => void;
 }) {
   const pct = totalG > 0 ? ((line.amount_g / totalG) * 100).toFixed(1) : "0.0";
+  const density = line.material?.density_g_per_ml || 1;
+  const shown = unit === "g" ? line.amount_g : line.amount_g / density;
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(line.amount_g.toString());
 
   const commit = () => {
     const n = parseFloat(val);
-    if (Number.isFinite(n) && n >= 0) onUpdateAmount(n);
+    // Input is in the displayed unit; store grams
+    if (Number.isFinite(n) && n >= 0) onUpdateAmount(unit === "g" ? n : n * density);
     setEditing(false);
   };
 
@@ -190,8 +194,8 @@ function LineRow({ line, totalG, onDelete, onUpdateAmount }: {
             onBlur={commit} onSubmitEditing={commit} autoFocus
           />
         ) : (
-          <TouchableOpacity onPress={() => { setVal(line.amount_g.toString()); setEditing(true); }}>
-            <Text style={s.lineAmount}>{line.amount_g.toFixed(3)}g</Text>
+          <TouchableOpacity onPress={() => { setVal(shown.toFixed(3)); setEditing(true); }}>
+            <Text style={s.lineAmount}>{shown.toFixed(3)}{unit}</Text>
           </TouchableOpacity>
         )}
         <Text style={s.linePct}>{pct}%</Text>
@@ -297,6 +301,7 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
 export default function FormulaDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
+  const [amountUnit, setAmountUnit] = useState<"g" | "mL">("g");
   const formulaId = parseInt(id ?? "0");
   const { user } = useAuth();
 
@@ -367,7 +372,7 @@ export default function FormulaDetail() {
   useEffect(() => {
     if (!inlineSearch.trim() || inlineSelected) { setInlineResults([]); return; }
     const timer = setTimeout(async () => {
-      const { data } = await supabase.from("materials").select("id,name,type,cas_number").eq("user_id", user?.id).ilike("name", `%${inlineSearch}%`).limit(15);
+      const { data } = await supabase.from("materials").select("id,name,type,cas_number,density_g_per_ml").eq("user_id", user?.id).ilike("name", `%${inlineSearch}%`).limit(15);
       setInlineResults((data as Material[]) ?? []);
     }, 250);
     return () => clearTimeout(timer);
@@ -404,7 +409,7 @@ export default function FormulaDetail() {
     const matIds = [...new Set(rawLines.map((l) => l.material_id))];
     let matMap: Record<number, Material> = {};
     if (matIds.length) {
-      const { data: mats } = await supabase.from("materials").select("id,name,type,cas_number").in("id", matIds);
+      const { data: mats } = await supabase.from("materials").select("id,name,type,cas_number,density_g_per_ml").in("id", matIds);
       (mats ?? []).forEach((m: any) => { matMap[m.id] = m; });
     }
     setLines(rawLines.map((l) => ({ ...l, material: matMap[l.material_id] })));
@@ -518,8 +523,17 @@ export default function FormulaDetail() {
   const normalizeToTarget = async () => {
     if (!lines.length || totalG <= 0 || Math.abs(totalG - targetConcentrateG) < 0.001) return;
     const scale = targetConcentrateG / totalG;
-    const normalized = lines.map((l) => ({ ...l, amount_g: +(l.amount_g * scale).toFixed(3) }));
-    await Promise.all(normalized.map((l) => supabase.from("formula_lines").update({ amount_g: l.amount_g }).eq("id", l.id)));
+    const normalized = lines.map((l) => ({ ...l, amount_g: +(safeNum(l.amount_g) * scale).toFixed(3) }));
+    // Per-line rounding can leave the sum a few mg off target — absorb the remainder into the largest line
+    const sum = normalized.reduce((acc, l) => acc + l.amount_g, 0);
+    const remainder = +(targetConcentrateG - sum).toFixed(3);
+    if (remainder !== 0 && normalized.length) {
+      const biggest = normalized.reduce((a, b) => (b.amount_g > a.amount_g ? b : a));
+      biggest.amount_g = +(biggest.amount_g + remainder).toFixed(3);
+    }
+    const results = await Promise.all(normalized.map((l) => supabase.from("formula_lines").update({ amount_g: l.amount_g }).eq("id", l.id)));
+    const failed = results.find((r) => r.error);
+    if (failed?.error) { Alert.alert("Normalize failed", failed.error.message); return; }
     setLines(normalized);
   };
 
@@ -625,6 +639,8 @@ export default function FormulaDetail() {
   const catG = (t: string) => lines.filter((l) => l.material?.type === t).reduce((sum, l) => sum + safeNum(l.amount_g), 0);
   const topG = catG("Top"), midG = catG("Mid"), baseG = catG("Base");
   const pctOf = (g: number) => (totalG > 0 ? Math.round((g / totalG) * 100) : 0);
+  const overTarget = totalG > targetConcentrateG;
+  const targetDiffLabel = Math.abs(totalG - targetConcentrateG).toFixed(3);
 
   return (
     <DarkScreen>
@@ -869,10 +885,6 @@ export default function FormulaDetail() {
                     <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Clear</Text>
                   </TouchableOpacity>
                 </View>
-              ) : !inlineSelected && inlineSearch.trim() && inlineResults.length === 0 ? (
-                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingHorizontal: 2 }}>
-                  <Text style={{ color: ACCENT, fontSize: 13 }}>★ "{inlineSearch}" will be added to your Organ</Text>
-                </View>
               ) : null}
             </View>
 
@@ -880,7 +892,9 @@ export default function FormulaDetail() {
             <View style={s.tableHeader}>
               <Text style={[s.tableHeaderText, { width: 56 }]}>Symbol</Text>
               <Text style={[s.tableHeaderText, { flex: 1 }]}>Material</Text>
-              <Text style={[s.tableHeaderText, { textAlign: "right" }]}>Amount (g)</Text>
+              <TouchableOpacity onPress={() => setAmountUnit((u) => (u === "g" ? "mL" : "g"))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={[s.tableHeaderText, { textAlign: "right", textDecorationLine: "underline" }]}>Amount ({amountUnit})</Text>
+              </TouchableOpacity>
               <View style={{ width: 26 }} />
             </View>
             {lines.length === 0 ? (
@@ -890,7 +904,7 @@ export default function FormulaDetail() {
             ) : (
               sortedLines.map((line) => (
                 <LineRow
-                  key={line.id} line={line} totalG={totalG}
+                  key={line.id} line={line} totalG={totalG} unit={amountUnit}
                   onDelete={() => handleDeleteLine(line.id)}
                   onUpdateAmount={(g) => handleUpdateAmount(line.id, g)}
                 />
@@ -899,7 +913,7 @@ export default function FormulaDetail() {
             {/* Total row */}
             <View style={s.tableTotalRow}>
               <Text style={[s.tableTotalLabel, { flex: 1 }]}>Total Materials Concentrate</Text>
-              <Text style={s.tableTotalVal}>{totalG.toFixed(2)}g</Text>
+              <Text style={s.tableTotalVal}>{amountUnit === "g" ? `${totalG.toFixed(3)}g` : `${lines.reduce((sum, l) => sum + l.amount_g / (l.material?.density_g_per_ml || 1), 0).toFixed(3)}mL`}</Text>
               <Text style={s.tableTotalPct}>  |  {lines.length > 0 ? "100%" : "0%"}</Text>
             </View>
 
@@ -935,13 +949,24 @@ export default function FormulaDetail() {
               </View>
             </View>
 
-            {/* Breakdown by symbol */}
+            {/* Breakdown by symbol + target warning */}
             {lines.length > 0 && (
-              <View style={s.breakdownRow}>
-                {topG > 0 && <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>▲ {pctOf(topG)}%</Text></View>}
-                {midG > 0 && <View style={[s.bdPill, { backgroundColor: "#F06CA6" }]}><Text style={s.bdPillDark}>● {pctOf(midG)}%</Text></View>}
-                {baseG > 0 && <View style={[s.bdPill, { backgroundColor: "#4C7DF0" }]}><Text style={s.bdPillLight}>■ {pctOf(baseG)}%</Text></View>}
-              </View>
+              <>
+                <View style={s.breakdownRow}>
+                  {topG > 0 && <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>▲ {pctOf(topG)}%</Text></View>}
+                  {midG > 0 && <View style={[s.bdPill, { backgroundColor: "#F06CA6" }]}><Text style={s.bdPillDark}>● {pctOf(midG)}%</Text></View>}
+                  {baseG > 0 && <View style={[s.bdPill, { backgroundColor: "#4C7DF0" }]}><Text style={s.bdPillLight}>■ {pctOf(baseG)}%</Text></View>}
+                </View>
+                <View style={[s.breakdownRow, { marginTop: 10 }]}>
+                  {atTarget ? (
+                    <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>On Target</Text></View>
+                  ) : (
+                    <View style={[s.bdPill, { backgroundColor: "#E53935" }]}>
+                      <Text style={s.bdPillLight}>⚠ {overTarget ? "↓" : "↑"} {targetDiffLabel}g {overTarget ? "Over Target" : "To Target"}</Text>
+                    </View>
+                  )}
+                </View>
+              </>
             )}
 
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
@@ -1246,7 +1271,7 @@ const s = StyleSheet.create({
   cardNotes: { fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 19 },
   cardBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
   cardBottomLeft: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
-  statusPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginRight: 10 },
+  statusPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3, marginRight: 10 },
   statusPillText: { fontSize: 9, color: "rgba(255,255,255,0.8)", fontWeight: "700", letterSpacing: 0.6 },
   cardMeta: { fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: "600", letterSpacing: 0.5 },
   cardSep: { fontSize: 11, color: "rgba(255,255,255,0.3)" },
