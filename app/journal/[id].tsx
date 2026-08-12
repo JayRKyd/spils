@@ -55,6 +55,7 @@ interface JournalEntry {
   music_source: string | null;
   music_title: string | null;
   inspiration_image_url: string | null;
+  ai_notes: string | null;
   perfumes?: { name: string } | null;
 }
 
@@ -95,7 +96,7 @@ const em = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 18 },
   pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
 
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingVertical: 16 },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
   cancelBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 15 },
   cancelBtnText: { color: "#fff", fontSize: 14 },
   savePill: { backgroundColor: "#edff8d", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
@@ -384,6 +385,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
     setSelectedColor("#a78bfa");
     setBottleImage(entry.image_url ?? null);
     setInspirationImage(entry.inspiration_image_url ?? null);
+    setAiResult(entry.ai_notes ?? null);
     setTopInput(""); setHeartInput(""); setBaseInput(""); setAccordInput("");
   }, [visible, entry]);
 
@@ -417,6 +419,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       temperature: temperature,
       image_url: bottleImage ?? null,
       inspiration_image_url: inspirationImage ?? null,
+      ai_notes: aiResult ?? null,
     }).eq("id", entry.id);
     setSaving(false);
     onSaved();
@@ -497,7 +500,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             </TouchableOpacity>
           </View>
 
-          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
+          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={140} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
             {/* Back carrot + header */}
             <View style={em.titleRow}>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -781,7 +784,6 @@ export default function JournalDetail() {
   const { user } = useAuth();
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const [entry, setEntry] = useState<JournalEntry | null>(null);
-  const [inspAspect, setInspAspect] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [editVisible, setEditVisible] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
@@ -800,13 +802,6 @@ export default function JournalDetail() {
   }, [id]);
 
   useEffect(() => { fetchEntry(); }, [fetchEntry]);
-
-  // Size the inspiration panel to the photo's own aspect ratio so it fills uncropped
-  useEffect(() => {
-    if (entry?.inspiration_image_url) {
-      Image.getSize(entry.inspiration_image_url, (w, h) => { if (w > 0 && h > 0) setInspAspect(w / h); }, () => setInspAspect(null));
-    } else setInspAspect(null);
-  }, [entry?.inspiration_image_url]);
 
   const handleDelete = () => {
     setConfirm({
@@ -986,7 +981,7 @@ export default function JournalDetail() {
 
         {/* Inspiration + Colors + Temperature */}
         <View style={d.inspRow}>
-          <View style={[d.inspBox, inspAspect ? { aspectRatio: inspAspect } : null]}>
+          <View style={d.inspBox}>
             {entry.inspiration_image_url
               ? <Image source={{ uri: entry.inspiration_image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
               : null}
@@ -1035,6 +1030,12 @@ export default function JournalDetail() {
         <View style={d.card}>
           <Text style={d.blockLabel}>NOTES</Text>
           <Text style={[d.blockText, !entry.description && d.blockTextEmpty]}>{entry.description || "—"}</Text>
+        </View>
+
+        {/* Scent Somm AI */}
+        <View style={d.card}>
+          <Text style={d.blockLabel}>SCENT SOMM AI</Text>
+          <Text style={[d.blockText, !entry.ai_notes && d.blockTextEmpty]}>{entry.ai_notes || "—"}</Text>
         </View>
       </ScrollView>
 

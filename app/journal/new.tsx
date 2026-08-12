@@ -484,6 +484,7 @@ export default function JournalNew() {
       music_source: musicUrl.trim() ? detectSource(musicUrl.trim()) : null,
       image_url: bottleBase64 ?? null,
       inspiration_image_url: inspirationImage ?? null,
+      ai_notes: aiResult ?? null,
       is_wishlisted: isWishlisted,
     }]);
     setSaving(false);
@@ -497,7 +498,7 @@ export default function JournalNew() {
     <LinearGradient colors={["#000000", "#000000", "#C9F24D"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <>
-          <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
+          <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={140} keyboardOpeningTime={0} enableResetScrollToCoords={false} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
 
             {/* Top nav */}
             <View style={s.topNav}>

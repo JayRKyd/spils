@@ -110,7 +110,7 @@ const em = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 18 },
   pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
 
-  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingVertical: 16 },
+  bottomBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 16 },
   cancelBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 100, paddingHorizontal: 32, paddingVertical: 15 },
   cancelBtnText: { color: "#fff", fontSize: 14 },
   savePill: { backgroundColor: "#00AEEF", borderRadius: 100, paddingHorizontal: 44, paddingVertical: 15 },
@@ -344,6 +344,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
   const [concentration, setConcentration] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
+  const [baseStatus, setBaseStatus] = useState<string | null>(null);
   const [genderOpen, setGenderOpen] = useState(false);
   const [notesTop, setNotesTop] = useState<string[]>([]);
   const [notesHeart, setNotesHeart] = useState<string[]>([]);
@@ -384,7 +385,16 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
     setSeasons(perfume.season ?? []);
     setConcentration(perfume.concentration ?? "");
     setCategory(perfume.category ?? "");
-    setStatus(perfume.status ?? "");
+    // Status chips drive the landing-page filters: Favorite → is_favorite, others → status.
+    // Statuses outside the chips (Owned/Sample/Archived) are preserved via baseStatus.
+    const rawStatus = perfume.status ?? "";
+    setStatus(
+      perfume.is_favorite ? "Favorite"
+        : rawStatus === "Wishlist" ? "Wishlist"
+        : rawStatus === "Sell-Trade" || rawStatus === "Sell/Trade" ? "Sell/Trade"
+        : ""
+    );
+    setBaseStatus(["Wishlist", "Sell-Trade", "Sell/Trade"].includes(rawStatus) ? null : (rawStatus || null));
     setNotesTop(perfume.top_notes ?? []);
     setNotesHeart(perfume.heart_notes ?? []);
     setNotesBase(perfume.base_notes ?? []);
@@ -440,7 +450,8 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       season: seasons.length ? seasons : null,
       concentration: concentration || null,
       category: category || null,
-      status: status || null,
+      status: status === "Wishlist" ? "Wishlist" : status === "Sell/Trade" ? "Sell-Trade" : baseStatus,
+      is_favorite: status === "Favorite",
       image_url: image ?? null,
       inspiration_image_url: inspirationImage ?? null,
       colors: colors.length ? colors : null,
@@ -471,7 +482,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             </TouchableOpacity>
           </View>
 
-          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
+          <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={140} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
             <View style={em.titleRow}>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={em.backCarrot}>‹</Text>
@@ -696,7 +707,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <Text style={em.label}>Status</Text>
             <View style={em.chipRow}>
               {STATUS_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[em.chip, status === opt && em.chipActive]} onPress={() => setStatus(opt)}>
+                <TouchableOpacity key={opt} style={[em.chip, status === opt && em.chipActive]} onPress={() => setStatus((prev) => prev === opt ? "" : opt)}>
                   <Text style={[em.chipText, status === opt && em.chipTextActive]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
@@ -744,7 +755,6 @@ const ms = StyleSheet.create({
 
 export default function CollectionDetail() {
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
-  const [inspAspect, setInspAspect] = useState<number | null>(null);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [perfume, setPerfume] = useState<Perfume | null>(null);
@@ -759,13 +769,6 @@ export default function CollectionDetail() {
   }, [id]);
 
   useEffect(() => { fetchPerfume(); }, [fetchPerfume]);
-
-  // Size the inspiration panel to the photo's own aspect ratio so it fills uncropped
-  useEffect(() => {
-    if (perfume?.inspiration_image_url) {
-      Image.getSize(perfume.inspiration_image_url, (w, h) => { if (w > 0 && h > 0) setInspAspect(w / h); }, () => setInspAspect(null));
-    } else setInspAspect(null);
-  }, [perfume?.inspiration_image_url]);
 
   const handleDelete = () => {
     setConfirm({
@@ -895,7 +898,7 @@ export default function CollectionDetail() {
 
         {/* Inspiration + Colors + Temperature */}
         <View style={d.inspRow}>
-          <View style={[d.inspBox, inspAspect ? { aspectRatio: inspAspect } : null]}>
+          <View style={d.inspBox}>
             {perfume.inspiration_image_url ? <Image source={{ uri: perfume.inspiration_image_url }} style={StyleSheet.absoluteFill as any} resizeMode="cover" /> : null}
             <Text style={d.inspLabel}>INSPIRATION</Text>
           </View>

@@ -432,7 +432,7 @@ export default function CollectionNew() {
   return (
     <LinearGradient colors={["#000000", "#000000", "#00AEEF"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
+        <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={140} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
 
             {/* Top nav */}
             <View style={s.topNav}>

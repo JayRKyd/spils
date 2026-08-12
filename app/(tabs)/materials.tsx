@@ -25,6 +25,7 @@ type Material = {
   types?: string[] | null;
   cas_number?: string | null;
   stock_g?: number | null;
+  stock_entered_unit?: string | null;
   ifra_limit?: string | null;
   density_g_per_ml?: number | null;
   is_favorite?: boolean;
@@ -251,7 +252,7 @@ function MaterialModal({
                 <TextInput
                   style={mo.threeInputText}
                   placeholder="IFRA %"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  placeholderTextColor="rgba(255,255,255,0.6)"
                   value={ifraLimit}
                   editable={false}
                 />
@@ -403,7 +404,7 @@ function MaterialCard({
         <View style={cd.metaLeft}>
           {item.stock_g != null ? (
             <View style={[cd.stockPill, isLowStock && cd.stockPillLow]}>
-              <Text style={[cd.stockText, isLowStock && cd.stockTextLow]}>{item.stock_g}g</Text>
+              <Text style={[cd.stockText, isLowStock && cd.stockTextLow]}>{item.stock_g}{item.stock_entered_unit === "ml" ? "mL" : "g"}</Text>
             </View>
           ) : null}
           {casIfra ? (
@@ -696,16 +697,18 @@ export default function Materials() {
             onPress={() => setCompDropVisible(true)}
           >
             <Text style={[s.filterChipText, compActive && s.filterChipTextActive]} numberOfLines={1}>
-              {compActive ? compFilter : "Composition"}  ⌄
+              {compActive ? compFilter : "Composition"}
             </Text>
+            <Text style={[s.filterChipChevron, compActive && s.filterChipTextActive]}>⌄</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.filterChip, indexActive && s.filterChipActive]}
             onPress={() => setIndexDropVisible(true)}
           >
             <Text style={[s.filterChipText, indexActive && s.filterChipTextActive]} numberOfLines={1}>
-              {indexActive ? indexFilter : "Index"}  ⌄
+              {indexActive ? indexFilter : "Index"}
             </Text>
+            <Text style={[s.filterChipChevron, indexActive && s.filterChipTextActive]}>⌄</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.importBtn} onPress={() => { setCsvPreview(null); setCsvImportVisible(true); }}>
             <Text style={s.importBtnText}>Import</Text>
@@ -722,7 +725,7 @@ export default function Materials() {
               <View style={{ flex: 1 }}>
                 <Text style={s.lowStockTitle}>{lowItems.length} material{lowItems.length > 1 ? "s" : ""} running low</Text>
                 <Text style={s.lowStockNames} numberOfLines={1}>
-                  {lowItems.map((m) => `${m.name} (${m.stock_g}g)`).join("  ·  ")}
+                  {lowItems.map((m) => `${m.name} (${m.stock_g}${m.stock_entered_unit === "ml" ? "mL" : "g"})`).join("  ·  ")}
                 </Text>
               </View>
             </View>
@@ -933,6 +936,9 @@ const s = StyleSheet.create({
   },
   filterChip: {
     flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
@@ -945,7 +951,9 @@ const s = StyleSheet.create({
     backgroundColor: ACCENT,
     borderColor: ACCENT,
   },
-  filterChipText: { fontSize: 13, fontWeight: "600", color: "#fff" },
+  filterChipText: { flex: 1, textAlign: "center", fontSize: 13, fontWeight: "600", color: "#fff" },
+  // ⌄ glyph draws low in the line box — pull it up so it sits centered next to the label
+  filterChipChevron: { fontSize: 13, fontWeight: "600", color: "#fff", marginTop: -7 },
   filterChipTextActive: { color: "#13131a" },
 
   importBtn: {
@@ -1181,7 +1189,7 @@ const mo = StyleSheet.create({
   stockInput: { flex: 1, color: "#fff", fontSize: 13, paddingVertical: 13 },
   unitToggle: { backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 4 },
   unitToggleText: { color: "#13131a", fontSize: 11, fontWeight: "700" },
-  ifraDisabled: { opacity: 0.45 },
+  ifraDisabled: { opacity: 0.8 },
 
   symbolRow: { flexDirection: "row", gap: 10 },
   symbolCol: { flex: 1, alignItems: "center" },

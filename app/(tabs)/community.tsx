@@ -93,7 +93,7 @@ const LISTING_TYPE_COLORS: Record<string, string> = {
   "For Sale": "#4ade80", Trade: "#60a5fa", Wanted: "#f87171", Free: "#c084fc",
 };
 
-const CONTACT_TOPICS = ["General Questions", "App Feedback", "Bug Report", "Account Help", "Feature Request", "Other"];
+const CONTACT_TOPICS = ["General Questions", "App Feedback", "Bug Report", "Account Help", "Feature Request", "Brand Collaborations", "Business Partnerships", "Media", "Press Kit", "Other"];
 
 // ─── ① NEWS TAB ───────────────────────────────────────────────────────────────
 
@@ -176,9 +176,9 @@ function NewsTab() {
 }
 
 const ns = StyleSheet.create({
-  heading: { color: "#fff", fontSize: 30, fontWeight: "800", letterSpacing: -0.5, marginTop: 8, marginBottom: 18 },
+  heading: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5, marginTop: 8, marginBottom: 18 },
   empty: { color: "rgba(255,255,255,0.6)", textAlign: "center", marginTop: 40, fontSize: 14 },
-  card: { backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  card: { backgroundColor: "transparent", borderRadius: 14, borderWidth: 1, borderColor: "#fff", paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
   cardTitle: { color: "#fff", fontSize: 14, fontWeight: "700", flex: 1, marginRight: 12, lineHeight: 19 },
   cardDate: { color: "rgba(255,255,255,0.85)", fontSize: 11, paddingTop: 2 },
   chip: { alignSelf: "flex-start", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
@@ -281,6 +281,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
   const [commentText, setCommentText] = useState("");
   const [commentPosting, setCommentPosting] = useState(false);
   const commentInputRef = useRef<any>(null);
+  const listRef = useRef<FlatList<any>>(null);
   const [commentFocused, setCommentFocused] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -397,6 +398,10 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
 
   const handleCreate = async (isDraft = false) => {
     if (!newName.trim()) return;
+    if (!user?.id) {
+      Alert.alert("Not signed in", "Your session expired. Please sign in again, then post.");
+      return;
+    }
     setSaving(true);
     const payload = {
       name: newName.trim(),
@@ -406,14 +411,19 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
       image_url: newPhoto || null,
       is_draft: isDraft,
     };
+    let error = null;
     if (editingId) {
-      const { error } = await (supabase as any).from("forum_threads").update(payload).eq("id", editingId);
-      if (error) console.error("handleCreate update error:", error.message);
+      ({ error } = await (supabase as any).from("forum_threads").update(payload).eq("id", editingId));
     } else {
-      const { error } = await (supabase as any).from("forum_threads").insert([{ ...payload, user_id: user?.id }]);
-      if (error) console.error("handleCreate insert error:", error.message);
+      ({ error } = await (supabase as any).from("forum_threads").insert([{ ...payload, user_id: user.id }]));
     }
     setSaving(false);
+    if (error) {
+      console.error("handleCreate error:", error.message);
+      // Keep the modal open so the user's post isn't silently lost
+      Alert.alert("Post failed", error.message ?? "Could not save your post. Please try again.");
+      return;
+    }
     closeModal();
     fetchThreads();
   };
@@ -422,15 +432,25 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
 
   const filtered = myPostsOnly ? threads.filter((t) => t.user_id === user?.id) : threads;
 
+  // Scroll the expanded card above the keyboard when the comment box gains focus
+  const scrollToExpanded = () => {
+    const idx = filtered.findIndex((t) => t.id === expandedId);
+    if (idx < 0) return;
+    setTimeout(() => listRef.current?.scrollToIndex({ index: idx, viewPosition: 0.05, animated: true }), 250);
+  };
+
   return (
     <View style={{ flex: 1 }}>
       {loading ? <ActivityIndicator color="#fff" style={{ marginTop: 48 }} /> : (
         <FlatList
+          ref={listRef}
           data={filtered}
           keyExtractor={(i) => i.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          onScrollToIndexFailed={() => {}}
           ListHeaderComponent={
             myPostsOnly ? (
               <View style={{ marginTop: 8, marginBottom: 14 }}>
@@ -533,6 +553,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
                           placeholderTextColor="rgba(255,255,255,0.4)"
                           value={commentText}
                           onChangeText={setCommentText}
+                          onFocus={scrollToExpanded}
                           multiline
                         />
                         <View style={{ alignItems: "flex-end", marginTop: 6 }}>
@@ -1012,27 +1033,26 @@ function SupportTab() {
     }
     const subject = encodeURIComponent(`[Spils] ${topic || "Support Request"} - ${name}`);
     const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\nTopic: ${topic || "General"}\n\n${message}`);
-    Linking.openURL(`mailto:support@aethera.app?subject=${subject}&body=${body}`);
+    Linking.openURL(`mailto:info@spils.app?subject=${subject}&body=${body}`);
     setSent(true);
   };
 
   return (
-    <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       {/* Heading */}
-      <Text style={ns.heading}>Contact + Support</Text>
+      <Text style={ns.heading}>SPILS Support</Text>
 
-      {/* Intro card */}
-      <View style={ct.introCard}>
-        <Text style={ct.introText}>
-          Get in touch with questions, feedback,{"\n"}account and tech support,{"\n"}or just to say aloha!
-        </Text>
-      </View>
+      {/* Intro */}
+      <Text style={ct.introText}>
+        For questions, feedback, account and{"\n"}tech support, or just to say Aloha...
+      </Text>
 
       {/* Form fields */}
       <View style={{ marginTop: 14 }}>
         {/* Topic — dropdown trigger */}
-        <TouchableOpacity style={[ct.field, { justifyContent: "center", marginBottom: 10 }]} onPress={() => setTopicPickerVisible(true)} activeOpacity={0.8}>
+        <TouchableOpacity style={[ct.field, { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }]} onPress={() => setTopicPickerVisible(true)} activeOpacity={0.8}>
           <Text style={topic ? { color: "#fff", fontSize: 15 } : ct.fieldPlaceholder}>{topic || "Topic"}</Text>
+          <Text style={ct.fieldChevron}>⌄</Text>
         </TouchableOpacity>
 
         <TextInput
@@ -1054,11 +1074,11 @@ function SupportTab() {
 
       {/* FAQs + Send row */}
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 18 }}>
-        <TouchableOpacity style={[ct.pill, { opacity: 0.45 }]} activeOpacity={1}>
+        <TouchableOpacity style={ct.pill} onPress={() => setFaqVisible(true)} activeOpacity={0.75}>
           <Text style={ct.pillText}>FAQs</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={ct.pill} onPress={handleSend} activeOpacity={0.75}>
-          <Text style={ct.pillText}>Send</Text>
+        <TouchableOpacity style={[ct.pill, ct.sendPill]} onPress={handleSend} activeOpacity={0.75}>
+          <Text style={[ct.pillText, ct.sendPillText]}>Send</Text>
         </TouchableOpacity>
       </View>
 
@@ -1145,15 +1165,17 @@ function SupportTab() {
 }
 
 const ct = StyleSheet.create({
-  introCard: { borderWidth: 1, borderColor: "rgba(255,255,255,0.55)", borderRadius: 14, paddingVertical: 22, paddingHorizontal: 20, alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)" },
-  introText: { color: "#C6FF00", fontSize: 15, fontWeight: "700", textAlign: "center", lineHeight: 24 },
+  introText: { color: "#edff8d", fontSize: 15, fontWeight: "600", lineHeight: 23, marginBottom: 6 },
   field: { borderWidth: 1, borderColor: "rgba(255,255,255,0.55)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: "#fff", fontSize: 15, backgroundColor: "transparent" },
   fieldPlaceholder: { color: "rgba(255,255,255,0.55)", fontSize: 15 },
+  fieldChevron: { color: "rgba(255,255,255,0.75)", fontSize: 15, marginTop: -6 },
   pill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.75)", borderRadius: 20, paddingHorizontal: 26, paddingVertical: 8 },
   pillText: { color: "#fff", fontSize: 14 },
+  sendPill: { backgroundColor: "#edff8d", borderColor: "#edff8d" },
+  sendPillText: { color: "#13131a", fontWeight: "700" },
   socialLink: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "600", letterSpacing: 0.5 },
   socialSep: { color: "rgba(255,255,255,0.55)", fontSize: 11 },
-  sentCard: { backgroundColor: "#3a3a42", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", padding: 28, alignItems: "center", width: "100%" },
+  sentCard: { backgroundColor: "#ED3B35", borderRadius: 20, padding: 28, alignItems: "center", width: "100%" },
   sentTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 6 },
   sentSub: { color: "#fff", fontSize: 15, fontWeight: "600", textAlign: "center", marginBottom: 16 },
   sentMeta: { color: "rgba(255,255,255,0.6)", fontSize: 13, textAlign: "center", lineHeight: 22 },
@@ -1259,6 +1281,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
   const [ecText, setEcText] = useState("");
 
   const fetchAll = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
     const [{ data: p }, { data: c }] = await Promise.all([
       (supabase as any).from("forum_threads")
@@ -1281,11 +1304,12 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
   const openEditPost = (t: ForumThread) => {
     setEditPost(t); setEName(t.name); setETopic(t.category ?? ""); setESource((t as any).source_url ?? ""); setEDesc(t.description ?? "");
   };
-  const saveEditPost = async () => {
+  const saveEditPost = async (publish = false) => {
     if (!editPost) return;
     setSaving(true);
     await (supabase as any).from("forum_threads").update({
       name: eName.trim(), category: eTopic.trim() || "General", source_url: eSource.trim() || null, description: eDesc.trim() || "",
+      ...(publish ? { is_draft: false } : {}),
     }).eq("id", editPost.id);
     setSaving(false); setEditPost(null); fetchAll();
   };
@@ -1306,9 +1330,12 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
     onConfirm: async () => { await (supabase as any).from("forum_comments").delete().eq("id", c.id); fetchAll(); },
   });
 
-  const Row = ({ title, onOpen, onEdit, onDelete }: { title: string; onOpen: () => void; onEdit: () => void; onDelete: () => void }) => (
+  const Row = ({ title, draft, onOpen, onEdit, onDelete }: { title: string; draft?: boolean; onOpen: () => void; onEdit: () => void; onDelete: () => void }) => (
     <TouchableOpacity style={mp.row} activeOpacity={0.8} onPress={onOpen}>
-      <Text style={mp.rowTitle} numberOfLines={1}>{title}</Text>
+      <View style={{ flex: 1, flexDirection: "row", alignItems: "center", marginRight: 12 }}>
+        <Text style={[mp.rowTitle, { flex: 0, marginRight: 8 }]} numberOfLines={1}>{title}</Text>
+        {draft ? <View style={mp.draftTag}><Text style={mp.draftTagText}>DRAFT</Text></View> : null}
+      </View>
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onEdit(); }} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}><Text style={mp.rowAction}>Edit</Text></TouchableOpacity>
         <Text style={mp.rowSep}> | </Text>
@@ -1338,7 +1365,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
           {loading ? <ActivityIndicator color="#fff" style={{ marginTop: 12 }} /> : (
             posts.length === 0 ? <Text style={mp.empty}>You haven't posted yet.</Text> :
             posts.map((p) => (
-              <Row key={p.id} title={p.name} onOpen={() => openView(p.id)} onEdit={() => openEditPost(p)} onDelete={() => deletePost(p)} />
+              <Row key={p.id} title={p.name} draft={!!p.is_draft} onOpen={() => openView(p.id)} onEdit={() => openEditPost(p)} onDelete={() => deletePost(p)} />
             ))
           )}
 
@@ -1374,9 +1401,14 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
               <TextInput style={[np.field, np.copyField]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={eDesc} onChangeText={setEDesc} multiline textAlignVertical="top" />
               <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
                 <TouchableOpacity style={np.postBtn} onPress={() => setEditPost(null)}><Text style={np.postBtnText}>Cancel</Text></TouchableOpacity>
-                <TouchableOpacity style={[np.postBtn, (!eName.trim() || saving) && { opacity: 0.4 }]} onPress={saveEditPost} disabled={!eName.trim() || saving}>
+                <TouchableOpacity style={[np.postBtn, (!eName.trim() || saving) && { opacity: 0.4 }]} onPress={() => saveEditPost()} disabled={!eName.trim() || saving}>
                   {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={np.postBtnText}>Save</Text>}
                 </TouchableOpacity>
+                {editPost?.is_draft ? (
+                  <TouchableOpacity style={[np.postBtn, { backgroundColor: "#edff8d", borderColor: "#edff8d" }, (!eName.trim() || saving) && { opacity: 0.4 }]} onPress={() => saveEditPost(true)} disabled={!eName.trim() || saving}>
+                    <Text style={[np.postBtnText, { color: "#13131a" }]}>Post</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           </View>
@@ -1410,6 +1442,8 @@ const mp = StyleSheet.create({
   rowTitle: { color: "#fff", fontSize: 14, fontWeight: "600", flex: 1, marginRight: 12 },
   rowAction: { color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: "600" },
   rowSep: { color: "rgba(255,255,255,0.4)", fontSize: 12 },
+  draftTag: { borderWidth: 1, borderColor: "#edff8d", borderRadius: 100, paddingHorizontal: 7, paddingVertical: 1 },
+  draftTagText: { color: "#edff8d", fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
   editBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 24 },
   editCard: { backgroundColor: "#141414", borderRadius: 16, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", padding: 20 },
   editTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 8 },
@@ -1505,12 +1539,12 @@ const ls = StyleSheet.create({
   iconBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.55)", alignItems: "center", justifyContent: "center" },
   iconBtnText: { color: "#fff", fontSize: 20, fontWeight: "300", lineHeight: 24, marginTop: -1 },
 
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 30, paddingTop: 22, paddingBottom: 0 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 30, paddingTop: 73, paddingBottom: 0 },
   backRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 30, paddingTop: 22, paddingBottom: 0 },
-  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: -4 },
-  pageTitle: { color: "#fff", fontSize: 26, fontWeight: "700", letterSpacing: -0.3 },
-  betaBadge: { backgroundColor: "#F2533A", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 },
-  betaText: { color: "#fff", fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
+  backCarrot: { color: "#fff", fontSize: 30, fontWeight: "300", lineHeight: 30, marginTop: 2 },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
+  betaBadge: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#edff8d", borderRadius: 100, paddingHorizontal: 10, paddingVertical: 3 },
+  betaText: { color: "#edff8d", fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
   subheadline: { color: "#FBE38A", fontSize: 11, fontWeight: "700", letterSpacing: 1, lineHeight: 18, paddingHorizontal: 30, marginTop: 12 },
 
   groupLabel: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 12 },

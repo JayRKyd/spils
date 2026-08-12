@@ -660,7 +660,7 @@ export default function FormulaDetail() {
         <Text style={s.pageTitle}>Lab</Text>
       </View>
 
-      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={40} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
+      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={140} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
 
         {/* ── Main Notes card (auto-open) ── */}
         <View style={s.notesCard}>
