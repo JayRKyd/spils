@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { GlassRow } from "@/components/GlassCard";
 import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
+import { uploadImageIfNeeded } from "@/lib/uploadImage";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -403,12 +404,20 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
       return;
     }
     setSaving(true);
+    let uploadedPhoto: string | null = null;
+    try {
+      uploadedPhoto = await uploadImageIfNeeded(newPhoto, "forum");
+    } catch (e: any) {
+      setSaving(false);
+      Alert.alert("Image upload failed", e?.message ?? "Please try again.");
+      return;
+    }
     const payload = {
       name: newName.trim(),
       description: newDesc.trim() || "",
       category: newTopic.trim() || categoryFilter || "General",
       source_url: newSource.trim() || null,
-      image_url: newPhoto || null,
+      image_url: uploadedPhoto,
       is_draft: isDraft,
     };
     let error = null;
@@ -446,7 +455,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
           ref={listRef}
           data={filtered}
           keyExtractor={(i) => i.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+          contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
@@ -1084,17 +1093,13 @@ function SupportTab() {
 
       {/* Social links */}
       <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 28, paddingBottom: 8 }}>
-        <TouchableOpacity onPress={() => Linking.openURL("https://instagram.com/aethera.app")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://instagram.com/spils.app")}>
           <Text style={ct.socialLink}>INSTAGRAM</Text>
         </TouchableOpacity>
         <Text style={ct.socialSep}> — </Text>
-        <TouchableOpacity onPress={() => Linking.openURL("https://discord.gg/aethera")}>
-          <Text style={ct.socialLink}>DISCORD</Text>
-        </TouchableOpacity>
+        <Text style={ct.socialLink}>DISCORD</Text>
         <Text style={ct.socialSep}> — </Text>
-        <TouchableOpacity onPress={() => Linking.openURL("https://spils.app")}>
-          <Text style={ct.socialLink}>SPILS.APP</Text>
-        </TouchableOpacity>
+        <Text style={ct.socialLink}>SPILS.APP</Text>
       </View>
 
       {/* Topic picker */}
@@ -1175,7 +1180,7 @@ const ct = StyleSheet.create({
   sendPillText: { color: "#13131a", fontWeight: "700" },
   socialLink: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "600", letterSpacing: 0.5 },
   socialSep: { color: "rgba(255,255,255,0.55)", fontSize: 11 },
-  sentCard: { backgroundColor: "#ED3B35", borderRadius: 20, padding: 28, alignItems: "center", width: "100%" },
+  sentCard: { backgroundColor: "#ED3B35", borderRadius: 20, borderWidth: 1.5, borderColor: "#ffffff", padding: 28, alignItems: "center", width: "100%" },
   sentTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 6 },
   sentSub: { color: "#fff", fontSize: 15, fontWeight: "600", textAlign: "center", marginBottom: 16 },
   sentMeta: { color: "rgba(255,255,255,0.6)", fontSize: 13, textAlign: "center", lineHeight: 22 },
@@ -1494,7 +1499,7 @@ export default function Community() {
   // ── Landing page ──────────────────────────────────────────────────────────
   return (
     <CommunityWrapper showSub>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 42, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {/* Available Now */}
         <Text style={ls.groupLabel}>AVAILABLE NOW</Text>
         {AVAILABLE.map((item) => (
@@ -1535,7 +1540,7 @@ export default function Community() {
 // ─── Landing page styles ──────────────────────────────────────────────────────
 
 const ls = StyleSheet.create({
-  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 8, paddingBottom: 4 },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.55)", alignItems: "center", justifyContent: "center" },
   iconBtnText: { color: "#fff", fontSize: 20, fontWeight: "300", lineHeight: 24, marginTop: -1 },
 
@@ -1553,7 +1558,7 @@ const ls = StyleSheet.create({
   comingRow: { marginBottom: 6 },
   comingText: { color: "#fff", fontSize: 19, fontWeight: "700", letterSpacing: -0.2 },
 
-  csCard: { width: "100%", borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", borderRadius: 20, overflow: "hidden", paddingVertical: 40, paddingHorizontal: 24, alignItems: "center", gap: 16 },
+  csCard: { width: "100%", borderWidth: 1.5, borderColor: "#ffffff", borderRadius: 20, overflow: "hidden", paddingVertical: 40, paddingHorizontal: 24, alignItems: "center", gap: 16 },
   csClose: { position: "absolute" as const, top: 12, right: 12, width: 28, height: 28, alignItems: "center", justifyContent: "center" },
   csCloseText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   csTitle: { color: "#fff", fontSize: 17, fontWeight: "700", textAlign: "center", lineHeight: 24 },

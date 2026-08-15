@@ -646,7 +646,7 @@ export default function NewFormula() {
                   </View>
                   <View style={[s.breakdownRow, { marginTop: 10 }]}>
                     {atTarget ? (
-                      <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>On Target</Text></View>
+                      <View style={[s.bdPill, { backgroundColor: "#D9F24E" }]}><Text style={s.bdPillDark}>On Target</Text></View>
                     ) : (
                       <View style={[s.bdPill, { backgroundColor: "#E53935" }]}>
                         <Text style={s.bdPillLight}>⚠ {overTarget ? "↓" : "↑"} {targetDiffLabel}g {overTarget ? "Over Target" : "To Target"}</Text>
@@ -820,7 +820,7 @@ const s = StyleSheet.create({
   lightboxClose: { position: "absolute", top: 60, right: 24, width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
   lightboxCloseText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 
-  paramRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  paramRow: { flexDirection: "row", gap: 12, alignItems: "flex-end" },
   paramColSm: { width: 74 },
   paramColLg: { flex: 1 },
   paramLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginBottom: 8 },

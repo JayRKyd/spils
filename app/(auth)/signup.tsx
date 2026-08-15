@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { SpilsLogo } from "@/components/SpilsLogo";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -18,17 +19,20 @@ export default function Signup() {
   const handleSignup = async () => {
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) setError(error.message);
-    else setSuccess(true);
+    const { data, error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
+    if (error) { setError(error.message); return; }
+    // With email confirmation disabled, signUp returns a live session — go straight in.
+    // With confirmation enabled there is no session yet, so show the check-your-email screen.
+    if (data.session) router.replace("/(tabs)" as any);
+    else setSuccess(true);
   };
 
   if (success) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.inner}>
-          <Text style={s.logo}>SP/LS.</Text>
+          <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" /></View>
           <Text style={s.successTitle}>Check your email</Text>
           <Text style={s.successSub}>We sent a confirmation link to {email}</Text>
           <TouchableOpacity style={s.primaryBtn} onPress={() => router.replace("/(auth)/login")}>
@@ -42,7 +46,7 @@ export default function Signup() {
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView style={s.inner} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Text style={s.logo}>SP/LS.</Text>
+        <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" /></View>
 
         <TextInput
           style={s.input}
@@ -107,7 +111,7 @@ const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#13131a" },
   inner: { flex: 1, justifyContent: "center", paddingHorizontal: 28 },
 
-  logo: { color: "#E5F772", fontSize: 34, fontWeight: "800", letterSpacing: 1, marginBottom: 40 },
+  logoWrap: { marginBottom: 40, alignSelf: "flex-start" },
 
   successTitle: { color: "#fff", fontSize: 24, fontWeight: "700", marginBottom: 10 },
   successSub: { color: "rgba(255,255,255,0.5)", fontSize: 15, marginBottom: 32 },

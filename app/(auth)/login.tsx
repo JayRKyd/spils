@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { SpilsLogo } from "@/components/SpilsLogo";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -26,7 +27,7 @@ export default function Login() {
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView style={s.inner} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Text style={s.logo}>SP/LS.</Text>
+        <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" /></View>
 
         <TextInput
           style={s.input}
@@ -91,7 +92,7 @@ const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#13131a" },
   inner: { flex: 1, justifyContent: "center", paddingHorizontal: 28 },
 
-  logo: { color: "#E5F772", fontSize: 34, fontWeight: "800", letterSpacing: 1, marginBottom: 40 },
+  logoWrap: { marginBottom: 40, alignSelf: "flex-start" },
 
   input: {
     backgroundColor: "rgba(255,255,255,0.07)",

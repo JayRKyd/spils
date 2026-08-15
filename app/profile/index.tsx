@@ -145,10 +145,10 @@ export default function ProfileScreen() {
       (supabase as any).from("marketplace_listings").select("*", { count: "exact", head: true }).eq("user_id", user.id),
       (supabase as any).from("marketplace_messages").select("*", { count: "exact", head: true }).eq("receiver_id", user.id).is("read_at", null),
       (supabase as any).from("marketplace_watchlist").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-      supabase.from("perfumes").select("*", { count: "exact", head: true }),
-      supabase.from("formulas").select("*", { count: "exact", head: true }),
-      (supabase as any).from("journal_entries").select("*", { count: "exact", head: true }),
-      (supabase as any).from("materials").select("*", { count: "exact", head: true }),
+      supabase.from("perfumes").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+      supabase.from("formulas").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+      (supabase as any).from("journal_entries").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+      (supabase as any).from("materials").select("*", { count: "exact", head: true }).eq("user_id", user.id),
     ]);
     setProfile(p ?? { username: null, avatar_url: null, bio: null, created_at: new Date().toISOString() });
     setStats({

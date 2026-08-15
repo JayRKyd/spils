@@ -16,6 +16,8 @@ import { stripMarkdown } from "@/lib/text";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
 import { SeasonIcon } from "@/components/SeasonIcon";
+import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
+import { uploadImageIfNeeded } from "@/lib/uploadImage";
 import ColorPicker from "react-native-wheel-color-picker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -230,6 +232,7 @@ export default function JournalNew() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const [aiActionLoading, setAiActionLoading] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [moreVisible, setMoreVisible] = useState(false);
@@ -393,6 +396,10 @@ export default function JournalNew() {
   const handleAddToCollection = async () => {
     setMoreVisible(false);
     try {
+      const [colBottle, colInsp] = await Promise.all([
+        uploadImageIfNeeded(bottleBase64 ?? null, "perfumes"),
+        uploadImageIfNeeded(inspirationImage ?? null, "perfumes"),
+      ]);
       const { error } = await (supabase as any).from("perfumes").insert([{
         user_id: user?.id,
         name: title.trim() || "Untitled",
@@ -418,12 +425,12 @@ export default function JournalNew() {
         dry_down: dryDownText.trim() || null,
         colors: colors.length ? colors : null,
         music: musicUrl.trim() || null,
-        image_url: bottleBase64 ?? null,
-        inspiration_image_url: inspirationImage ?? null,
+        image_url: colBottle,
+        inspiration_image_url: colInsp,
         notes: description.trim() || null,
       }]);
       if (error) throw error;
-      Alert.alert("Added to Collection", `"${title || "Entry"}" is now in your Collection.`);
+      setConfirm({ title: "Added to Collection", message: `"${title || "Entry"}" is now in your Collection.`, infoOnly: true });
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Could not add to collection. Please try again.");
     }
@@ -454,6 +461,18 @@ export default function JournalNew() {
   const handleSave = async () => {
     setSaving(true);
     const detectSource = (url: string) => url.includes("spotify") ? "spotify" : url.includes("youtube") ? "youtube" : "link";
+    let uploadedBottle: string | null = null;
+    let uploadedInsp: string | null = null;
+    try {
+      [uploadedBottle, uploadedInsp] = await Promise.all([
+        uploadImageIfNeeded(bottleBase64 ?? null, "journal"),
+        uploadImageIfNeeded(inspirationImage ?? null, "journal"),
+      ]);
+    } catch (e: any) {
+      setSaving(false);
+      Alert.alert("Image upload failed", e?.message ?? "Please try again.");
+      return;
+    }
     const { error } = await (supabase as any).from("journal_entries").insert([{
       user_id: user?.id,
       title: title.trim() || null,
@@ -482,8 +501,8 @@ export default function JournalNew() {
       temperature: temperatureVal,
       music_url: musicUrl.trim() || null,
       music_source: musicUrl.trim() ? detectSource(musicUrl.trim()) : null,
-      image_url: bottleBase64 ?? null,
-      inspiration_image_url: inspirationImage ?? null,
+      image_url: uploadedBottle,
+      inspiration_image_url: uploadedInsp,
       ai_notes: aiResult ?? null,
       is_wishlisted: isWishlisted,
     }]);
@@ -648,6 +667,7 @@ export default function JournalNew() {
                     row={false}
                     swatches={false}
                     discrete={false}
+                    shadeSliderThumb={true}
                   />
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -909,6 +929,8 @@ export default function JournalNew() {
             </ScrollView>
           </SafeAreaView>
         </Modal>
+
+        <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
       </SafeAreaView>
     </LinearGradient>
   );

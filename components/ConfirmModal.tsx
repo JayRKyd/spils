@@ -4,7 +4,9 @@ export interface ConfirmConfig {
   title: string;
   message: string;
   confirmLabel?: string;
-  onConfirm: () => void;
+  /** Informational popup: single OK button, no Cancel, neutral color */
+  infoOnly?: boolean;
+  onConfirm?: () => void;
 }
 
 /**
@@ -26,11 +28,15 @@ export function ConfirmModal({ config, onClose }: { config: ConfirmConfig | null
           <Text style={st.title}>{config?.title}</Text>
           <Text style={st.msg}>{config?.message}</Text>
           <View style={st.row}>
-            <TouchableOpacity style={st.btn} onPress={onClose}>
-              <Text style={st.btnText}>Cancel</Text>
-            </TouchableOpacity>
+            {!config?.infoOnly && (
+              <TouchableOpacity style={st.btn} onPress={onClose}>
+                <Text style={st.btnText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={st.btn} onPress={handleConfirm}>
-              <Text style={st.confirmText}>{config?.confirmLabel ?? "Delete"}</Text>
+              <Text style={config?.infoOnly ? st.btnText : st.confirmText}>
+                {config?.confirmLabel ?? (config?.infoOnly ? "OK" : "Delete")}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

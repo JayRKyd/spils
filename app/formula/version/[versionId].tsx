@@ -802,7 +802,7 @@ const s = StyleSheet.create({
   imgDelText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 
   // Parameters
-  paramRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  paramRow: { flexDirection: "row", gap: 12, alignItems: "flex-end" },
   paramColSm: { width: 74 },
   paramColLg: { flex: 1 },
   paramLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginBottom: 8 },

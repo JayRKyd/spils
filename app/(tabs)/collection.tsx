@@ -283,10 +283,10 @@ const s = StyleSheet.create({
   viewSortActive: { color: "#fff", fontWeight: "700" },
   viewSortSep: { color: "rgba(255,255,255,0.35)", fontSize: 13 },
 
-  searchWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", borderRadius: 50, marginHorizontal: 30, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, marginBottom: 14, gap: 8 },
-  searchInput: { flex: 1, color: "#fff", fontSize: 14, paddingVertical: 6 },
-  searchBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 50, paddingHorizontal: 18, paddingVertical: 8 },
-  searchBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  searchWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 24, marginHorizontal: 30, paddingLeft: 16, paddingRight: 5, paddingVertical: 5, marginBottom: 14 },
+  searchInput: { flex: 1, color: "#fff", fontSize: 14, paddingVertical: 7 },
+  searchBtn: { backgroundColor: "#fff", borderRadius: 18, paddingHorizontal: 16, paddingVertical: 7 },
+  searchBtnText: { color: "#13131a", fontSize: 12, fontWeight: "600" },
 
   chipsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingBottom: 14, paddingTop: 2, gap: 8 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 50, borderWidth: 1, borderColor: "rgba(255,255,255,0.4)", backgroundColor: "transparent" },

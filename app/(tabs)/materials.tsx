@@ -878,8 +878,8 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 30,
-    paddingTop: 6,
-    paddingBottom: 2,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   logo: { fontSize: 20, fontWeight: "900", color: "#edff8d", letterSpacing: -0.5 },
   profileCircle: {
@@ -989,8 +989,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
   bannerCard: {
-    backgroundColor: "#13131a",
+    backgroundColor: "#141414",
     borderRadius: 18,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.9)",
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 26,

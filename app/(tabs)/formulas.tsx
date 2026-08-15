@@ -409,9 +409,9 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 2,
+    paddingHorizontal: 30,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   logo: { fontSize: 20, fontWeight: "900", color: "#edff8d", letterSpacing: -0.5 },
   profileCircle: {

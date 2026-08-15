@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
 import { SeasonIcon } from "@/components/SeasonIcon";
 import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
+import { uploadImageIfNeeded } from "@/lib/uploadImage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -391,6 +392,18 @@ function EditModal({ visible, entry, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
+    let upBottle: string | null = null;
+    let upInsp: string | null = null;
+    try {
+      [upBottle, upInsp] = await Promise.all([
+        uploadImageIfNeeded(bottleImage, "journal"),
+        uploadImageIfNeeded(inspirationImage, "journal"),
+      ]);
+    } catch (e: any) {
+      setSaving(false);
+      Alert.alert("Image upload failed", e?.message ?? "Please try again.");
+      return;
+    }
     await (supabase as any).from("journal_entries").update({
       title: title.trim() || null,
       description: description.trim() || null,
@@ -417,8 +430,8 @@ function EditModal({ visible, entry, onClose, onSaved }: {
       longevity: String(longevity),
       colors: colors.length ? colors : null,
       temperature: temperature,
-      image_url: bottleImage ?? null,
-      inspiration_image_url: inspirationImage ?? null,
+      image_url: upBottle,
+      inspiration_image_url: upInsp,
       ai_notes: aiResult ?? null,
     }).eq("id", entry.id);
     setSaving(false);
@@ -679,7 +692,7 @@ function EditModal({ visible, entry, onClose, onSaved }: {
             <View style={em.sectionBox}>
               <Text style={em.boxLabel}>COLOR(S)</Text>
               <View style={{ height: 280, marginBottom: 12 }}>
-                <ColorPicker color={selectedColor} onColorChange={setSelectedColor} thumbSize={28} sliderSize={28} noSnap={true} row={false} swatches={false} discrete={false} />
+                <ColorPicker color={selectedColor} onColorChange={setSelectedColor} thumbSize={28} sliderSize={28} noSnap={true} row={false} swatches={false} discrete={false} shadeSliderThumb={true} />
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
@@ -848,7 +861,7 @@ export default function JournalDetail() {
         notes: entry.description || null,
       }]);
       if (error) throw error;
-      Alert.alert("Added to Collection", `"${entry.title || "Entry"}" is now in your Collection.`);
+      setConfirm({ title: "Added to Collection", message: `"${entry.title || "Entry"}" is now in your Collection.`, infoOnly: true });
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Could not add to collection.");
     }

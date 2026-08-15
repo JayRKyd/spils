@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
 import { SeasonIcon } from "@/components/SeasonIcon";
+import { uploadImageIfNeeded } from "@/lib/uploadImage";
 import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -437,6 +438,18 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
 
   const handleSave = async () => {
     setSaving(true);
+    let upBottle: string | null = null;
+    let upInsp: string | null = null;
+    try {
+      [upBottle, upInsp] = await Promise.all([
+        uploadImageIfNeeded(image, "perfumes"),
+        uploadImageIfNeeded(inspirationImage, "perfumes"),
+      ]);
+    } catch (e: any) {
+      setSaving(false);
+      Alert.alert("Image upload failed", e?.message ?? "Please try again.");
+      return;
+    }
     const { error } = await supabase.from("perfumes").update({
       name: name.trim() || perfume.name,
       brand: brand.trim() || null,
@@ -452,8 +465,8 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       category: category || null,
       status: status === "Wishlist" ? "Wishlist" : status === "Sell/Trade" ? "Sell-Trade" : baseStatus,
       is_favorite: status === "Favorite",
-      image_url: image ?? null,
-      inspiration_image_url: inspirationImage ?? null,
+      image_url: upBottle,
+      inspiration_image_url: upInsp,
       colors: colors.length ? colors : null,
       top_notes: notesTop.length ? notesTop : null,
       heart_notes: notesHeart.length ? notesHeart : null,
@@ -659,7 +672,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
             <View style={em.sectionBox}>
               <Text style={em.boxLabel}>COLOR(S)</Text>
               <View style={{ height: 280, marginBottom: 12 }}>
-                <ColorPicker color={selectedColor} onColorChange={setSelectedColor} thumbSize={28} sliderSize={28} noSnap={true} row={false} swatches={false} discrete={false} />
+                <ColorPicker color={selectedColor} onColorChange={setSelectedColor} thumbSize={28} sliderSize={28} noSnap={true} row={false} swatches={false} discrete={false} shadeSliderThumb={true} />
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
