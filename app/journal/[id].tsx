@@ -785,7 +785,7 @@ const ms = StyleSheet.create({
   btn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
   btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
   btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
-  btnDanger: { borderColor: "rgba(220,50,50,0.25)" },
+  btnMagenta: { backgroundColor: "#EC008C", borderColor: "#EC008C" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
   btnTextLight: { color: "#fff" },
 });
@@ -1076,8 +1076,8 @@ export default function JournalDetail() {
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setMoreVisible(false)} />
           <View style={ms.sheet}>
             <View style={ms.handle} />
-            <TouchableOpacity style={ms.btn} onPress={handleShare}>
-              <Text style={ms.btnText}>Share</Text>
+            <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={handleShare}>
+              <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ms.btn} onPress={handleAddToCollection}>
               <Text style={ms.btnText}>Add to Collection</Text>
@@ -1085,8 +1085,8 @@ export default function JournalDetail() {
             <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
               <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[ms.btn, ms.btnDanger]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
-              <Text style={[ms.btnText, { color: "#dc2626" }]}>Delete</Text>
+            <TouchableOpacity style={[ms.btn, ms.btnMagenta]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
+              <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>

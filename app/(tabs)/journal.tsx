@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ProfileIcon } from "@/components/ProfileIcon";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
@@ -433,6 +433,9 @@ export default function Journal() {
   const [filterVisible, setFilterVisible] = useState(false);
   const [filters, setFilters] = useState<Filters>({ seasons: [], minRating: 0, visibility: "all" });
   const [view, setView] = useState<"landing" | "list" | "calendar" | "sotd">("landing");
+  // Tab screens stay mounted — without this the hero video keeps decoding
+  // while the user is on other tabs, which builds up and aborts the app.
+  const isFocused = useIsFocused();
   const [sotdInput, setSotdInput] = useState("");
   const [sotdSaving, setSotdSaving] = useState(false);
   const [sotdEntries, setSotdEntries] = useState<ScentOfDayEntry[]>([]);
@@ -602,7 +605,7 @@ export default function Journal() {
             source={require("../../assets/JOURNAL VIDEO - ORB.mp4")}
             style={s.heroImage}
             resizeMode={ResizeMode.COVER}
-            shouldPlay={view === "landing"}
+            shouldPlay={view === "landing" && isFocused}
             isLooping
             isMuted
           />

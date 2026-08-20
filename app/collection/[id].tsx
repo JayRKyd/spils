@@ -759,9 +759,11 @@ const ms = StyleSheet.create({
   sheet: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 10 },
   handle: { width: 40, height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, alignSelf: "center", marginBottom: 12 },
   btn: { borderWidth: 1, borderColor: "rgba(0,0,0,0.15)", borderRadius: 100, paddingVertical: 16, alignItems: "center" },
-  btnDanger: { borderColor: "rgba(220,50,50,0.25)" },
+  btnBlue: { backgroundColor: "#30B8E8", borderColor: "#30B8E8" },
+  btnMagenta: { backgroundColor: "#EC008C", borderColor: "#EC008C" },
   btnGrey: { backgroundColor: "#E5E5E5", borderColor: "#E5E5E5" },
   btnText: { color: "#13131a", fontSize: 15, fontWeight: "500" as const },
+  btnTextLight: { color: "#fff" },
 });
 
 // ─── Detail Screen ────────────────────────────────────────────────────────────
@@ -976,8 +978,8 @@ export default function CollectionDetail() {
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setMoreVisible(false)} />
           <View style={ms.sheet}>
             <View style={ms.handle} />
-            <TouchableOpacity style={ms.btn} onPress={handleShare}>
-              <Text style={ms.btnText}>Share</Text>
+            <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={handleShare}>
+              <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ms.btn} onPress={handleAddToWishlist}>
               <Text style={ms.btnText}>Add to Wishlist</Text>
@@ -985,8 +987,8 @@ export default function CollectionDetail() {
             <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
               <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[ms.btn, ms.btnDanger]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
-              <Text style={[ms.btnText, { color: "#dc2626" }]}>Delete</Text>
+            <TouchableOpacity style={[ms.btn, ms.btnMagenta]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
+              <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>

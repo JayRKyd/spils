@@ -1,0 +1,23 @@
+diff --git a/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm b/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+index 2a67797..1948b83 100644
+--- a/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
++++ b/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+@@ -435,7 +435,17 @@ void ObjCTurboModule::performVoidMethodInvocation(
+     @try {
+       [inv invokeWithTarget:strongModule];
+     } @catch (NSException *exception) {
+-      throw convertNSExceptionToJSError(runtime, exception, std::string{moduleName}, methodNameStr);
++      if (shouldVoidMethodsExecuteSync_) {
++        throw convertNSExceptionToJSError(runtime, exception, std::string{moduleName}, methodNameStr);
++      } else {
++        // SPILS patch: async void invocations run on a dispatch queue with no
++        // C++ handler above this frame — rethrowing here calls std::terminate
++        // and aborts the whole app (SIGABRT, seen on iOS 26). Log instead.
++        // See facebook/react-native#54859.
++        LOG(ERROR) << "NSException thrown by " << moduleName << "." << methodNameStr
++                   << " during async void invocation: "
++                   << [[exception description] UTF8String];
++      }
+     } @finally {
+       [retainedObjectsForInvocation removeAllObjects];
+     }

@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -1458,12 +1458,21 @@ export default function Community() {
   const [section, setSection] = useState<SectionKey | null>(null);
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
   const [myPostsOnly, setMyPostsOnly] = useState(false);
+  const params = useLocalSearchParams<{ myPosts?: string }>();
 
   useFocusEffect(
     useCallback(() => {
+      // Deep link from Profile ("Posts"/"Comments") straight into My Posts
+      if (params.myPosts === "1") {
+        setSection("chat");
+        setMyPostsOnly(true);
+        setComingSoonVisible(false);
+        router.setParams({ myPosts: "" } as any);
+        return;
+      }
       setSection(null);
       setComingSoonVisible(true);
-    }, [])
+    }, [params.myPosts])
   );
 
   const handleMenu = (key: SectionKey) => {

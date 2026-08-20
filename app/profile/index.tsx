@@ -5,12 +5,35 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-import GradientScreen from "@/components/GradientScreen";
-import { GlassRow } from "@/components/GlassCard";
+import { SpilsLogo } from "@/components/SpilsLogo";
+import { ProfileIcon } from "@/components/ProfileIcon";
 import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
+
+const ACCENT = "#a68bfa";
+const STAT_COLORS: Record<string, string> = {
+  Journal: "#edff8d",
+  Collection: "#00AEEF",
+  Lab: "#EC008C",
+  Organ: "#33FF00",
+};
+
+function DarkScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <LinearGradient
+      colors={["#000000", "#000000", ACCENT]}
+      locations={[0, 0.82, 1]}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView>
+    </LinearGradient>
+  );
+}
 
 interface ProfileData {
   username: string | null;
@@ -29,14 +52,10 @@ interface Stats {
   materials: number;
 }
 
-function StatCard({ label, value, onPress, disabled }: { label: string; value: number; onPress?: () => void; disabled?: boolean }) {
+function StatCard({ label, value, onPress }: { label: string; value: number; onPress?: () => void }) {
   return (
-    <TouchableOpacity
-      style={[s.statCard, disabled && s.disabled]}
-      onPress={disabled ? () => Alert.alert("Coming Soon", "Marketplace isn't available yet.") : onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-    >
-      <Text style={s.statValue}>{value}</Text>
+    <TouchableOpacity style={s.statCard} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[s.statValue, { color: STAT_COLORS[label] ?? "#fff" }]}>{value}</Text>
       <Text style={s.statLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -182,118 +201,133 @@ export default function ProfileScreen() {
     });
   };
 
+  const memberSince = profile?.created_at
+    ? (() => { const d = new Date(profile.created_at); return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(-2)}`; })()
+    : null;
+
   if (loading) return (
-    <GradientScreen gradient="profile">
+    <DarkScreen>
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color="#a78bfa" />
+        <ActivityIndicator color={ACCENT} />
       </View>
-    </GradientScreen>
+    </DarkScreen>
   );
 
   return (
-    <GradientScreen gradient="profile">
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+    <DarkScreen>
+      {/* Nav */}
+      <View style={s.topNav}>
+        <SpilsLogo height={22} color="#edff8d" />
+        <TouchableOpacity onPress={() => {}} style={{ padding: 2 }}>
+          <ProfileIcon size={34} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        {/* Heading + Sign Out */}
+        <View style={s.headerRow}>
           <Text style={s.pageTitle}>Profile</Text>
           <TouchableOpacity onPress={handleSignOut}><Text style={s.signOut}>Sign Out</Text></TouchableOpacity>
         </View>
 
-        <GlassRow style={s.profileCard}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 12 }}>
+        {/* Profile card */}
+        <View style={s.profileCard}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
             <View style={s.avatar}>
               {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={{ width: "100%", height: "100%", borderRadius: 32 }} />
+                <Image source={{ uri: profile.avatar_url }} style={{ width: "100%", height: "100%", borderRadius: 30 }} />
               ) : (
                 <Text style={s.avatarText}>{getInitials()}</Text>
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.displayName}>{profile?.username ?? user?.email?.split("@")[0] ?? "User"}</Text>
-              <Text style={s.email}>{user?.email}</Text>
-              {profile?.created_at ? <Text style={s.memberSince}>Member since {new Date(profile.created_at).toLocaleDateString()}</Text> : null}
+              <Text style={s.displayName} numberOfLines={1}>{profile?.username ?? user?.email?.split("@")[0] ?? "User"}</Text>
+              <Text style={s.metaRow} numberOfLines={1}>
+                <Text style={s.email}>{user?.email}</Text>
+                {memberSince ? <Text style={s.memberSince}>  |  Member since {memberSince}</Text> : null}
+              </Text>
             </View>
           </View>
           {profile?.bio ? <Text style={s.bio}>{profile.bio}</Text> : null}
           <TouchableOpacity style={s.editProfileBtn} onPress={() => setEditVisible(true)}>
             <Text style={s.editProfileText}>Edit Profile</Text>
           </TouchableOpacity>
-        </GlassRow>
+        </View>
 
-        <Text style={s.sectionLabel}>YOUR ACTIVITY</Text>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+        {/* My Spils */}
+        <Text style={s.sectionLabel}>MY SPILS</Text>
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 26 }}>
           <StatCard label="Journal" value={stats.journal} onPress={() => router.push("/(tabs)/journal" as any)} />
           <StatCard label="Collection" value={stats.perfumes} onPress={() => router.push("/(tabs)/collection" as any)} />
-        </View>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
           <StatCard label="Lab" value={stats.formulas} onPress={() => router.push("/(tabs)/formulas" as any)} />
           <StatCard label="Organ" value={stats.materials} onPress={() => router.push("/(tabs)/materials" as any)} />
         </View>
 
-        <Text style={s.sectionLabel}>MARKETPLACE</Text>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
-          <StatCard label="Listings" value={stats.listings} onPress={() => router.push("/profile/listings" as any)} />
-          <StatCard label="Unread" value={stats.messages} onPress={() => router.push("/profile/messages" as any)} />
-          <StatCard label="Watchlist" value={stats.watchlist} onPress={() => router.push("/profile/watchlist" as any)} />
+        {/* My Community */}
+        <View style={s.labelRow}>
+          <Text style={[s.sectionLabel, { marginBottom: 0 }]}>MY COMMUNITY</Text>
+          <View style={s.betaBadge}><Text style={s.betaText}>Beta</Text></View>
+        </View>
+        <View style={{ flexDirection: "row", gap: 12, marginBottom: 26 }}>
+          <TouchableOpacity style={s.pillBtn} onPress={() => router.push("/(tabs)/community?myPosts=1" as any)}>
+            <Text style={s.pillBtnText}>Posts</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.pillBtn} onPress={() => router.push("/(tabs)/community?myPosts=1" as any)}>
+            <Text style={s.pillBtnText}>Comments</Text>
+          </TouchableOpacity>
         </View>
 
-        {[
-          { label: "My Listings", path: "/profile/listings", icon: "📦" },
-          { label: "Messages", path: "/profile/messages", icon: "💬" },
-          { label: "Watchlist", path: "/profile/watchlist", icon: "❤️" },
-        ].map(({ label, path, icon }) => (
-          <TouchableOpacity key={path} style={s.navRow} onPress={() => router.push(path as any)}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <Text style={{ fontSize: 18 }}>{icon}</Text>
-              <Text style={s.navLabel}>{label}</Text>
-            </View>
-            <Text style={s.navChevron}>›</Text>
-          </TouchableOpacity>
-        ))}
-
-        <TouchableOpacity
-          style={[s.navRow, s.disabled]}
-          onPress={() => Alert.alert("Coming Soon", "Marketplace isn't available yet.")}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Text style={{ fontSize: 18 }}>🛒</Text>
-            <Text style={s.navLabel}>Marketplace</Text>
-          </View>
-          <Text style={s.navChevron}>›</Text>
-        </TouchableOpacity>
+        {/* Marketplace (coming soon) */}
+        <View style={s.labelRow}>
+          <Text style={[s.sectionLabel, s.dimmed, { marginBottom: 0 }]}>MARKETPLACE</Text>
+          <Text style={[s.sectionLabel, s.dimmed, { marginBottom: 0, fontWeight: "400" }]}> [COMING]</Text>
+        </View>
+        <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+          {["My Listings", "Watchlist", "Messages"].map((label) => (
+            <TouchableOpacity key={label} style={[s.pillBtn, s.dimmed]} onPress={() => Alert.alert("Coming Soon", "Marketplace isn't available yet.")} activeOpacity={1}>
+              <Text style={s.pillBtnText}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
 
       {profile && (
         <EditProfileModal visible={editVisible} profile={profile} onClose={() => setEditVisible(false)} onSaved={() => { setEditVisible(false); fetchProfile(); }} />
       )}
       <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
-    </GradientScreen>
+    </DarkScreen>
   );
 }
 
 const s = StyleSheet.create({
-  pageTitle: { color: "#fff", fontSize: 24, fontWeight: "700" },
-  signOut: { color: "#f87171", fontSize: 14 },
-  profileCard: { padding: 20, marginBottom: 20 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(167,139,250,0.25)", borderWidth: 2, borderColor: "rgba(167,139,250,0.5)", alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  avatarText: { color: "#fff", fontSize: 20, fontWeight: "700" },
+  topNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 12, paddingBottom: 4 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 73, marginBottom: 22 },
+  pageTitle: { color: "#fff", fontSize: 23, fontWeight: "800", letterSpacing: -0.5 },
+  signOut: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  profileCard: { borderWidth: 0.5, borderColor: "rgba(255,255,255,0.6)", borderRadius: 16, padding: 20, marginBottom: 32 },
+  avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  avatarText: { color: "#13131a", fontSize: 20, fontWeight: "700" },
+  metaRow: { marginTop: 4 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  betaBadge: { backgroundColor: "#edff8d", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  betaText: { color: "#13131a", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
+  pillBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 100, paddingHorizontal: 24, paddingVertical: 10 },
+  pillBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  dimmed: { opacity: 0.4 },
   avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(167,139,250,0.25)", borderWidth: 2, borderColor: "rgba(167,139,250,0.5)", alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarLargeText: { color: "#fff", fontSize: 28, fontWeight: "700" },
   avatarEditBadge: { position: "absolute", bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: "#a78bfa", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#000000" },
   avatarChangeText: { color: "#a78bfa", fontSize: 13, fontWeight: "600", marginTop: 10 },
-  displayName: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  email: { color: "rgba(255,255,255,0.5)", fontSize: 13 },
-  memberSince: { color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 },
-  bio: { color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 12 },
-  editProfileBtn: { borderWidth: 1, borderColor: "rgba(167,139,250,0.5)", borderRadius: 20, paddingVertical: 8, alignItems: "center" },
-  editProfileText: { color: "#a78bfa", fontSize: 14, fontWeight: "600" },
-  sectionLabel: { color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: "600", letterSpacing: 1, marginBottom: 8 },
-  statCard: { flex: 1, backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 16, padding: 16, alignItems: "center" },
-  statValue: { color: "#fff", fontSize: 24, fontWeight: "700" },
-  statLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 4, textAlign: "center" },
-  navRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8 },
-  navLabel: { color: "#fff", fontWeight: "500", fontSize: 15 },
-  navChevron: { color: "rgba(255,255,255,0.4)", fontSize: 20 },
-  disabled: { opacity: 0.4 },
+  displayName: { color: "#fff", fontSize: 20, fontWeight: "800" },
+  email: { color: ACCENT, fontSize: 12, fontWeight: "600" },
+  memberSince: { color: "rgba(255,255,255,0.55)", fontSize: 12 },
+  bio: { color: "rgba(255,255,255,0.5)", fontSize: 14, marginTop: 12 },
+  editProfileBtn: { borderWidth: 1, borderColor: ACCENT, borderRadius: 100, paddingVertical: 10, alignItems: "center", marginTop: 16 },
+  editProfileText: { color: ACCENT, fontSize: 14, fontWeight: "600" },
+  sectionLabel: { color: "#fff", fontSize: 12, fontWeight: "700", letterSpacing: 1.5, marginBottom: 12 },
+  statCard: { flex: 1, backgroundColor: "transparent", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
+  statValue: { fontSize: 26, fontWeight: "800" },
+  statLabel: { color: "#fff", fontSize: 10, marginTop: 4, textAlign: "center" },
   modal: { flex: 1, backgroundColor: "#000000" },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
   modalTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
