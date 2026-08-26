@@ -693,7 +693,7 @@ export default function Materials() {
         {/* Filter row */}
         <View style={s.filterRow}>
           <TouchableOpacity
-            style={[s.filterChip, compActive && s.filterChipActive]}
+            style={[s.filterChip, { flex: 1.35 }, compActive && s.filterChipActive]}
             onPress={() => setCompDropVisible(true)}
           >
             <Text style={[s.filterChipText, compActive && s.filterChipTextActive]} numberOfLines={1}>
@@ -702,7 +702,7 @@ export default function Materials() {
             <Text style={[s.filterChipChevron, compActive && s.filterChipTextActive]}>⌄</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.filterChip, indexActive && s.filterChipActive]}
+            style={[s.filterChip, { flex: 0.8 }, indexActive && s.filterChipActive]}
             onPress={() => setIndexDropVisible(true)}
           >
             <Text style={[s.filterChipText, indexActive && s.filterChipTextActive]} numberOfLines={1}>

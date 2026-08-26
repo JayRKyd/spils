@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ProfileIcon } from "@/components/ProfileIcon";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
@@ -107,10 +107,11 @@ interface Material {
 }
 
 interface FormulaLine {
-  id: number;
-  material_id: number;
+  id: number; // negative = added locally, not yet saved
+  material_id: number; // 0 = material to be created in Organ on save
   amount_g: number;
   material?: Material;
+  pendingName?: string;
 }
 
 interface MoodItem {
@@ -184,7 +185,7 @@ function LineRow({ line, totalG, unit, onDelete, onUpdateAmount }: {
     <View style={s.lineRow}>
       <Text style={s.lineSymbol}>{symbol}</Text>
       <Text style={[s.lineName, { flex: 1, marginRight: 6 }]} numberOfLines={1}>
-        {line.material?.name ?? `Material #${line.material_id}`}
+        {line.material?.name ?? line.pendingName ?? `Material #${line.material_id}`}
       </Text>
       <View style={{ alignItems: "flex-end", marginRight: 2 }}>
         {editing ? (
@@ -301,6 +302,11 @@ function AddMoodItemModal({ visible, formulaId, onClose, onAdded }: {
 export default function FormulaDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
+  // Edits stay local until Save — the live formula is only written by handleSave
+  const [dirty, setDirty] = useState(false);
+  const [deletedLineIds, setDeletedLineIds] = useState<number[]>([]);
+  const tempIdRef = useRef(-1);
+  const originalAmounts = useRef<Record<number, number>>({});
   const [amountUnit, setAmountUnit] = useState<"g" | "mL">("g");
   const formulaId = parseInt(id ?? "0");
   const { user } = useAuth();
@@ -378,11 +384,10 @@ export default function FormulaDetail() {
     return () => clearTimeout(timer);
   }, [inlineSearch, inlineSelected]);
 
-  const saveParams = useCallback(async (bSize = bottleSizeMl, cPct = concPercent, dil = diluent) => {
-    const notesStr = `Bottle: ${bSize}mL, Concentration: ${cPct}%, Diluent: ${dil}`;
-    await supabase.from("formulas").update({ notes: notesStr }).eq("id", formulaId);
-    setFormula((prev) => prev ? { ...prev, notes: notesStr } : prev);
-  }, [formulaId, bottleSizeMl, concPercent, diluent]);
+  // Parameters now persist on Save only — this just marks the formula dirty
+  const saveParams = useCallback(async () => {
+    setDirty(true);
+  }, []);
 
   const fetchMoodItems = useCallback(async () => {
     const { data } = await supabase
@@ -413,6 +418,9 @@ export default function FormulaDetail() {
       (mats ?? []).forEach((m: any) => { matMap[m.id] = m; });
     }
     setLines(rawLines.map((l) => ({ ...l, material: matMap[l.material_id] })));
+    originalAmounts.current = Object.fromEntries(rawLines.map((l) => [l.id, l.amount_g]));
+    setDeletedLineIds([]);
+    setDirty(false);
     setLoading(false);
     fetchMoodItems();
   }, [formulaId, fetchMoodItems]);
@@ -440,32 +448,19 @@ export default function FormulaDetail() {
     }
   };
 
-  const handleInlineAdd = async () => {
+  const handleInlineAdd = () => {
     const matName = inlineSelected?.name ?? inlineSearch.trim();
     if (!matName) return;
-    setInlineAdding(true);
-    try {
-      let materialId = inlineSelected?.id ?? null;
-      if (!materialId) {
-        // New material — auto-add to Organ
-        const { data: mat, error: matErr } = await supabase
-          .from("materials")
-          .insert([{ name: matName, user_id: user?.id }])
-          .select("id")
-          .single();
-        if (matErr || !mat) throw matErr ?? new Error("Failed to create material");
-        materialId = mat.id;
-      }
-      await supabase.from("formula_lines").insert([{
-        formula_id: formulaId, material_id: materialId, amount_g: parseFloat(inlineAmount) || 0,
-      }]);
-      setInlineSearch(""); setInlineSelected(null); setInlineAmount("0.000"); setInlineResults([]);
-      fetchData();
-    } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Failed to add material");
-    } finally {
-      setInlineAdding(false);
-    }
+    const newLine: FormulaLine = {
+      id: tempIdRef.current--,
+      material_id: inlineSelected?.id ?? 0,
+      amount_g: parseFloat(inlineAmount) || 0,
+      material: inlineSelected ?? undefined,
+      pendingName: inlineSelected ? undefined : matName,
+    };
+    setLines((prev) => [...prev, newLine]);
+    setDirty(true);
+    setInlineSearch(""); setInlineSelected(null); setInlineAmount("0.000"); setInlineResults([]);
   };
 
   const handleDeleteLine = (lineId: number) => {
@@ -473,27 +468,31 @@ export default function FormulaDetail() {
       title: "Remove Material",
       message: "Remove this material from the formula?",
       confirmLabel: "Remove",
-      onConfirm: async () => { await supabase.from("formula_lines").delete().eq("id", lineId); fetchData(); },
+      onConfirm: () => {
+        setLines((prev) => prev.filter((l) => l.id !== lineId));
+        if (lineId > 0) setDeletedLineIds((prev) => [...prev, lineId]);
+        setDirty(true);
+      },
     });
   };
 
-  const handleUpdateAmount = async (lineId: number, amount_g: number) => {
-    await supabase.from("formula_lines").update({ amount_g }).eq("id", lineId);
+  const handleUpdateAmount = (lineId: number, amount_g: number) => {
     setLines((prev) => prev.map((l) => l.id === lineId ? { ...l, amount_g } : l));
+    setDirty(true);
   };
 
-  const commitName = async () => {
+  const commitName = () => {
     if (!nameVal.trim() || !formula) { setEditingName(false); return; }
-    await supabase.from("formulas").update({ name: nameVal.trim() }).eq("id", formula.id);
     setFormula((f) => f ? { ...f, name: nameVal.trim() } : f);
     setEditingName(false);
+    setDirty(true);
   };
 
-  const commitDesc = async () => {
+  const commitDesc = () => {
     if (!formula) { setEditingDesc(false); return; }
-    await supabase.from("formulas").update({ description: descVal.trim() || null }).eq("id", formula.id);
     setFormula((f) => f ? { ...f, description: descVal.trim() || null } : f);
     setEditingDesc(false);
+    setDirty(true);
   };
 
   // Called from the in-sheet "Are you sure?" confirmation
@@ -520,7 +519,7 @@ export default function FormulaDetail() {
     });
   };
 
-  const normalizeToTarget = async () => {
+  const normalizeToTarget = () => {
     if (!lines.length || totalG <= 0 || Math.abs(totalG - targetConcentrateG) < 0.001) return;
     const scale = targetConcentrateG / totalG;
     const normalized = lines.map((l) => ({ ...l, amount_g: +(safeNum(l.amount_g) * scale).toFixed(3) }));
@@ -531,22 +530,59 @@ export default function FormulaDetail() {
       const biggest = normalized.reduce((a, b) => (b.amount_g > a.amount_g ? b : a));
       biggest.amount_g = +(biggest.amount_g + remainder).toFixed(3);
     }
-    const results = await Promise.all(normalized.map((l) => supabase.from("formula_lines").update({ amount_g: l.amount_g }).eq("id", l.id)));
-    const failed = results.find((r) => r.error);
-    if (failed?.error) { Alert.alert("Normalize failed", failed.error.message); return; }
     setLines(normalized);
+    setDirty(true);
   };
 
+  // Persists everything edited on this page: formula fields, parameters, and line changes
   const handleSave = async () => {
     if (!formula) return;
     setSaveMenuVisible(false);
     setSaving(true);
-    const name = editingName ? (nameVal.trim() || formula.name) : formula.name;
-    const description = editingDesc ? (descVal.trim() || null) : formula.description;
-    const { error } = await supabase.from("formulas").update({ name, description, status: statusVal }).eq("id", formulaId);
-    setSaving(false);
-    if (error) { Alert.alert("Save failed", error.message); return; }
-    router.replace("/(tabs)/formulas" as any);
+    try {
+      const name = editingName ? (nameVal.trim() || formula.name) : formula.name;
+      const description = editingDesc ? (descVal.trim() || null) : formula.description;
+      const notesStr = `Bottle: ${bottleSizeMl}mL, Concentration: ${concPercent}%, Diluent: ${diluent}`;
+      const { error } = await supabase.from("formulas")
+        .update({ name, description, status: statusVal, notes: notesStr }).eq("id", formulaId);
+      if (error) throw error;
+
+      if (deletedLineIds.length) {
+        const { error: delErr } = await supabase.from("formula_lines").delete().in("id", deletedLineIds);
+        if (delErr) throw delErr;
+      }
+
+      for (const l of lines) {
+        if (l.id > 0) {
+          if (originalAmounts.current[l.id] !== l.amount_g) {
+            const { error: upErr } = await supabase.from("formula_lines").update({ amount_g: l.amount_g }).eq("id", l.id);
+            if (upErr) throw upErr;
+          }
+        } else {
+          let materialId = l.material_id;
+          if (!materialId) {
+            // New material typed in by name — create it in the Organ now
+            const { data: mat, error: matErr } = await supabase
+              .from("materials")
+              .insert([{ name: l.pendingName ?? "Material", user_id: user?.id }])
+              .select("id")
+              .single();
+            if (matErr || !mat) throw matErr ?? new Error("Failed to create material");
+            materialId = mat.id;
+          }
+          const { error: insErr } = await supabase.from("formula_lines").insert([{
+            formula_id: formulaId, material_id: materialId, amount_g: l.amount_g,
+          }]);
+          if (insErr) throw insErr;
+        }
+      }
+
+      setSaving(false);
+      router.replace("/(tabs)/formulas" as any);
+    } catch (e: any) {
+      setSaving(false);
+      Alert.alert("Save failed", e?.message ?? "Please try again.");
+    }
   };
 
   const handleSaveVersion = async (label: string) => {
@@ -654,7 +690,21 @@ export default function FormulaDetail() {
 
       {/* Back carrot + section header */}
       <View style={s.headerRow}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity
+          onPress={() => {
+            if (dirty) {
+              setConfirm({
+                title: "Discard Changes",
+                message: "You have unsaved changes. Leave without saving?",
+                confirmLabel: "Discard",
+                onConfirm: () => router.back(),
+              });
+            } else {
+              router.back();
+            }
+          }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Text style={s.backCarrot}>‹</Text>
         </TouchableOpacity>
         <Text style={s.pageTitle}>Lab</Text>
@@ -995,7 +1045,7 @@ export default function FormulaDetail() {
                 <TouchableOpacity
                   key={st}
                   style={[s.statusChip, active && s.statusChipActive]}
-                  onPress={() => setStatusVal(active ? null : st)}
+                  onPress={() => { setStatusVal(active ? null : st); setDirty(true); }}
                 >
                   <Text style={[s.statusChipText, active && s.statusChipTextActive]}>{st.toUpperCase()}</Text>
                 </TouchableOpacity>
@@ -1019,7 +1069,7 @@ export default function FormulaDetail() {
               <TouchableOpacity
                 key={d}
                 style={{ paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-                onPress={() => { setDiluent(d); setDiluentPickerVisible(false); saveParams(bottleSizeMl, concPercent, d); }}
+                onPress={() => { setDiluent(d); setDiluentPickerVisible(false); saveParams(); }}
               >
                 <Text style={{ color: "#fff", fontSize: 16 }}>{d}</Text>
                 {diluent === d ? <Text style={{ color: "#a78bfa", fontSize: 18 }}>✓</Text> : null}

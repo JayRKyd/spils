@@ -37,8 +37,8 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
-        {/* Nav list */}
-        <View style={s.navList}>
+        {/* Nav list — anchored to the upper third rather than centered */}
+        <View style={[s.navList, { paddingTop: height * 0.14 }]}>
           {NAV_ITEMS.map(({ label, path }) => (
             <TouchableOpacity
               key={path}
@@ -74,7 +74,7 @@ const s = StyleSheet.create({
   },
   profileIcon: { fontSize: 16 },
 
-  navList: { flex: 1, justifyContent: "center", paddingHorizontal: 28, gap: 4 },
+  navList: { flex: 1, justifyContent: "flex-start", paddingHorizontal: 28, gap: 4 },
 
   pill: {
     alignSelf: "flex-start",

@@ -8,7 +8,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { consumeMyPostsIntent } from "@/lib/navIntents";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -1454,25 +1456,33 @@ const mp = StyleSheet.create({
   editTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 8 },
 });
 
+const WELCOME_SEEN_KEY = "spils_community_welcome_seen";
+
 export default function Community() {
   const [section, setSection] = useState<SectionKey | null>(null);
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
   const [myPostsOnly, setMyPostsOnly] = useState(false);
-  const params = useLocalSearchParams<{ myPosts?: string }>();
+
+  const dismissWelcome = () => {
+    setComingSoonVisible(false);
+    AsyncStorage.setItem(WELCOME_SEEN_KEY, "1").catch(() => {});
+  };
 
   useFocusEffect(
     useCallback(() => {
-      // Deep link from Profile ("Posts"/"Comments") straight into My Posts
-      if (params.myPosts === "1") {
+      // One-shot intent from Profile ("Posts"/"Comments") straight into My Posts
+      if (consumeMyPostsIntent()) {
         setSection("chat");
         setMyPostsOnly(true);
         setComingSoonVisible(false);
-        router.setParams({ myPosts: "" } as any);
         return;
       }
       setSection(null);
-      setComingSoonVisible(true);
-    }, [params.myPosts])
+      // Welcome popup only auto-shows until the user closes it once
+      AsyncStorage.getItem(WELCOME_SEEN_KEY)
+        .then((seen) => { if (!seen) setComingSoonVisible(true); })
+        .catch(() => {});
+    }, [])
   );
 
   const handleMenu = (key: SectionKey) => {
@@ -1527,14 +1537,14 @@ export default function Community() {
       </ScrollView>
 
       {/* Welcome pop-up */}
-      <Modal visible={comingSoonVisible} transparent animationType="fade" onRequestClose={() => setComingSoonVisible(false)}>
+      <Modal visible={comingSoonVisible} transparent animationType="fade" onRequestClose={dismissWelcome}>
         <TouchableOpacity
           style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}
-          onPress={() => setComingSoonVisible(false)}
+          onPress={dismissWelcome}
           activeOpacity={1}
         >
           <BlurView intensity={60} tint="light" style={ls.csCard}>
-            <TouchableOpacity style={ls.csClose} onPress={() => setComingSoonVisible(false)}>
+            <TouchableOpacity style={ls.csClose} onPress={dismissWelcome}>
               <Text style={ls.csCloseText}>✕</Text>
             </TouchableOpacity>
             <Text style={ls.csTitle}>Welcome to the{"\n"}SPILS© Community [Beta].</Text>

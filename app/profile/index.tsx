@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { SpilsLogo } from "@/components/SpilsLogo";
 import { ProfileIcon } from "@/components/ProfileIcon";
 import { ConfirmModal, ConfirmConfig } from "@/components/ConfirmModal";
+import { requestMyPosts } from "@/lib/navIntents";
 
 const ACCENT = "#a68bfa";
 const STAT_COLORS: Record<string, string> = {
@@ -244,7 +245,7 @@ export default function ProfileScreen() {
               <Text style={s.displayName} numberOfLines={1}>{profile?.username ?? user?.email?.split("@")[0] ?? "User"}</Text>
               <Text style={s.metaRow} numberOfLines={1}>
                 <Text style={s.email}>{user?.email}</Text>
-                {memberSince ? <Text style={s.memberSince}>  |  Member since {memberSince}</Text> : null}
+                {memberSince ? <Text style={s.memberSince}>  |  Since {memberSince}</Text> : null}
               </Text>
             </View>
           </View>
@@ -269,10 +270,10 @@ export default function ProfileScreen() {
           <View style={s.betaBadge}><Text style={s.betaText}>Beta</Text></View>
         </View>
         <View style={{ flexDirection: "row", gap: 12, marginBottom: 26 }}>
-          <TouchableOpacity style={s.pillBtn} onPress={() => router.push("/(tabs)/community?myPosts=1" as any)}>
+          <TouchableOpacity style={s.pillBtn} onPress={() => { requestMyPosts(); router.push("/(tabs)/community" as any); }}>
             <Text style={s.pillBtnText}>Posts</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.pillBtn} onPress={() => router.push("/(tabs)/community?myPosts=1" as any)}>
+          <TouchableOpacity style={s.pillBtn} onPress={() => { requestMyPosts(); router.push("/(tabs)/community" as any); }}>
             <Text style={s.pillBtnText}>Comments</Text>
           </TouchableOpacity>
         </View>

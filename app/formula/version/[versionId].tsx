@@ -287,6 +287,7 @@ export default function FormulaVersionDetail() {
   const [moodOpen, setMoodOpen] = useState(false);
   const [paramsOpen, setParamsOpen] = useState(false);
   const [formulaOpen, setFormulaOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [concFocused, setConcFocused] = useState(false);
   const [amountUnit, setAmountUnit] = useState<"g" | "mL">("g");
 
@@ -420,6 +421,26 @@ export default function FormulaVersionDetail() {
   const totalG = snapshot?.lines?.reduce((sum, l) => sum + l.amount_g, 0) ?? 0;
   const targetConcentrateG = snapshot ? +(snapshot.bottle_ml * (snapshot.concentration_pct / 100)).toFixed(3) : 0;
   const diluentNeededMl = snapshot ? Math.max(0, +(snapshot.bottle_ml - targetConcentrateG).toFixed(1)) : 0;
+  const atTarget = Math.abs(totalG - targetConcentrateG) < 0.001;
+  const overTarget = totalG > targetConcentrateG;
+  const targetDiffLabel = Math.abs(totalG - targetConcentrateG).toFixed(3);
+  const catG = (t: string) => (snapshot?.lines ?? []).filter((l) => l.type === t).reduce((acc, l) => acc + l.amount_g, 0);
+  const topG = catG("Top"), midG = catG("Mid"), baseG = catG("Base");
+  const pctOf = (g: number) => (totalG > 0 ? Math.round((g / totalG) * 100) : 0);
+
+  const normalizeToTarget = () => {
+    if (!snapshot || !snapshot.lines.length || totalG <= 0 || atTarget) return;
+    const scale = targetConcentrateG / totalG;
+    const normalized = snapshot.lines.map((l) => ({ ...l, amount_g: +(l.amount_g * scale).toFixed(3) }));
+    // Per-line rounding can leave the sum a few mg off target — absorb the remainder into the largest line
+    const sum = normalized.reduce((acc, l) => acc + l.amount_g, 0);
+    const remainder = +(targetConcentrateG - sum).toFixed(3);
+    if (remainder !== 0 && normalized.length) {
+      const biggest = normalized.reduce((a, b) => (b.amount_g > a.amount_g ? b : a));
+      biggest.amount_g = +(biggest.amount_g + remainder).toFixed(3);
+    }
+    setSnapshot((prev) => (prev ? { ...prev, lines: normalized } : prev));
+  };
   const moodImages = moodItems.filter((i) => i.media_type === "image" && i.display_url);
   const sortedLines = snapshot
     ? snapshot.lines.map((line, idx) => ({ line, idx })).sort((a, b) => symbolRank(a.line.type) - symbolRank(b.line.type))
@@ -683,6 +704,69 @@ export default function FormulaVersionDetail() {
                 )}
               </View>
             )}
+
+            {/* ── Summary ── */}
+            {snapshot && (
+              <View style={s.section}>
+                <TouchableOpacity style={s.sectionHead} activeOpacity={0.8} onPress={() => setSummaryOpen((v) => !v)}>
+                  <Text style={s.sectionHeadTitle}>Summary</Text>
+                  {!summaryOpen && <Text style={s.sectionShow}>Show</Text>}
+                </TouchableOpacity>
+                {summaryOpen && (
+                <View style={s.sectionBody}>
+                  <View style={{ flexDirection: "row" }}>
+                    <View style={{ flex: 1, alignItems: "center" }}>
+                      <Text style={s.statVal}>{totalG.toFixed(3)}g</Text>
+                      <Text style={s.statLabel}>CONCENTRATE TOTAL</Text>
+                    </View>
+                    <View style={s.statDivider} />
+                    <View style={{ flex: 1, alignItems: "center" }}>
+                      <Text style={s.statVal}>{targetConcentrateG.toFixed(3)}g</Text>
+                      <Text style={s.statLabel}>TARGET CONCENTRATE</Text>
+                    </View>
+                    <View style={s.statDivider} />
+                    <View style={{ flex: 1, alignItems: "center" }}>
+                      <Text style={s.statVal}>{diluentNeededMl}ml</Text>
+                      <Text style={s.statLabel}>DILUENT</Text>
+                    </View>
+                  </View>
+
+                  {/* Breakdown by symbol + target warning */}
+                  {snapshot.lines.length > 0 && (
+                    <>
+                      <View style={s.breakdownRow}>
+                        {topG > 0 && <View style={[s.bdPill, { backgroundColor: "#9BE24F" }]}><Text style={s.bdPillDark}>▲ {pctOf(topG)}%</Text></View>}
+                        {midG > 0 && <View style={[s.bdPill, { backgroundColor: "#F06CA6" }]}><Text style={s.bdPillDark}>● {pctOf(midG)}%</Text></View>}
+                        {baseG > 0 && <View style={[s.bdPill, { backgroundColor: "#4C7DF0" }]}><Text style={s.bdPillLight}>■ {pctOf(baseG)}%</Text></View>}
+                      </View>
+                      <View style={[s.breakdownRow, { marginTop: 10 }]}>
+                        {atTarget ? (
+                          <View style={[s.bdPill, { backgroundColor: "#D9F24E" }]}><Text style={s.bdPillDark}>On Target</Text></View>
+                        ) : (
+                          <View style={[s.bdPill, { backgroundColor: "#E53935" }]}>
+                            <Text style={s.bdPillLight}>⚠ {overTarget ? "↓" : "↑"} {targetDiffLabel}g {overTarget ? "Over Target" : "To Target"}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </>
+                  )}
+
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                    <TouchableOpacity
+                      style={[s.normalizeBtn, (atTarget || totalG === 0) && { opacity: 0.4 }]}
+                      onPress={normalizeToTarget}
+                      disabled={atTarget || totalG === 0}
+                    >
+                      <Text style={s.normalizeBtnText}>Normalize to Target</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setSummaryOpen(false)}>
+                      <Text style={s.sectionShow}>Hide</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                )}
+              </View>
+            )}
           </ScrollView>
         )}
 
@@ -793,6 +877,15 @@ const s = StyleSheet.create({
   sectionHeadTitle: { color: "#fff", fontWeight: "600", fontSize: 16 },
   sectionShow: { color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: "500" },
   sectionBody: { paddingHorizontal: 18, paddingBottom: 20, paddingTop: 2 },
+  statVal: { color: "#fff", fontWeight: "700", fontSize: 17, marginBottom: 4, textAlign: "center" },
+  statLabel: { color: "rgba(255,255,255,0.45)", fontSize: 11, textAlign: "center" },
+  statDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.15)", marginVertical: 4 },
+  breakdownRow: { flexDirection: "row", gap: 10, marginTop: 20, justifyContent: "center" },
+  bdPill: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 6 },
+  bdPillDark: { color: "#13131a", fontSize: 13, fontWeight: "700" },
+  bdPillLight: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  normalizeBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 },
+  normalizeBtnText: { color: "rgba(255,255,255,0.75)", fontWeight: "600", fontSize: 12 },
 
   // Mood board
   addPill: { borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 6 },
