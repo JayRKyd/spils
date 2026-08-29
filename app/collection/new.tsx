@@ -280,21 +280,37 @@ export default function CollectionNew() {
       if (resp.error) throw resp.error;
       const a = resp.data?.autofill;
       if (a && typeof a === "object") {
-        if (!title && a.perfume) setTitle(a.perfume);
-        if (!brand && a.brand) setBrand(a.brand);
-        if (!perfumer && a.perfumer) setPerfumer(a.perfumer);
-        if (a.gender) setGender(a.gender);
-        if (Array.isArray(a.seasons) && !seasons.length) {
-          const validSeasons = ["Spring", "Summer", "Fall", "Winter"];
-          const valid = a.seasons.filter((x: any) => typeof x === "string" && validSeasons.includes(x));
-          if (valid.length) setSeasons(valid);
+        // A recognized label means the user scanned a (possibly different) bottle —
+        // all scan-owned fields reset to the new bottle's data (cleared when the
+        // scan has none) so nothing from a previous scan can linger and mix.
+        // Unrecognized scans keep the gentle fill-only-if-empty behavior.
+        const recognized = !!a.perfume;
+        const validSeasons = ["Spring", "Summer", "Fall", "Winter"];
+        const strArr = (v: any) => (Array.isArray(v) ? v.filter((x: any) => typeof x === "string") : []);
+        if (recognized) {
+          setTitle(a.perfume);
+          setBrand(a.brand ?? "");
+          setPerfumer(a.perfumer ?? "");
+          if (a.gender) setGender(a.gender);
+          setSeasons(strArr(a.seasons).filter((x: string) => validSeasons.includes(x)));
+          setFamilies(strArr(a.fragrance_families));
+          setNotesTop(strArr(a.top_notes));
+          setNotesHeart(strArr(a.heart_notes));
+          setNotesBase(strArr(a.base_notes));
+        } else {
+          if (!title && a.perfume) setTitle(a.perfume);
+          if (!brand && a.brand) setBrand(a.brand);
+          if (!perfumer && a.perfumer) setPerfumer(a.perfumer);
+          if (a.gender) setGender(a.gender);
+          if (!seasons.length) {
+            const valid = strArr(a.seasons).filter((x: string) => validSeasons.includes(x));
+            if (valid.length) setSeasons(valid);
+          }
+          if (!families.length && strArr(a.fragrance_families).length) setFamilies(strArr(a.fragrance_families));
+          if (!notesTop.length && strArr(a.top_notes).length) setNotesTop(strArr(a.top_notes));
+          if (!notesHeart.length && strArr(a.heart_notes).length) setNotesHeart(strArr(a.heart_notes));
+          if (!notesBase.length && strArr(a.base_notes).length) setNotesBase(strArr(a.base_notes));
         }
-        if (Array.isArray(a.fragrance_families) && !families.length) {
-          setFamilies(a.fragrance_families.filter((x: any) => typeof x === "string"));
-        }
-        if (Array.isArray(a.top_notes) && !notesTop.length) setNotesTop(a.top_notes.filter((x: any) => typeof x === "string"));
-        if (Array.isArray(a.heart_notes) && !notesHeart.length) setNotesHeart(a.heart_notes.filter((x: any) => typeof x === "string"));
-        if (Array.isArray(a.base_notes) && !notesBase.length) setNotesBase(a.base_notes.filter((x: any) => typeof x === "string"));
         setAiStatus("✦ Auto-filled from label");
       } else {
         setAiStatus("Couldn't read the label.");
