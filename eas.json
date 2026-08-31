@@ -24,9 +24,7 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "knowlesjordy@gmail.com",
-        "ascAppId": "6784083228",
-        "appleTeamId": "FA57DRZMZ9"
+        "appleId": "knowlesjordy@gmail.com"
       }
     }
   }
