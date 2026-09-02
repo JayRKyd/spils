@@ -9,9 +9,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { router, useFocusEffect } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { consumeMyPostsIntent } from "@/lib/navIntents";
-import * as ImagePicker from "expo-image-picker";
+import { checkModeration } from "@/lib/moderation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { GlassRow } from "@/components/GlassCard";
@@ -57,7 +56,7 @@ interface ForumThread {
 }
 
 interface ThreadComment {
-  id: string; content: string; created_at: string;
+  id: string; content: string; created_at: string; user_id?: string;
   profiles?: { username: string | null } | null;
 }
 
@@ -289,14 +288,84 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
   const [commentOpen, setCommentOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const pickPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access."); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 0.6, base64: true });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setNewPhoto(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
-    }
+  // Community image uploads are disabled for V1 (moderation); existing post
+  // images still display, and editing an old post keeps its image.
+
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (supabase as any).from("user_blocks").select("blocked_id").eq("blocker_id", user.id)
+      .then(({ data }: any) => setBlockedIds(new Set((data ?? []).map((b: any) => b.blocked_id))));
+    (supabase as any).from("profiles").select("is_admin").eq("id", user.id).single()
+      .then(({ data }: any) => setIsAdmin(!!data?.is_admin));
+  }, [user?.id]);
+
+  const adminRemovePost = (threadId: string) => {
+    setConfirm({
+      title: "Remove Post",
+      message: "Remove this post and its comments for all users?",
+      confirmLabel: "Remove",
+      onConfirm: async () => {
+        await (supabase as any).from("forum_comments").delete().eq("thread_id", threadId);
+        await (supabase as any).from("forum_threads").delete().eq("id", threadId);
+        closeExpanded();
+        fetchThreads();
+      },
+    });
+  };
+
+  const adminRemoveComment = (threadId: string, commentId: string) => {
+    setConfirm({
+      title: "Remove Comment",
+      message: "Remove this comment for all users?",
+      confirmLabel: "Remove",
+      onConfirm: async () => {
+        await (supabase as any).from("forum_comments").delete().eq("id", commentId);
+        const { data } = await (supabase as any)
+          .from("forum_comments").select("*, profiles(username)")
+          .eq("thread_id", threadId).order("created_at", { ascending: true });
+        setExpandedComments(data ?? []);
+      },
+    });
+  };
+
+  const reportContent = (targetType: "post" | "comment", targetId: string) => {
+    setConfirm({
+      title: targetType === "post" ? "Report Post" : "Report Comment",
+      message: "Report this to the SPILS team for review?",
+      confirmLabel: "Report",
+      onConfirm: async () => {
+        const { error } = await (supabase as any).from("community_reports").insert([{
+          reporter_id: user?.id, target_type: targetType, target_id: targetId,
+        }]);
+        if (!error) {
+          setTimeout(() => setConfirm({
+            title: "Report Received",
+            message: "Thank you — our team will review it shortly.",
+            infoOnly: true,
+          }), 350);
+        }
+      },
+    });
+  };
+
+  const blockUser = (targetId: string, username: string) => {
+    setConfirm({
+      title: "Block User",
+      message: `Block ${username}? You won't see their posts or comments anymore.`,
+      confirmLabel: "Block",
+      onConfirm: async () => {
+        const { error } = await (supabase as any).from("user_blocks").insert([{
+          blocker_id: user?.id, blocked_id: targetId,
+        }]);
+        if (!error || error.code === "23505") {
+          setBlockedIds((prev) => new Set(prev).add(targetId));
+          closeExpanded();
+        }
+      },
+    });
   };
 
   const fetchThreads = useCallback(async () => {
@@ -355,13 +424,23 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
 
   const postComment = async (threadId: string) => {
     if (!commentText.trim()) return;
+    const mod = checkModeration(commentText);
+    if (mod.verdict === "block") {
+      Alert.alert("Can't post", "Your comment contains content that violates the SPILS community guidelines. Please edit it and try again.");
+      return;
+    }
     setCommentPosting(true);
-    const { error } = await (supabase as any).from("forum_comments").insert([{
+    const { data: created, error } = await (supabase as any).from("forum_comments").insert([{
       thread_id: threadId,
       content: commentText.trim(),
       user_id: user?.id,
-    }]);
+    }]).select("id").single();
     if (error) { console.error("postComment error:", error.message); setCommentPosting(false); return; }
+    if (mod.verdict === "flag" && created?.id) {
+      await (supabase as any).from("community_reports").insert([{
+        reporter_id: user?.id, target_type: "comment", target_id: created.id, reason: `auto-flag: ${mod.term}`,
+      }]);
+    }
     setCommentText("");
     const { data } = await (supabase as any)
       .from("forum_comments")
@@ -405,6 +484,11 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
       Alert.alert("Not signed in", "Your session expired. Please sign in again, then post.");
       return;
     }
+    const mod = checkModeration(`${newName} ${newTopic} ${newDesc} ${newSource}`);
+    if (mod.verdict === "block") {
+      Alert.alert("Can't post", "Your post contains content that violates the SPILS community guidelines. Please edit it and try again.");
+      return;
+    }
     setSaving(true);
     let uploadedPhoto: string | null = null;
     try {
@@ -423,10 +507,14 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
       is_draft: isDraft,
     };
     let error = null;
+    let targetId: string | null = editingId;
     if (editingId) {
       ({ error } = await (supabase as any).from("forum_threads").update(payload).eq("id", editingId));
     } else {
-      ({ error } = await (supabase as any).from("forum_threads").insert([{ ...payload, user_id: user.id }]));
+      const { data: created, error: insErr } = await (supabase as any)
+        .from("forum_threads").insert([{ ...payload, user_id: user.id }]).select("id").single();
+      error = insErr;
+      targetId = created?.id ?? null;
     }
     setSaving(false);
     if (error) {
@@ -435,13 +523,20 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
       Alert.alert("Post failed", error.message ?? "Could not save your post. Please try again.");
       return;
     }
+    if (mod.verdict === "flag" && targetId) {
+      // Auto-file for admin review; the post stays up in the meantime
+      await (supabase as any).from("community_reports").insert([{
+        reporter_id: user.id, target_type: "post", target_id: targetId, reason: `auto-flag: ${mod.term}`,
+      }]);
+    }
     closeModal();
     fetchThreads();
   };
 
   const closeExpanded = () => { setExpandedId(null); setExpandedComments([]); setExpandedImage(null); setCommentText(""); setCommentOpen(false); };
 
-  const filtered = myPostsOnly ? threads.filter((t) => t.user_id === user?.id) : threads;
+  const visible = threads.filter((t) => !t.user_id || !blockedIds.has(t.user_id));
+  const filtered = myPostsOnly ? visible.filter((t) => t.user_id === user?.id) : visible;
 
   // Scroll the expanded card above the keyboard when the comment box gains focus
   const scrollToExpanded = () => {
@@ -587,18 +682,51 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
                     {!commentLoading && expandedComments.length === 0 ? (
                       <Text style={[ns.cardDesc, { marginBottom: 8 }]}>No comments yet.</Text>
                     ) : null}
-                    {expandedComments.map((c) => (
+                    {expandedComments.filter((c) => !c.user_id || !blockedIds.has(c.user_id)).map((c) => (
                       <View key={c.id} style={{ marginBottom: 16 }}>
                         <Text style={[ns.cardDesc, { lineHeight: 20 }]}>{c.content}</Text>
-                        <Text style={ft.byLineComment}>
-                          by <Text style={ft.authorLink}>{c.profiles?.username ?? "Anonymous User"}</Text>
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <Text style={ft.byLineComment}>
+                            by <Text style={ft.authorLink}>{c.profiles?.username ?? "Anonymous User"}</Text>
+                          </Text>
+                          {c.user_id && c.user_id !== user?.id ? (
+                            <TouchableOpacity onPress={() => reportContent("comment", c.id)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                              <Text style={ft.modLink}>  ·  Report</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                          {isAdmin ? (
+                            <TouchableOpacity onPress={() => adminRemoveComment(item.id, c.id)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                              <Text style={ft.modLink}>  ·  Remove</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
                       </View>
                     ))}
 
-                    <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 4 }} onPress={closeExpanded} activeOpacity={0.7}>
-                      <Text style={ns.closeTxt}>Close</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        {item.user_id && item.user_id !== user?.id ? (
+                          <>
+                            <TouchableOpacity onPress={() => reportContent("post", item.id)} hitSlop={{ top: 8, bottom: 8 }}>
+                              <Text style={ft.modLink}>Report</Text>
+                            </TouchableOpacity>
+                            <Text style={ft.modLink}>  |  </Text>
+                            <TouchableOpacity onPress={() => blockUser(item.user_id!, item.profiles?.username ?? "this user")} hitSlop={{ top: 8, bottom: 8 }}>
+                              <Text style={ft.modLink}>Block User</Text>
+                            </TouchableOpacity>
+                          </>
+                        ) : null}
+                        {isAdmin && item.user_id !== user?.id ? <Text style={ft.modLink}>  |  </Text> : null}
+                        {isAdmin ? (
+                          <TouchableOpacity onPress={() => adminRemovePost(item.id)} hitSlop={{ top: 8, bottom: 8 }}>
+                            <Text style={ft.modLink}>Remove</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                      <TouchableOpacity onPress={closeExpanded} activeOpacity={0.7}>
+                        <Text style={ns.closeTxt}>Close</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ) : null}
               </View>
@@ -638,13 +766,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
 
               <TextInput style={[np.field, np.copyField]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={newDesc} onChangeText={setNewDesc} multiline textAlignVertical="top" />
 
-              <TouchableOpacity style={np.photoBox} onPress={pickPhoto} activeOpacity={0.85}>
-                {newPhoto ? (
-                  <Image source={{ uri: newPhoto }} style={{ width: "100%", height: "100%", borderRadius: 10 }} resizeMode="cover" />
-                ) : (
-                  <Text style={np.photoLabel}>Include Image (optional)</Text>
-                )}
-              </TouchableOpacity>
+              {/* Image uploads disabled for V1 (moderation) */}
 
               <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
                 <TouchableOpacity
@@ -686,6 +808,7 @@ const ft = StyleSheet.create({
   authorLink: { color: "#fff", fontSize: 12, textDecorationLine: "underline" },
   editLink: { color: "rgba(255,255,255,0.8)", fontSize: 13 },
   editSep: { color: "rgba(255,255,255,0.35)", fontSize: 13 },
+  modLink: { color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: "600" },
   commentBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 20, paddingHorizontal: 20, paddingVertical: 7 },
   commentBtnActive: { backgroundColor: "#D9F24E", borderColor: "#D9F24E" },
   commentBtnText: { color: "#fff", fontSize: 13, fontWeight: "500" },
@@ -1154,10 +1277,18 @@ function SupportTab() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 20 }}>
             {[
-              { q: "How do I add materials to my Organ?", a: "Go to the Organ tab and tap the + button. Fill in the material details and tap Save." },
-              { q: "Can I import materials from a CSV?", a: "CSV import is available on the web app at aethera.app. Your data syncs automatically to mobile." },
-              { q: "How does the AI label scanner work?", a: "In New Journal Entry, tap the bottle photo card. The AI reads the label and prefills your entry automatically." },
-              { q: "Is my data private by default?", a: "Yes. Journal entries and formulas are private. You control visibility — toggle Public to share with the community." },
+              { q: "What is SPILS?", a: "SPILS is A Digital Playground for Fragrance Lovers, bringing Journal, Collection, Lab, Organ and Community together in one place." },
+              { q: "Who is SPILS for?", a: "Fragrance enthusiasts, collectors, aspiring perfumers and creators." },
+              { q: "What is Journal?", a: "Capture SOTD, fragrance experiences, notes, impressions, performance, memories and inspiration." },
+              { q: "What is Collection?", a: "Your personal space to organize and explore your fragrance collection." },
+              { q: "What is Lab?", a: "A workspace for creating, saving and evolving fragrance formulas and experiments." },
+              { q: "Are my Lab formulas private?", a: "Your formulas are private to your account and are not publicly shared unless you choose to share them through a supported SPILS feature." },
+              { q: "What is Organ?", a: "Your perfumery reference library for organizing and exploring fragrance materials and ingredients." },
+              { q: "Can I upload my own materials to Organ?", a: "Yes. You can add materials individually or import multiple materials at once using a .CSV file. Your CSV should include the following column headers: Symbols, Name, Notes, CAS, IFRA, and Stock (g/ml). You can also download the SPILS CSV template directly from the Organ Import window to make setup easy." },
+              { q: "Does SPILS include IFRA information?", a: "Not yet. IFRA-related tools are planned for a future update. Always consult current official IFRA standards and applicable safety guidance." },
+              { q: "What is Community?", a: "A space to explore, discover and connect around fragrance." },
+              { q: "Can I report inappropriate content or block someone?", a: "Yes. Use Report for inappropriate content and Block if you no longer want to interact with another account." },
+              { q: "How do I contact SPILS?", a: "info@spils.app" },
             ].map(({ q, a }, i) => (
               <GlassRow key={i} style={[s.card, { marginBottom: 10 }]}>
                 <Text style={[s.cardTitle, { fontSize: 13, marginBottom: 4 }]}>{q}</Text>
@@ -1313,6 +1444,16 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
   };
   const saveEditPost = async (publish = false) => {
     if (!editPost) return;
+    const mod = checkModeration(`${eName} ${eTopic} ${eDesc} ${eSource}`);
+    if (mod.verdict === "block") {
+      Alert.alert("Can't save", "Your post contains content that violates the SPILS community guidelines. Please edit it and try again.");
+      return;
+    }
+    if (mod.verdict === "flag") {
+      await (supabase as any).from("community_reports").insert([{
+        reporter_id: user?.id, target_type: "post", target_id: editPost.id, reason: `auto-flag: ${mod.term}`,
+      }]);
+    }
     setSaving(true);
     await (supabase as any).from("forum_threads").update({
       name: eName.trim(), category: eTopic.trim() || "General", source_url: eSource.trim() || null, description: eDesc.trim() || "",
@@ -1328,6 +1469,16 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
 
   const saveEditComment = async () => {
     if (!editComment) return;
+    const mod = checkModeration(ecText);
+    if (mod.verdict === "block") {
+      Alert.alert("Can't save", "Your comment contains content that violates the SPILS community guidelines. Please edit it and try again.");
+      return;
+    }
+    if (mod.verdict === "flag") {
+      await (supabase as any).from("community_reports").insert([{
+        reporter_id: user?.id, target_type: "comment", target_id: editComment.id, reason: `auto-flag: ${mod.term}`,
+      }]);
+    }
     await (supabase as any).from("forum_comments").update({ content: ecText.trim() }).eq("id", editComment.id);
     setEditComment(null); fetchAll();
   };
@@ -1456,17 +1607,15 @@ const mp = StyleSheet.create({
   editTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 8 },
 });
 
-const WELCOME_SEEN_KEY = "spils_community_welcome_seen";
+// Welcome popup shows once per app session — resets when the app is relaunched
+let welcomeShownThisSession = false;
 
 export default function Community() {
   const [section, setSection] = useState<SectionKey | null>(null);
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
   const [myPostsOnly, setMyPostsOnly] = useState(false);
 
-  const dismissWelcome = () => {
-    setComingSoonVisible(false);
-    AsyncStorage.setItem(WELCOME_SEEN_KEY, "1").catch(() => {});
-  };
+  const dismissWelcome = () => setComingSoonVisible(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -1478,10 +1627,10 @@ export default function Community() {
         return;
       }
       setSection(null);
-      // Welcome popup only auto-shows until the user closes it once
-      AsyncStorage.getItem(WELCOME_SEEN_KEY)
-        .then((seen) => { if (!seen) setComingSoonVisible(true); })
-        .catch(() => {});
+      if (!welcomeShownThisSession) {
+        welcomeShownThisSession = true;
+        setComingSoonVisible(true);
+      }
     }, [])
   );
 

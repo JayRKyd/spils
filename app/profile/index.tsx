@@ -202,6 +202,27 @@ export default function ProfileScreen() {
     });
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDeleteAccount = () => {
+    setConfirm({
+      title: "Delete Account",
+      message: "This permanently deletes your account and everything in it — journal, collection, lab formulas, organ, and community posts. This cannot be undone.",
+      confirmLabel: "Delete",
+      onConfirm: async () => {
+        setDeleting(true);
+        try {
+          const { data, error } = await (supabase as any).functions.invoke("delete-account");
+          if (error || data?.error) throw error ?? new Error(data.error);
+          await signOut();
+          router.replace("/(auth)/login" as any);
+        } catch (e: any) {
+          setDeleting(false);
+          Alert.alert("Delete failed", e?.message ?? "Please try again or contact info@spils.app.");
+        }
+      },
+    });
+  };
+
   const memberSince = profile?.created_at
     ? (() => { const d = new Date(profile.created_at); return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}.${String(d.getFullYear()).slice(-2)}`; })()
     : null;
@@ -290,6 +311,13 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Delete Account (App Review requirement) */}
+        <TouchableOpacity style={{ alignSelf: "center", marginTop: 44, padding: 8 }} onPress={handleDeleteAccount} disabled={deleting}>
+          {deleting
+            ? <ActivityIndicator color="#ff5252" size="small" />
+            : <Text style={s.deleteAccount}>Delete Account</Text>}
+        </TouchableOpacity>
       </ScrollView>
 
       {profile && (
@@ -315,6 +343,7 @@ const s = StyleSheet.create({
   pillBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 100, paddingHorizontal: 24, paddingVertical: 10 },
   pillBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   dimmed: { opacity: 0.4 },
+  deleteAccount: { color: "#ff5252", fontSize: 13, fontWeight: "600" },
   avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(167,139,250,0.25)", borderWidth: 2, borderColor: "rgba(167,139,250,0.5)", alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarLargeText: { color: "#fff", fontSize: 28, fontWeight: "700" },
   avatarEditBadge: { position: "absolute", bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: "#a78bfa", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#000000" },
