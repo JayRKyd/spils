@@ -194,6 +194,7 @@ export default function JournalNew() {
   const [priceText, setPriceText] = useState("");
   const [sizeText, setSizeText] = useState("");
   const [rating, setRating] = useState("");
+  const [yearText, setYearText] = useState("");
   const [category, setCategory] = useState("");
   const [concentration, setConcentration] = useState("");
   const [remindsMeOf, setRemindsMeOf] = useState("");
@@ -425,6 +426,7 @@ export default function JournalNew() {
         price: priceText ? (parseFloat(priceText) || null) : null,
         size_ml: sizeText ? (parseFloat(sizeText) || null) : null,
         rating: rating ? parseFloat(rating) : null,
+        year: yearText ? parseInt(yearText, 10) || null : null,
         reminds_me_of: remindsMeOf.trim() || null,
         temperature: temperatureVal,
         season: seasons.length ? seasons : null,
@@ -502,6 +504,7 @@ export default function JournalNew() {
       concentration: concentration.trim() || null,
       reminds_me_of: remindsMeOf.trim() || null,
       rating_10: rating ? parseFloat(rating) : null,
+      year: yearText ? parseInt(yearText, 10) || null : null,
       seasons: seasons.length ? seasons : null,
       is_public: false,
       entry_date: entryDate,
@@ -585,7 +588,10 @@ export default function JournalNew() {
                     <TextInput style={[s.field, { flex: 1 }]} placeholder="Price" placeholderTextColor="rgba(255,255,255,0.4)" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
                     <TextInput style={[s.field, { flex: 1 }]} placeholder="Size" placeholderTextColor="rgba(255,255,255,0.4)" value={sizeText} onChangeText={setSizeText} />
                   </View>
-                  <TextInput style={[s.field, { alignSelf: "flex-start", minWidth: 90 }]} placeholder="Rating" placeholderTextColor="rgba(255,255,255,0.4)" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+                  <View style={s.row}>
+                    <TextInput style={[s.field, { flex: 1 }]} placeholder="Rating" placeholderTextColor="rgba(255,255,255,0.4)" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+                    <TextInput style={[s.field, { flex: 1 }]} placeholder="Year" placeholderTextColor="rgba(255,255,255,0.4)" value={yearText} onChangeText={setYearText} keyboardType="number-pad" />
+                  </View>
                 </View>
               </View>
 

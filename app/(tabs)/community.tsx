@@ -4,6 +4,7 @@ import { SpilsLogo } from "../../components/SpilsLogo";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   Modal, ScrollView, ActivityIndicator, StyleSheet, Linking, Alert, Share, Image,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -331,21 +332,33 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
     });
   };
 
-  const reportContent = (targetType: "post" | "comment", targetId: string) => {
+  const reportContent = (targetType: "post" | "comment", targetId: string, excerpt?: string) => {
     setConfirm({
       title: targetType === "post" ? "Report Post" : "Report Comment",
       message: "Report this to the SPILS team for review?",
       confirmLabel: "Report",
       onConfirm: async () => {
+        // File the report regardless — the email below is extra visibility
         const { error } = await (supabase as any).from("community_reports").insert([{
           reporter_id: user?.id, target_type: targetType, target_id: targetId,
         }]);
-        if (!error) {
-          setTimeout(() => setConfirm({
-            title: "Report Received",
-            message: "Thank you — our team will review it shortly.",
-            infoOnly: true,
-          }), 350);
+        // Open the user's mail app pre-filled to info@spils.app
+        const subject = encodeURIComponent(`[SPILS] Content Report — ${targetType}`);
+        const body = encodeURIComponent(
+          `I'd like to report the following ${targetType}:\n\n` +
+          (excerpt ? `"${excerpt.slice(0, 300)}"\n\n` : "") +
+          `Reference: ${targetType}/${targetId}\n\nReason (optional): `
+        );
+        try {
+          await Linking.openURL(`mailto:info@spils.app?subject=${subject}&body=${body}`);
+        } catch {
+          if (!error) {
+            setTimeout(() => setConfirm({
+              title: "Report Received",
+              message: "Thank you — our team will review it shortly.",
+              infoOnly: true,
+            }), 350);
+          }
         }
       },
     });
@@ -690,7 +703,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
                             by <Text style={ft.authorLink}>{c.profiles?.username ?? "Anonymous User"}</Text>
                           </Text>
                           {c.user_id && c.user_id !== user?.id ? (
-                            <TouchableOpacity onPress={() => reportContent("comment", c.id)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
+                            <TouchableOpacity onPress={() => reportContent("comment", c.id, c.content)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}>
                               <Text style={ft.modLink}>  ·  Report</Text>
                             </TouchableOpacity>
                           ) : null}
@@ -707,7 +720,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         {item.user_id && item.user_id !== user?.id ? (
                           <>
-                            <TouchableOpacity onPress={() => reportContent("post", item.id)} hitSlop={{ top: 8, bottom: 8 }}>
+                            <TouchableOpacity onPress={() => reportContent("post", item.id, `${item.name}${item.description ? ` — ${item.description}` : ""}`)} hitSlop={{ top: 8, bottom: 8 }}>
                               <Text style={ft.modLink}>Report</Text>
                             </TouchableOpacity>
                             <Text style={ft.modLink}>  |  </Text>
@@ -1547,7 +1560,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
 
         {/* Edit post */}
         <Modal visible={!!editPost} transparent animationType="fade" onRequestClose={() => setEditPost(null)}>
-          <View style={mp.editBackdrop}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={mp.editBackdrop}>
             <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setEditPost(null)} />
             <View style={mp.editCard}>
               <Text style={mp.editTitle}>Edit Post</Text>
@@ -1556,7 +1569,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
                 <TextInput style={[np.field, { flex: 1, marginTop: 0 }]} placeholder="Topic" placeholderTextColor="rgba(255,255,255,0.4)" value={eTopic} onChangeText={setETopic} />
                 <TextInput style={[np.field, { flex: 1.4, marginTop: 0 }]} placeholder="Source Link (optional)" placeholderTextColor="rgba(255,255,255,0.4)" value={eSource} onChangeText={setESource} autoCapitalize="none" />
               </View>
-              <TextInput style={[np.field, np.copyField]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={eDesc} onChangeText={setEDesc} multiline textAlignVertical="top" />
+              <TextInput style={[np.field, { minHeight: 100, marginTop: 12 }]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={eDesc} onChangeText={setEDesc} multiline textAlignVertical="top" />
               <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
                 <TouchableOpacity style={np.postBtn} onPress={() => setEditPost(null)}><Text style={np.postBtnText}>Cancel</Text></TouchableOpacity>
                 <TouchableOpacity style={[np.postBtn, (!eName.trim() || saving) && { opacity: 0.4 }]} onPress={() => saveEditPost()} disabled={!eName.trim() || saving}>
@@ -1569,12 +1582,12 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
                 ) : null}
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Edit comment */}
         <Modal visible={!!editComment} transparent animationType="fade" onRequestClose={() => setEditComment(null)}>
-          <View style={mp.editBackdrop}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={mp.editBackdrop}>
             <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setEditComment(null)} />
             <View style={mp.editCard}>
               <Text style={mp.editTitle}>Edit Comment</Text>
@@ -1584,7 +1597,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
                 <TouchableOpacity style={[np.postBtn, !ecText.trim() && { opacity: 0.4 }]} onPress={saveEditComment} disabled={!ecText.trim()}><Text style={np.postBtnText}>Save</Text></TouchableOpacity>
               </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />

@@ -195,6 +195,7 @@ export default function CollectionNew() {
   const [priceText, setPriceText] = useState("");
   const [sizeText, setSizeText] = useState("");
   const [rating, setRating] = useState("");
+  const [yearText, setYearText] = useState("");
   const [remindsMeOf, setRemindsMeOf] = useState("");
   const [seasons, setSeasons] = useState<string[]>([]);
   const [concentration, setConcentration] = useState("");
@@ -430,6 +431,7 @@ export default function CollectionNew() {
       price: priceText ? parseFloat(priceText) : null,
       size_ml: sizeText ? parseFloat(sizeText) : null,
       rating: rating ? parseFloat(rating) : null,
+      year: yearText ? parseInt(yearText, 10) || null : null,
       reminds_me_of: remindsMeOf.trim() || null,
       temperature: temperatureVal,
       season: seasons.length ? seasons : null,
@@ -506,7 +508,10 @@ export default function CollectionNew() {
                     <TextInput style={[s.field, { flex: 1 }]} placeholder="Price" placeholderTextColor="rgba(255,255,255,0.4)" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" />
                     <TextInput style={[s.field, { flex: 1 }]} placeholder="Size" placeholderTextColor="rgba(255,255,255,0.4)" value={sizeText} onChangeText={setSizeText} keyboardType="decimal-pad" />
                   </View>
-                  <TextInput style={[s.field, { alignSelf: "flex-start", minWidth: 90 }]} placeholder="Rating" placeholderTextColor="rgba(255,255,255,0.4)" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+                  <View style={s.row}>
+                    <TextInput style={[s.field, { flex: 1 }]} placeholder="Rating" placeholderTextColor="rgba(255,255,255,0.4)" value={rating} onChangeText={setRating} keyboardType="decimal-pad" />
+                    <TextInput style={[s.field, { flex: 1 }]} placeholder="Year" placeholderTextColor="rgba(255,255,255,0.4)" value={yearText} onChangeText={setYearText} keyboardType="number-pad" />
+                  </View>
                 </View>
               </View>
 

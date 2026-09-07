@@ -339,6 +339,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
   const [sizeText, setSizeText] = useState("");
   const [priceText, setPriceText] = useState("");
   const [rating, setRating] = useState("");
+  const [yearText, setYearText] = useState("");
   const [remindsMeOf, setRemindsMeOf] = useState("");
   const [temperature, setTemperature] = useState(5);
   const [seasons, setSeasons] = useState<string[]>([]);
@@ -381,6 +382,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
     setSizeText(perfume.size_ml != null ? String(perfume.size_ml) : "");
     setPriceText(perfume.price != null ? String(perfume.price) : "");
     setRating(perfume.rating != null ? String(perfume.rating) : "");
+    setYearText(perfume.year != null ? String(perfume.year) : "");
     setRemindsMeOf(perfume.reminds_me_of ?? "");
     setTemperature(perfume.temperature ?? 5);
     setSeasons(perfume.season ?? []);
@@ -458,6 +460,7 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       size_ml: sizeText ? parseFloat(sizeText) : null,
       price: priceText ? parseFloat(priceText) : null,
       rating: rating ? parseFloat(rating) : null,
+      year: yearText ? parseInt(yearText, 10) || null : null,
       reminds_me_of: remindsMeOf.trim() || null,
       temperature: temperature,
       season: seasons.length ? seasons : null,
@@ -525,7 +528,10 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
                   <F placeholder="Price" value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" style={{ flex: 1, marginBottom: 0 }} />
                   <F placeholder="Size" value={sizeText} onChangeText={setSizeText} keyboardType="decimal-pad" style={{ flex: 1, marginBottom: 0 }} />
                 </View>
-                <F placeholder="Rating" value={rating} onChangeText={setRating} keyboardType="decimal-pad" style={{ alignSelf: "flex-start", minWidth: 90, marginBottom: 0 }} />
+                <View style={[em.row, { marginBottom: 0 }]}>
+                  <F placeholder="Rating" value={rating} onChangeText={setRating} keyboardType="decimal-pad" style={{ flex: 1, marginBottom: 0 }} />
+                  <F placeholder="Year" value={yearText} onChangeText={setYearText} keyboardType="number-pad" style={{ flex: 1, marginBottom: 0 }} />
+                </View>
               </View>
             </View>
 
