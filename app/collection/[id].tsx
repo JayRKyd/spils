@@ -876,6 +876,7 @@ export default function CollectionDetail() {
           <Row label="Price" value={perfume.price != null ? String(perfume.price) : "—"} />
           <Row label="Size" value={perfume.size_ml != null ? `${perfume.size_ml}ml` : "—"} />
           <Row label="Rating" value={perfume.rating != null ? String(perfume.rating) : "—"} />
+          <Row label="Year" value={perfume.year != null ? String(perfume.year) : "—"} />
           <Row label="Category" value={perfume.category ?? "—"} />
           <Row label="Concentration" value={perfume.concentration ?? "—"} />
           <Row label="Gender" value={perfume.gender ?? "—"} />

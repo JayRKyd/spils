@@ -922,6 +922,7 @@ export default function JournalDetail() {
     ${row("Price", entry.price_text)}
     ${row("Size", entry.size)}
     ${row("Rating", entry.rating_10 != null ? `${entry.rating_10} / 10` : null)}
+    ${row("Year", entry.year != null ? String(entry.year) : null)}
     ${row("Category", entry.category)}
     ${row("Concentration", entry.concentration)}
     ${row("Gender", entry.gender)}
@@ -1020,6 +1021,7 @@ export default function JournalDetail() {
           <Row label="Price" value={entry.price_text ?? "—"} />
           <Row label="Size" value={entry.size ?? "—"} />
           <Row label="Rating" value={entry.rating_10 != null ? String(entry.rating_10) : "—"} />
+          <Row label="Year" value={entry.year != null ? String(entry.year) : "—"} />
           <Row label="Category" value={entry.category ?? "—"} />
           <Row label="Concentration" value={entry.concentration ?? "—"} />
           <Row label="Gender" value={entry.gender ?? "—"} />
