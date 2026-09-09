@@ -125,7 +125,7 @@ function NewsTab() {
     <FlatList
       data={news}
       keyExtractor={(i) => i.id}
-      contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 20 }}
+      contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 140 }}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={<Text style={ns.heading}>Industry News</Text>}
       ListEmptyComponent={<Text style={ns.empty}>No news articles yet</Text>}
@@ -565,7 +565,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
           ref={listRef}
           data={filtered}
           keyExtractor={(i) => i.id}
-          contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 20 }}
+          contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
@@ -1172,6 +1172,7 @@ function SupportTab() {
   const [topicPickerVisible, setTopicPickerVisible] = useState(false);
   const [sent, setSent] = useState(false);
   const [faqVisible, setFaqVisible] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const handleSend = () => {
     if (!name.trim() || !email.trim() || !message.trim()) {
@@ -1185,7 +1186,7 @@ function SupportTab() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingBottom: 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       {/* Heading */}
       <Text style={ns.heading}>SPILS Support</Text>
 
@@ -1237,7 +1238,9 @@ function SupportTab() {
         <Text style={ct.socialSep}> — </Text>
         <Text style={ct.socialLink}>DISCORD</Text>
         <Text style={ct.socialSep}> — </Text>
-        <Text style={ct.socialLink}>SPILS.APP</Text>
+        <TouchableOpacity onPress={() => Linking.openURL("https://spils.app")}>
+          <Text style={ct.socialLink}>SPILS.APP</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Topic picker */}
@@ -1280,36 +1283,33 @@ function SupportTab() {
         </TouchableOpacity>
       </Modal>
 
-      {/* FAQ modal */}
+      {/* FAQ modal — Community coral scheme, collapsible drawers */}
       <Modal visible={faqVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setFaqVisible(false)}>
-        <SafeAreaView style={s.modal}>
-          <View style={s.modalHeader}>
-            <View style={{ width: 60 }} />
-            <Text style={s.modalTitle}>FAQs</Text>
-            <TouchableOpacity onPress={() => setFaqVisible(false)}><Text style={s.accentText}>Close</Text></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
-            {[
-              { q: "What is SPILS?", a: "SPILS is A Digital Playground for Fragrance Lovers, bringing Journal, Collection, Lab, Organ and Community together in one place." },
-              { q: "Who is SPILS for?", a: "Fragrance enthusiasts, collectors, aspiring perfumers and creators." },
-              { q: "What is Journal?", a: "Capture SOTD, fragrance experiences, notes, impressions, performance, memories and inspiration." },
-              { q: "What is Collection?", a: "Your personal space to organize and explore your fragrance collection." },
-              { q: "What is Lab?", a: "A workspace for creating, saving and evolving fragrance formulas and experiments." },
-              { q: "Are my Lab formulas private?", a: "Your formulas are private to your account and are not publicly shared unless you choose to share them through a supported SPILS feature." },
-              { q: "What is Organ?", a: "Your perfumery reference library for organizing and exploring fragrance materials and ingredients." },
-              { q: "Can I upload my own materials to Organ?", a: "Yes. You can add materials individually or import multiple materials at once using a .CSV file. Your CSV should include the following column headers: Symbols, Name, Notes, CAS, IFRA, and Stock (g/ml). You can also download the SPILS CSV template directly from the Organ Import window to make setup easy." },
-              { q: "Does SPILS include IFRA information?", a: "Not yet. IFRA-related tools are planned for a future update. Always consult current official IFRA standards and applicable safety guidance." },
-              { q: "What is Community?", a: "A space to explore, discover and connect around fragrance." },
-              { q: "Can I report inappropriate content or block someone?", a: "Yes. Use Report for inappropriate content and Block if you no longer want to interact with another account." },
-              { q: "How do I contact SPILS?", a: "info@spils.app" },
-            ].map(({ q, a }, i) => (
-              <GlassRow key={i} style={[s.card, { marginBottom: 10 }]}>
-                <Text style={[s.cardTitle, { fontSize: 13, marginBottom: 4 }]}>{q}</Text>
-                <Text style={[s.cardDesc, { lineHeight: 19 }]}>{a}</Text>
-              </GlassRow>
-            ))}
-          </ScrollView>
-        </SafeAreaView>
+        <LinearGradient colors={CORAL_GRAD} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View style={ct.faqHeader}>
+              <View style={{ width: 50 }} />
+              <Text style={ct.faqTitle}>FAQs</Text>
+              <TouchableOpacity onPress={() => setFaqVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={ct.faqClose}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 10, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+              {FAQS.map(({ q, a }, i) => {
+                const open = openFaq === i;
+                return (
+                  <TouchableOpacity key={i} style={ct.faqCard} activeOpacity={0.8} onPress={() => setOpenFaq(open ? null : i)}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <Text style={ct.faqQ}>{q}</Text>
+                      <Text style={ct.faqChevron}>{open ? "–" : "+"}</Text>
+                    </View>
+                    {open ? <Text style={ct.faqA}>{a}</Text> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </SafeAreaView>
+        </LinearGradient>
       </Modal>
     </ScrollView>
   );
@@ -1324,6 +1324,13 @@ const ct = StyleSheet.create({
   pillText: { color: "#fff", fontSize: 14 },
   sendPill: { backgroundColor: "#edff8d", borderColor: "#edff8d" },
   sendPillText: { color: "#13131a", fontWeight: "700" },
+  faqHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: 16, paddingBottom: 10 },
+  faqTitle: { color: "#fff", fontSize: 18, fontWeight: "800" },
+  faqClose: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  faqCard: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#fff", borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  faqQ: { color: "#fff", fontSize: 14, fontWeight: "700", flex: 1, marginRight: 12, lineHeight: 19 },
+  faqChevron: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  faqA: { color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 20, marginTop: 10 },
   socialLink: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "600", letterSpacing: 0.5 },
   socialSep: { color: "rgba(255,255,255,0.55)", fontSize: 11 },
   sentCard: { backgroundColor: "#ED3B35", borderRadius: 20, borderWidth: 1.5, borderColor: "#ffffff", padding: 28, alignItems: "center", width: "100%" },
@@ -1335,6 +1342,21 @@ const ct = StyleSheet.create({
 // ─── Main Community Screen ────────────────────────────────────────────────────
 
 const CORAL_GRAD = ["#F2533A", "#F07D40", "#F5C840"] as const;
+
+const FAQS = [
+  { q: "What is SPILS?", a: "SPILS is A Digital Playground for Fragrance Lovers, bringing Journal, Collection, Lab, Organ and Community together in one place." },
+  { q: "Who is SPILS for?", a: "Fragrance enthusiasts, collectors, aspiring perfumers and creators." },
+  { q: "What is Journal?", a: "Capture SOTD, fragrance experiences, notes, impressions, performance, memories and inspiration." },
+  { q: "What is Collection?", a: "Your personal space to organize and explore your fragrance collection." },
+  { q: "What is Lab?", a: "A workspace for creating, saving and evolving fragrance formulas and experiments." },
+  { q: "Are my Lab formulas private?", a: "Your formulas are private to your account and are not publicly shared unless you choose to share them through a supported SPILS feature." },
+  { q: "What is Organ?", a: "Your perfumery reference library for organizing and exploring fragrance materials and ingredients." },
+  { q: "Can I upload my own materials to Organ?", a: "Yes. You can add materials individually or import multiple materials at once using a .CSV file. Your CSV should include the following column headers: Symbols, Name, Notes, CAS, IFRA, and Stock (g/ml). You can also download the SPILS CSV template directly from the Organ Import window to make setup easy." },
+  { q: "Does SPILS include IFRA information?", a: "Not yet. IFRA-related tools are planned for a future update. Always consult current official IFRA standards and applicable safety guidance." },
+  { q: "What is Community?", a: "A space to explore, discover and connect around fragrance." },
+  { q: "Can I report inappropriate content or block someone?", a: "Yes. Use Report for inappropriate content and Block if you no longer want to interact with another account." },
+  { q: "How do I contact SPILS?", a: "info@spils.app" },
+];
 
 const AVAILABLE = [
   { key: "news",    label: "Industry News" },
@@ -1531,7 +1553,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
           <Text style={ls.pageTitle}>Community</Text>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 16, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
           <Text style={mp.heading}>My Posts</Text>
           {loading ? <ActivityIndicator color="#fff" style={{ marginTop: 12 }} /> : (
             posts.length === 0 ? <Text style={mp.empty}>You haven't posted yet.</Text> :
@@ -1680,7 +1702,7 @@ export default function Community() {
   // ── Landing page ──────────────────────────────────────────────────────────
   return (
     <CommunityWrapper showSub>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 42, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 42, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         {/* Available Now */}
         <Text style={ls.groupLabel}>AVAILABLE NOW</Text>
         {AVAILABLE.map((item) => (

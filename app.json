@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme": "aethera",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/SPILS_AppIcon_1024x1024_FINAL.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
