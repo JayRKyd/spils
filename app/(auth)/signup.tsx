@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator,
-  StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform, Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -15,6 +15,7 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const handleSignup = async () => {
     setLoading(true);
@@ -74,7 +75,20 @@ export default function Signup() {
 
         {error ? <Text style={s.error}>{error}</Text> : null}
 
-        <TouchableOpacity style={[s.primaryBtn, loading && { opacity: 0.7 }]} onPress={handleSignup} disabled={loading}>
+        {/* Terms + Privacy agreement (required) */}
+        <View style={s.agreeRow}>
+          <TouchableOpacity style={[s.checkbox, agreed && s.checkboxOn]} onPress={() => setAgreed((v) => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            {agreed ? <Text style={s.checkboxTick}>✓</Text> : null}
+          </TouchableOpacity>
+          <Text style={s.agreeText}>
+            I agree to the{" "}
+            <Text style={s.agreeLink} onPress={() => Linking.openURL("https://www.spils.app/terms-of-service")}>Terms of Service</Text>
+            {" "}and{" "}
+            <Text style={s.agreeLink} onPress={() => Linking.openURL("https://www.spils.app/privacy-policy")}>Privacy Policy</Text>
+          </Text>
+        </View>
+
+        <TouchableOpacity style={[s.primaryBtn, (loading || !agreed) && { opacity: 0.5 }]} onPress={handleSignup} disabled={loading || !agreed}>
           {loading ? <ActivityIndicator color="#13131a" /> : <Text style={s.primaryBtnText}>Sign Up</Text>}
         </TouchableOpacity>
 
@@ -133,6 +147,13 @@ const s = StyleSheet.create({
   eyeIcon: { fontSize: 16 },
 
   error: { color: "#f87171", fontSize: 13, marginBottom: 10 },
+
+  agreeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4, marginBottom: 6 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.35)", alignItems: "center", justifyContent: "center" },
+  checkboxOn: { backgroundColor: "#E5F772", borderColor: "#E5F772" },
+  checkboxTick: { color: "#13131a", fontSize: 14, fontWeight: "700" },
+  agreeText: { color: "rgba(255,255,255,0.6)", fontSize: 13, flex: 1, lineHeight: 19 },
+  agreeLink: { color: "#E5F772", fontWeight: "600" },
 
   primaryBtn: {
     backgroundColor: "#E5F772", borderRadius: 50,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Modal, Alert, StyleSheet, Image,
+  TextInput, ActivityIndicator, Modal, Alert, StyleSheet, Image, Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -312,8 +312,19 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        {/* Legal */}
+        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 44 }}>
+          <TouchableOpacity onPress={() => Linking.openURL("https://www.spils.app/terms-of-service")} hitSlop={{ top: 8, bottom: 8 }}>
+            <Text style={s.legalLink}>Terms of Service</Text>
+          </TouchableOpacity>
+          <Text style={s.legalSep}>  ·  </Text>
+          <TouchableOpacity onPress={() => Linking.openURL("https://www.spils.app/privacy-policy")} hitSlop={{ top: 8, bottom: 8 }}>
+            <Text style={s.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Delete Account (App Review requirement) */}
-        <TouchableOpacity style={{ alignSelf: "center", marginTop: 44, padding: 8 }} onPress={handleDeleteAccount} disabled={deleting}>
+        <TouchableOpacity style={{ alignSelf: "center", marginTop: 18, padding: 8 }} onPress={handleDeleteAccount} disabled={deleting}>
           {deleting
             ? <ActivityIndicator color="#ff5252" size="small" />
             : <Text style={s.deleteAccount}>Delete Account</Text>}
@@ -344,6 +355,8 @@ const s = StyleSheet.create({
   pillBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   dimmed: { opacity: 0.4 },
   deleteAccount: { color: "#ff5252", fontSize: 13, fontWeight: "600" },
+  legalLink: { color: "rgba(255,255,255,0.65)", fontSize: 12, fontWeight: "600" },
+  legalSep: { color: "rgba(255,255,255,0.35)", fontSize: 12 },
   avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(167,139,250,0.25)", borderWidth: 2, borderColor: "rgba(167,139,250,0.5)", alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarLargeText: { color: "#fff", fontSize: 28, fontWeight: "700" },
   avatarEditBadge: { position: "absolute", bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: "#a78bfa", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#000000" },
