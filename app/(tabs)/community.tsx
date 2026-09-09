@@ -448,7 +448,17 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
       content: commentText.trim(),
       user_id: user?.id,
     }]).select("id").single();
-    if (error) { console.error("postComment error:", error.message); setCommentPosting(false); return; }
+    if (error) {
+      console.error("postComment error:", error.message);
+      setCommentPosting(false);
+      Alert.alert(
+        "Comment failed",
+        error.code === "42501"
+          ? "Your account is currently suspended from posting in the Community."
+          : "Could not post your comment. Please try again."
+      );
+      return;
+    }
     if (mod.verdict === "flag" && created?.id) {
       await (supabase as any).from("community_reports").insert([{
         reporter_id: user?.id, target_type: "comment", target_id: created.id, reason: `auto-flag: ${mod.term}`,
@@ -533,7 +543,12 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
     if (error) {
       console.error("handleCreate error:", error.message);
       // Keep the modal open so the user's post isn't silently lost
-      Alert.alert("Post failed", error.message ?? "Could not save your post. Please try again.");
+      Alert.alert(
+        "Post failed",
+        error.code === "42501"
+          ? "Your account is currently suspended from posting in the Community."
+          : (error.message ?? "Could not save your post. Please try again.")
+      );
       return;
     }
     if (mod.verdict === "flag" && targetId) {
