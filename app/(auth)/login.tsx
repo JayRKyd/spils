@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { AppleLogo } from "@/components/AppleLogo";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -70,7 +71,7 @@ export default function Login() {
             <Text style={s.socialG}>G</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.socialBtn} onPress={() => Alert.alert("Apple", "Apple sign-in coming soon.")}>
-            <Text style={s.socialIcon}></Text>
+            <AppleLogo size={22} color="#13131a" />
           </TouchableOpacity>
           <TouchableOpacity style={[s.socialBtn, s.socialFB]} onPress={() => Alert.alert("Facebook", "Facebook sign-in coming soon.")}>
             <Text style={[s.socialIcon, { color: "#fff" }]}>f</Text>
