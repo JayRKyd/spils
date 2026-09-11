@@ -1,13 +1,12 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator,
-  StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { SpilsLogo } from "@/components/SpilsLogo";
-import { AppleLogo } from "@/components/AppleLogo";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -60,25 +59,7 @@ export default function Login() {
           {loading ? <ActivityIndicator color="#13131a" /> : <Text style={s.primaryBtnText}>Sign In</Text>}
         </TouchableOpacity>
 
-        <View style={s.divider}>
-          <View style={s.dividerLine} />
-          <Text style={s.dividerText}>Or</Text>
-          <View style={s.dividerLine} />
-        </View>
-
-        <View style={s.socialRow}>
-          <TouchableOpacity style={s.socialBtn} onPress={() => Alert.alert("Google", "Google sign-in coming soon.")}>
-            <Text style={s.socialG}>G</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.socialBtn} onPress={() => Alert.alert("Apple", "Apple sign-in coming soon.")}>
-            <AppleLogo size={22} color="#13131a" />
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.socialBtn, s.socialFB]} onPress={() => Alert.alert("Facebook", "Facebook sign-in coming soon.")}>
-            <Text style={[s.socialIcon, { color: "#fff" }]}>f</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={s.footer} onPress={() => router.push("/(auth)/signup")}>
+        <TouchableOpacity style={[s.footer, { marginTop: 28 }]} onPress={() => router.push("/(auth)/signup")}>
           <Text style={s.footerText}>
             You don't have an account?{"  "}
             <Text style={s.footerLink}>Sign Up</Text>
@@ -118,21 +99,6 @@ const s = StyleSheet.create({
     paddingVertical: 17, alignItems: "center", marginTop: 8, marginBottom: 4,
   },
   primaryBtnText: { color: "#13131a", fontWeight: "700", fontSize: 16 },
-
-  divider: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 22 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
-  dividerText: { color: "rgba(255,255,255,0.4)", fontSize: 13 },
-
-  socialRow: { flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 36 },
-  socialBtn: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: "#fff",
-    alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
-  },
-  socialFB: { backgroundColor: "#1877F2" },
-  socialG: { fontSize: 20, fontWeight: "700", color: "#4285F4" },
-  socialIcon: { fontSize: 20, fontWeight: "700", color: "#13131a" },
 
   footer: { alignItems: "center" },
   footerText: { color: "rgba(255,255,255,0.45)", fontSize: 13 },
