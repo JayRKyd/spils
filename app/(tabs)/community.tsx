@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { router, useFocusEffect } from "expo-router";
@@ -782,7 +783,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
               <Text style={ls.pageTitle}>Community</Text>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView contentContainerStyle={{ paddingHorizontal: 30, paddingTop: 12, paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} enableOnAndroid extraScrollHeight={140} keyboardOpeningTime={0} enableResetScrollToCoords={false}>
               <Text style={np.title}>{editingId ? "Edit Post" : "New Post"}</Text>
 
               <TextInput style={np.field} placeholder="Title" placeholderTextColor="rgba(255,255,255,0.4)" value={newName} onChangeText={setNewName} />
@@ -816,7 +817,7 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
                     : <Text style={np.postBtnText}>{editingId ? "Save" : "Post"}</Text>}
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            </KeyboardAwareScrollView>
           </SafeAreaView>
         </LinearGradient>
       </Modal>
