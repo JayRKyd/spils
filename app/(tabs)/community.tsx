@@ -656,11 +656,18 @@ function ForumTab({ categoryFilter, title = "General Chat", myPostsOnly, setMyPo
                   ) : null
                 )}
 
-                {/* 6. Tab (ALL CAPS) + 7. More (collapsed) / Comment (expanded) */}
+                {/* 6. Tab (ALL CAPS) + Source (expanded) + 7. More (collapsed) / Comment (expanded) */}
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
-                  {item.category ? (
-                    <View style={ns.chip}><Text style={ns.chipText}>{item.category.toUpperCase()}</Text></View>
-                  ) : <View />}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    {item.category ? (
+                      <View style={ns.chip}><Text style={ns.chipText}>{item.category.toUpperCase()}</Text></View>
+                    ) : null}
+                    {expanded && item.source_url ? (
+                      <TouchableOpacity style={ns.actionBtn} onPress={() => Linking.openURL(item.source_url!)} activeOpacity={0.7}>
+                        <Text style={ns.actionBtnText}>SOURCE</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                   {expanded ? (
                     <TouchableOpacity
                       style={[ft.commentBtn, commentOpen && ft.commentBtnActive]}
