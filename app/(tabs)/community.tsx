@@ -1361,11 +1361,11 @@ const CORAL_GRAD = ["#F2533A", "#F07D40", "#F5C840"] as const;
 const FAQS = [
   { q: "What is SPILS?", a: "SPILS is A Digital Playground for Fragrance Lovers, bringing Journal, Collection, Lab, Organ and Community together in one place." },
   { q: "Who is SPILS for?", a: "Fragrance enthusiasts, collectors, aspiring perfumers and creators." },
+  { q: "Is SPILS free?", a: "Yes. SPILS is launching completely open and free to explore for approximately the first 30 days. After this introductory period, you can stay on the Free plan or upgrade to SPILS Premium for expanded access. There is no automatic subscription or charge. Premium pricing will be announced before it goes live, and Community will remain free." },
+  { q: "What happens to everything I create during the introductory period?", a: "It stays with you. Anything you create during the introductory period remains in your account and accessible, even if you choose to stay on the Free plan. Future Free limits may affect how much new content you can create, but we won't delete or lock away what you've already made." },
   { q: "What is Journal?", a: "Capture SOTD, fragrance experiences, notes, impressions, performance, memories and inspiration." },
-  { q: "What is Collection?", a: "Your personal space to organize and explore your fragrance collection." },
   { q: "What is Lab?", a: "A workspace for creating, saving and evolving fragrance formulas and experiments." },
   { q: "Are my Lab formulas private?", a: "Your formulas are private to your account and are not publicly shared unless you choose to share them through a supported SPILS feature." },
-  { q: "What is Organ?", a: "Your perfumery reference library for organizing and exploring fragrance materials and ingredients." },
   { q: "Can I upload my own materials to Organ?", a: "Yes. You can add materials individually or import multiple materials at once using a .CSV file. Your CSV should include the following column headers: Symbols, Name, Notes, CAS, IFRA, and Stock (g/ml). You can also download the SPILS CSV template directly from the Organ Import window to make setup easy." },
   { q: "Does SPILS include IFRA information?", a: "Not yet. IFRA-related tools are planned for a future update. Always consult current official IFRA standards and applicable safety guidance." },
   { q: "What is Community?", a: "A space to explore, discover and connect around fragrance." },
