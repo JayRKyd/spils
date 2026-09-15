@@ -18,7 +18,9 @@
       "bundleIdentifier": "app.spils.mobile",
       "buildNumber": "2",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "SPILS uses your camera to photograph perfume bottles. For example, you can snap a picture of a bottle's label to automatically fill in its name, brand, and notes, or attach the photo to a journal entry, collection bottle, or Lab mood board.",
+        "NSPhotoLibraryUsageDescription": "SPILS accesses your photo library so you can pick existing photos of your perfume bottles. For example, you can select a bottle photo to display on a collection or journal entry, or add images to a Lab formula mood board."
       }
     },
     "android": {
@@ -34,7 +36,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "SPILS uses your camera to photograph perfume bottles. For example, you can snap a picture of a bottle's label to automatically fill in its name, brand, and notes, or attach the photo to a journal entry, collection bottle, or Lab mood board.",
+          "photosPermission": "SPILS accesses your photo library so you can pick existing photos of your perfume bottles. For example, you can select a bottle photo to display on a collection or journal entry, or add images to a Lab formula mood board.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "router": {},
