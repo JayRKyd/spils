@@ -2,7 +2,7 @@
   "expo": {
     "name": "Spils",
     "slug": "aethera-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "spils",
     "orientation": "portrait",
     "icon": "./assets/SPILS_AppIcon_1024x1024_FINAL.png",
