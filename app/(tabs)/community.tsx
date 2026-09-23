@@ -223,6 +223,7 @@ function ThreadDetailModal({ thread, visible, onClose }: { thread: ForumThread |
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={s.modal}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={s.modalHeader}>
           <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>← Back</Text></TouchableOpacity>
           <Text style={[s.modalTitle, { flex: 1, marginHorizontal: 12 }]} numberOfLines={1}>{thread.name}</Text>
@@ -257,6 +258,7 @@ function ThreadDetailModal({ thread, visible, onClose }: { thread: ForumThread |
             {posting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.postBtnText}>Post</Text>}
           </TouchableOpacity>
         </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
@@ -1609,12 +1611,16 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
             <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setEditPost(null)} />
             <View style={mp.editCard}>
               <Text style={mp.editTitle}>Edit Post</Text>
-              <TextInput style={np.field} placeholder="Title" placeholderTextColor="rgba(255,255,255,0.4)" value={eName} onChangeText={setEName} />
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
-                <TextInput style={[np.field, { flex: 1, marginTop: 0 }]} placeholder="Topic" placeholderTextColor="rgba(255,255,255,0.4)" value={eTopic} onChangeText={setETopic} />
-                <TextInput style={[np.field, { flex: 1.4, marginTop: 0 }]} placeholder="Source Link (optional)" placeholderTextColor="rgba(255,255,255,0.4)" value={eSource} onChangeText={setESource} autoCapitalize="none" />
-              </View>
-              <TextInput style={[np.field, { minHeight: 100, marginTop: 12 }]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={eDesc} onChangeText={setEDesc} multiline textAlignVertical="top" />
+              {/* Fields scroll within the card; buttons stay pinned below so
+                  Save/Cancel remain reachable with the keyboard up. */}
+              <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <TextInput style={np.field} placeholder="Title" placeholderTextColor="rgba(255,255,255,0.4)" value={eName} onChangeText={setEName} />
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                  <TextInput style={[np.field, { flex: 1, marginTop: 0 }]} placeholder="Topic" placeholderTextColor="rgba(255,255,255,0.4)" value={eTopic} onChangeText={setETopic} />
+                  <TextInput style={[np.field, { flex: 1.4, marginTop: 0 }]} placeholder="Source Link (optional)" placeholderTextColor="rgba(255,255,255,0.4)" value={eSource} onChangeText={setESource} autoCapitalize="none" />
+                </View>
+                <TextInput style={[np.field, { minHeight: 100, maxHeight: 160, marginTop: 12 }]} placeholder="Copy" placeholderTextColor="rgba(255,255,255,0.4)" value={eDesc} onChangeText={setEDesc} multiline textAlignVertical="top" scrollEnabled />
+              </ScrollView>
               <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
                 <TouchableOpacity style={np.postBtn} onPress={() => setEditPost(null)}><Text style={np.postBtnText}>Cancel</Text></TouchableOpacity>
                 <TouchableOpacity style={[np.postBtn, (!eName.trim() || saving) && { opacity: 0.4 }]} onPress={() => saveEditPost()} disabled={!eName.trim() || saving}>
@@ -1636,7 +1642,7 @@ function MyPostsScreen({ onBack }: { onBack: () => void }) {
             <TouchableOpacity style={StyleSheet.absoluteFill as any} activeOpacity={1} onPress={() => setEditComment(null)} />
             <View style={mp.editCard}>
               <Text style={mp.editTitle}>Edit Comment</Text>
-              <TextInput style={[np.field, { minHeight: 100, marginTop: 4 }]} placeholder="Comment" placeholderTextColor="rgba(255,255,255,0.4)" value={ecText} onChangeText={setEcText} multiline textAlignVertical="top" />
+              <TextInput style={[np.field, { minHeight: 100, maxHeight: 180, marginTop: 4 }]} placeholder="Comment" placeholderTextColor="rgba(255,255,255,0.4)" value={ecText} onChangeText={setEcText} multiline textAlignVertical="top" scrollEnabled />
               <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
                 <TouchableOpacity style={np.postBtn} onPress={() => setEditComment(null)}><Text style={np.postBtnText}>Cancel</Text></TouchableOpacity>
                 <TouchableOpacity style={[np.postBtn, !ecText.trim() && { opacity: 0.4 }]} onPress={saveEditComment} disabled={!ecText.trim()}><Text style={np.postBtnText}>Save</Text></TouchableOpacity>
@@ -1661,7 +1667,7 @@ const mp = StyleSheet.create({
   draftTag: { borderWidth: 1, borderColor: "#edff8d", borderRadius: 100, paddingHorizontal: 7, paddingVertical: 1 },
   draftTagText: { color: "#edff8d", fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
   editBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 24 },
-  editCard: { backgroundColor: "#141414", borderRadius: 16, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", padding: 20 },
+  editCard: { backgroundColor: "#141414", borderRadius: 16, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.4)", padding: 20, maxHeight: "85%" },
   editTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 8 },
 });
 
