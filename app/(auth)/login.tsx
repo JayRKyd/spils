@@ -27,7 +27,7 @@ export default function Login() {
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView style={s.inner} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" /></View>
+        <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" plain /></View>
 
         <TextInput
           style={s.input}

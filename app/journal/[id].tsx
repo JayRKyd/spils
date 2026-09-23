@@ -511,7 +511,8 @@ function EditModal({ visible, entry, onClose, onSaved }: {
         <SafeAreaView style={{ flex: 1 }}>
           {/* Top nav */}
           <View style={em.topNav}>
-            <SpilsLogo height={22} color="#edff8d" />
+            {/* plain: navigating under this open edit modal would freeze iOS */}
+            <SpilsLogo height={22} color="#edff8d" plain />
             <TouchableOpacity style={[em.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={onClose}>
               <ProfileIcon size={34} />
             </TouchableOpacity>

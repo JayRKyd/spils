@@ -492,7 +492,8 @@ function EditModal({ visible, perfume, onClose, onSaved }: {
       <LinearGradient colors={["#000000", "#000000", "#00AEEF"]} locations={[0, 0.82, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={em.topNav}>
-            <SpilsLogo height={22} color="#edff8d" />
+            {/* plain: navigating under this open edit modal would freeze iOS */}
+            <SpilsLogo height={22} color="#edff8d" plain />
             <TouchableOpacity style={[em.profileBtn, { backgroundColor: "transparent", borderWidth: 0 }]} onPress={onClose}>
               <ProfileIcon size={34} />
             </TouchableOpacity>

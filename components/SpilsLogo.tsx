@@ -1,8 +1,15 @@
+import { TouchableOpacity } from "react-native";
+import { router } from "expo-router";
 import Svg, { Path, Polygon, Rect } from "react-native-svg";
 
-export function SpilsLogo({ height = 24, color = "#1c1c1c" }: { height?: number; color?: string }) {
+/**
+ * SPILS wordmark. Tapping it returns to the Dashboard from anywhere.
+ * Pass `plain` to render it non-tappable (auth screens, inside edit modals —
+ * navigating under an open native modal freezes iOS).
+ */
+export function SpilsLogo({ height = 24, color = "#1c1c1c", plain = false }: { height?: number; color?: string; plain?: boolean }) {
   const width = height * (492.74 / 147.86);
-  return (
+  const mark = (
     <Svg viewBox="0 0 492.74 147.86" width={width} height={height}>
       <Rect width={492.74} height={147.86} fill="none" />
       <Path
@@ -30,5 +37,16 @@ export function SpilsLogo({ height = 24, color = "#1c1c1c" }: { height?: number;
         fill={color}
       />
     </Svg>
+  );
+  if (plain) return mark;
+  return (
+    <TouchableOpacity
+      onPress={() => router.navigate("/(tabs)" as any)}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      accessibilityRole="button"
+      accessibilityLabel="Go to Dashboard"
+    >
+      {mark}
+    </TouchableOpacity>
   );
 }

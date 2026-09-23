@@ -33,7 +33,7 @@ export default function Signup() {
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.inner}>
-          <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" /></View>
+          <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" plain /></View>
           <Text style={s.successTitle}>Check your email</Text>
           <Text style={s.successSub}>We sent a confirmation link to {email}</Text>
           <TouchableOpacity style={s.primaryBtn} onPress={() => router.replace("/(auth)/login")}>
@@ -47,7 +47,7 @@ export default function Signup() {
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView style={s.inner} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" /></View>
+        <View style={s.logoWrap}><SpilsLogo height={34} color="#E5F772" plain /></View>
 
         <TextInput
           style={s.input}
