@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.spils.mobile",
+      "usesAppleSignIn": true,
       "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -44,7 +45,9 @@
           "photosPermission": "SPILS accesses your photo library so you can pick existing photos of your perfume bottles. For example, you can select a bottle photo to display on a collection or journal entry, or add images to a Lab formula mood board.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "extra": {
       "router": {},

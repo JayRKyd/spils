@@ -6,16 +6,32 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { signInWithApple, signInWithGoogle } from "@/lib/socialAuth";
 import { SpilsLogo } from "@/components/SpilsLogo";
+import { AppleLogo } from "@/components/AppleLogo";
+import { GoogleLogo } from "@/components/GoogleLogo";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [agreed, setAgreed] = useState(false);
+
+  const handleSocial = async (provider: "apple" | "google") => {
+    setError("");
+    setSocialLoading(true);
+    try {
+      const session = provider === "apple" ? await signInWithApple() : await signInWithGoogle();
+      if (session) router.replace("/(tabs)" as any);
+    } catch (e: any) {
+      setError(e?.message ?? "Sign-up failed. Please try again.");
+    }
+    setSocialLoading(false);
+  };
 
   const handleSignup = async () => {
     setLoading(true);
@@ -92,6 +108,22 @@ export default function Signup() {
           {loading ? <ActivityIndicator color="#13131a" /> : <Text style={s.primaryBtnText}>Sign Up</Text>}
         </TouchableOpacity>
 
+        <View style={s.orRow}>
+          <View style={s.orLine} />
+          <Text style={s.orText}>Or</Text>
+          <View style={s.orLine} />
+        </View>
+
+        {/* Same Terms/Privacy gate as email sign-up */}
+        <View style={s.socialRow}>
+          <TouchableOpacity style={[s.socialBtn, (socialLoading || !agreed) && { opacity: 0.5 }]} onPress={() => handleSocial("apple")} disabled={socialLoading || !agreed}>
+            <AppleLogo size={24} color="#13131a" />
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.socialBtn, (socialLoading || !agreed) && { opacity: 0.5 }]} onPress={() => handleSocial("google")} disabled={socialLoading || !agreed}>
+            <GoogleLogo size={22} />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={[s.footer, { marginTop: 28 }]} onPress={() => router.back()}>
           <Text style={s.footerText}>
             Already have an account?{"  "}
@@ -142,6 +174,12 @@ const s = StyleSheet.create({
     paddingVertical: 17, alignItems: "center", marginTop: 8, marginBottom: 4,
   },
   primaryBtnText: { color: "#13131a", fontWeight: "700", fontSize: 16 },
+
+  orRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 22 },
+  orLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.15)" },
+  orText: { color: "rgba(255,255,255,0.45)", fontSize: 13 },
+  socialRow: { flexDirection: "row", justifyContent: "center", gap: 18, marginTop: 18 },
+  socialBtn: { width: 54, height: 54, borderRadius: 27, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
 
   footer: { alignItems: "center" },
   footerText: { color: "rgba(255,255,255,0.45)", fontSize: 13 },
