@@ -5,7 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 // Must be listed under Redirect URLs in Supabase Auth -> URL Configuration.
-const REDIRECT_TO = "aethera://auth-callback";
+const REDIRECT_TO = "spils://auth-callback";
 
 /**
  * Native Sign in with Apple -> Supabase session.
