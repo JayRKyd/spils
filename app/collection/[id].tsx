@@ -795,7 +795,8 @@ export default function CollectionDetail() {
     setConfirm({
       title: "Delete Perfume",
       message: `Remove "${perfume?.name}"? This cannot be undone.`,
-      onConfirm: async () => { await supabase.from("perfumes").delete().eq("id", id); router.back(); },
+      // let the confirm modal finish dismissing before unmounting the screen
+      onConfirm: async () => { await supabase.from("perfumes").delete().eq("id", id); setTimeout(() => router.back(), 350); },
     });
   };
 
@@ -815,7 +816,6 @@ export default function CollectionDetail() {
 
   const handleAddToWishlist = async () => {
     if (!perfume) return;
-    setMoreVisible(false);
     setPerfume((prev) => prev ? { ...prev, status: "Wishlist" } : prev);
     await supabase.from("perfumes").update({ status: "Wishlist" }).eq("id", id);
     Alert.alert("Added to Wishlist", `${perfume.name} was moved to your wishlist.`);
@@ -985,16 +985,19 @@ export default function CollectionDetail() {
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setMoreVisible(false)} />
           <View style={ms.sheet}>
             <View style={ms.handle} />
-            <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={handleShare}>
+            {/* Close this sheet fully before presenting the next native view
+                (share sheet / confirm modal) — overlapping iOS modal
+                transitions freeze the app. */}
+            <TouchableOpacity style={[ms.btn, ms.btnBlue]} onPress={() => { setMoreVisible(false); setTimeout(handleShare, 400); }}>
               <Text style={[ms.btnText, ms.btnTextLight]}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={ms.btn} onPress={handleAddToWishlist}>
+            <TouchableOpacity style={ms.btn} onPress={() => { setMoreVisible(false); setTimeout(handleAddToWishlist, 400); }}>
               <Text style={ms.btnText}>Add to Wishlist</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[ms.btn, ms.btnGrey]} onPress={() => { setMoreVisible(false); Alert.alert("Print", "Print coming soon."); }}>
               <Text style={[ms.btnText, { color: "rgba(19,19,26,0.4)" }]}>Print</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[ms.btn, ms.btnMagenta]} onPress={() => { setMoreVisible(false); handleDelete(); }}>
+            <TouchableOpacity style={[ms.btn, ms.btnMagenta]} onPress={() => { setMoreVisible(false); setTimeout(handleDelete, 400); }}>
               <Text style={[ms.btnText, ms.btnTextLight]}>Delete</Text>
             </TouchableOpacity>
           </View>

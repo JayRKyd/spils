@@ -478,18 +478,24 @@ export default function Journal() {
     fetchSotdEntries();
   };
 
+  // iOS can't handle two native modals transitioning at once — close the edit
+  // sheet fully before presenting the delete confirm, and keep the target in a
+  // ref since sotdSelected is cleared by then.
+  const sotdPendingDelete = useRef<ScentOfDayEntry | null>(null);
+
   const handleSotdDelete = () => {
     if (!sotdSelected) return;
-    setSotdDeleteConfirm(true);
+    sotdPendingDelete.current = sotdSelected;
+    setSotdSelected(null);
+    setTimeout(() => setSotdDeleteConfirm(true), 400);
   };
 
   const confirmSotdDelete = async () => {
-    if (!sotdSelected) return;
+    const target = sotdPendingDelete.current;
+    if (!target) return;
+    sotdPendingDelete.current = null;
     setSotdDeleteConfirm(false);
-    setSotdActionSaving(true);
-    await (supabase as any).from("scent_of_day").delete().eq("id", sotdSelected.id);
-    setSotdActionSaving(false);
-    setSotdSelected(null);
+    await (supabase as any).from("scent_of_day").delete().eq("id", target.id);
     fetchSotdEntries();
   };
 
