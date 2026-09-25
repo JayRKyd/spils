@@ -171,7 +171,7 @@ function FilterModal({
 
 const fm = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: "flex-end" },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, overflow: "hidden", borderWidth: 0.5, borderColor: "rgba(255,255,255,0.9)", borderBottomWidth: 0 },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, overflow: "hidden" },
   confirmBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 36 },
   confirmCard: { backgroundColor: "#141414", borderRadius: 20, padding: 24 },
   confirmTitle: { color: "#fff", fontSize: 17, fontWeight: "700", marginBottom: 8 },
